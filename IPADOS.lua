@@ -1,4 +1,4 @@
--- 3D iPad v4 | Delta compatible (client-side LocalScript)
+-- 3D iPad v4b | Delta compatible (client-side LocalScript)
 -- Everything is a real Part in Workspace. The screen is a Part with a SurfaceGui,
 -- so when the iPad tilts, the screen tilts with it.
 --
@@ -12,7 +12,7 @@
 --   * App Store: tap GET to download (only works while Wi-Fi is connected)
 --   * Swipe up from the very bottom of the screen to leave an app
 --   * Drag left/right on the silver frame to tilt, double-tap the frame to straighten
---   * Battery drains while the iPad is open. At 0% it turns off.
+--   * Battery is fixed at 100% (no draining)
 
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
@@ -29,7 +29,6 @@ local PUSH = 0.08              -- tap push-back force (studs)
 local MAX_TILT = math.rad(35)  -- max sideways tilt
 local TILT_SPEED = 0.3         -- degrees of tilt per pixel dragged
 local TILT_MODE = "side"       -- "side" = turns left/right, "roll" = leans like a tilted picture
-local DRAIN_MINUTES = 15       -- minutes from 100% to 0% (only while the iPad is open)
 local WIFI_NAME = "baseplate_5G"
 local VOL_STEP = 0.0625        -- volume change per button press
 local RELOCK_ON_CLOSE = true   -- closing the iPad locks it again
@@ -1170,7 +1169,7 @@ task.spawn(function()
 	end
 end)
 
--- ===== STATUS BAR (wifi + battery) =====
+-- ===== STATUS BAR (wifi + battery, battery stays at 100%) =====
 local status = ui("Frame", {
 	Name = "StatusBar",
 	Size = UDim2.fromOffset(CW, 56),
@@ -1218,7 +1217,7 @@ local battNub = ui("Frame", {
 }, status)
 corner(battNub, UDim.new(0, 2))
 
--- ===== OVERLAYS: volume HUD, brightness, eye protection, dead screen =====
+-- ===== OVERLAYS: volume HUD, brightness, eye protection =====
 local volHud = ui("Frame", {
 	Name = "VolumeHud",
 	Size = UDim2.fromOffset(300, 64),
@@ -1278,48 +1277,6 @@ local warm = ui("Frame", {
 	BorderSizePixel = 0,
 	ZIndex = 91,
 }, sg)
-
-local deadFrame = ui("Frame", {
-	Name = "Dead",
-	Size = UDim2.fromScale(1, 1),
-	BackgroundColor3 = BLACK,
-	BackgroundTransparency = 1,
-	BorderSizePixel = 0,
-	Visible = false,
-	ZIndex = 200,
-}, sg)
-local deadIcon = ui("Frame", {
-	Size = UDim2.fromOffset(160, 70),
-	Position = UDim2.fromOffset(CW / 2 - 80, CH / 2 - 35),
-	BackgroundTransparency = 1,
-	BorderSizePixel = 0,
-	Visible = false,
-	ZIndex = 201,
-}, deadFrame)
-local deadBody = ui("Frame", {
-	Size = UDim2.fromOffset(140, 70),
-	BackgroundTransparency = 1,
-	BorderSizePixel = 0,
-	ZIndex = 201,
-}, deadIcon)
-corner(deadBody, UDim.new(0, 18))
-ui("UIStroke", { Color = RED, Thickness = 5 }, deadBody)
-local deadNub = ui("Frame", {
-	Size = UDim2.fromOffset(8, 24),
-	Position = UDim2.fromOffset(146, 23),
-	BackgroundColor3 = RED,
-	BorderSizePixel = 0,
-	ZIndex = 201,
-}, deadIcon)
-corner(deadNub, UDim.new(0, 4))
-local deadSliver = ui("Frame", {
-	Size = UDim2.fromOffset(18, 50),
-	Position = UDim2.fromOffset(10, 10),
-	BackgroundColor3 = RED,
-	BorderSizePixel = 0,
-	ZIndex = 202,
-}, deadIcon)
-corner(deadSliver, UDim.new(0, 8))
 
 -- ===== CONTROL CENTER =====
 local PANEL_W, PANEL_H, PANEL_Y = 570, 450, 78
@@ -1525,45 +1482,6 @@ local function freezeCamera()
 		cam.CameraType = Enum.CameraType.Scriptable
 	end
 end
-
--- ===== BATTERY =====
-local batt = 100
-local DRAIN_SECONDS = DRAIN_MINUTES * 60
-
-local function updateBattery()
-	pctLabel.Text = math.ceil(batt) .. "%"
-	battFill.Size = UDim2.fromOffset(math.floor(44 * batt / 100), 18)
-	battFill.BackgroundColor3 = batt <= 20 and RED or WHITE
-end
-
-local function powerOff()
-	dead = true
-	ccTarget = 0
-	ccDragging = false
-	if mode then
-		mode = nil
-		restoreCamera()
-	end
-	deadIcon.Visible = false
-	deadFrame.Visible = true
-	TweenService:Create(deadFrame, TweenInfo.new(0.8), { BackgroundTransparency = 0 }):Play()
-	task.delay(0.9, function()
-		deadIcon.Visible = true
-	end)
-end
-
-task.spawn(function()
-	while alive and not dead do
-		task.wait(1)
-		if isOpen then
-			batt = math.max(0, batt - 100 / DRAIN_SECONDS)
-			updateBattery()
-			if batt <= 0 then
-				powerOff()
-			end
-		end
-	end
-end)
 
 -- ===== WI-FI LOGIC =====
 refreshWifi = function()
@@ -1952,7 +1870,7 @@ conns[#conns + 1] = UIS.InputBegan:Connect(function(input)
 	local onScreen = math.abs(lp.X) <= SW / 2 and math.abs(lp.Y) <= SH / 2
 	local inFrame = math.abs(lp.X) <= BW / 2 + TILT_MARGIN and math.abs(lp.Y) <= BH / 2 + TILT_MARGIN
 	if not inFrame then return end
-	if dead and onScreen then return end -- iPad is off
+	if dead and onScreen then return end
 
 	dragType = ut
 	freezeCamera()
