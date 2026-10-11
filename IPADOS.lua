@@ -1,18 +1,6 @@
 -- 3D iPad v4b | Delta compatible (client-side LocalScript)
 -- Everything is a real Part in Workspace. The screen is a Part with a SurfaceGui,
 -- so when the iPad tilts, the screen tilts with it.
---
--- iPad is an ITEM: it shows up in your inventory (hotbar) as "iPad".
---   * Tap the item = the iPad appears on your screen
---   * Tap the TOP button on the iPad (the part on the top edge) = closes the iPad (back to inventory)
---   * Tap the SIDE buttons (right edge) = volume up / down (hold to repeat)
---   * Swipe up on the screen to unlock
---   * Swipe DOWN starting on the battery / wifi icons = Control Center
---   * Wi-Fi is OFF by default: Control Center > Wi-Fi > turn on > tap baseplate_5G
---   * App Store: tap GET to download (only works while Wi-Fi is connected)
---   * Swipe up from the very bottom of the screen to leave an app
---   * Drag left/right on the silver frame to tilt, double-tap the frame to straighten
---   * Battery is fixed at 100% (no draining)
 
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
@@ -23,17 +11,17 @@ local TweenService = game:GetService("TweenService")
 local player = Players.LocalPlayer
 
 -- ===== SETTINGS =====
-local K = 1.0                  -- overall iPad size (bigger = larger)
-local DIST = 2.4               -- distance from camera
-local PUSH = 0.08              -- tap push-back force (studs)
-local MAX_TILT = math.rad(35)  -- max sideways tilt
-local TILT_SPEED = 0.3         -- degrees of tilt per pixel dragged
-local TILT_MODE = "side"       -- "side" = turns left/right, "roll" = leans like a tilted picture
+local K = 1.0
+local DIST = 2.4
+local PUSH = 0.08
+local MAX_TILT = math.rad(35)
+local TILT_SPEED = 0.3
+local TILT_MODE = "side"
 local WIFI_NAME = "baseplate_5G"
-local VOL_STEP = 0.0625        -- volume change per button press
-local RELOCK_ON_CLOSE = true   -- closing the iPad locks it again
+local VOL_STEP = 0.0625
+local RELOCK_ON_CLOSE = true
 
--- ===== CLEAN UP OLD COPY (if you run the script again) =====
+-- ===== CLEAN UP OLD COPY =====
 do
 	local old = Workspace:FindFirstChild("IPad3D_Swipe")
 	if old then old:Destroy() end
@@ -52,8 +40,8 @@ end
 local BW, BH, BT, R = 2.5 * K, 3.3 * K, 0.14 * K, 0.2 * K
 local SW, SH = 2.1 * K, 2.9 * K
 local E = 0.02 * K
-local CW, CH = 630, 870        -- screen canvas pixels
-local TILT_MARGIN = 0.5 * K    -- extra grab area around the frame for tilting
+local CW, CH = 630, 870
+local TILT_MARGIN = 0.5 * K
 
 local WHITE = Color3.new(1, 1, 1)
 local BLACK = Color3.new(0, 0, 0)
@@ -92,7 +80,6 @@ do
 		return p
 	end
 
-	-- ===== BODY (rounded corners from cylinders) =====
 	local silver = Color3.fromRGB(205, 207, 214)
 	local metal = Enum.Material.Metal
 
@@ -111,11 +98,9 @@ do
 		end
 	end
 
-	-- ===== BEZEL =====
 	local FZ = BT / 2
 	part("Bezel", Vector3.new(BW - 0.14 * K, BH - 0.14 * K, E), CFrame.new(0, 0, FZ + E / 2), Color3.fromRGB(8, 8, 10))
 
-	-- ===== FRONT CAMERA =====
 	part(
 		"FrontCamera",
 		Vector3.new(E, 0.07 * K, 0.07 * K),
@@ -125,12 +110,10 @@ do
 		Enum.PartType.Cylinder
 	)
 
-	-- ===== BUTTONS (top = close, side = volume) =====
 	powerBtn = part("PowerButton", Vector3.new(0.5 * K, 0.06 * K, 0.1 * K), CFrame.new(BW / 2 - 0.6 * K, BH / 2 + 0.03 * K, 0), silver, metal)
 	volUpBtn = part("VolUp", Vector3.new(0.06 * K, 0.34 * K, 0.1 * K), CFrame.new(BW / 2 + 0.03 * K, BH / 2 - 0.8 * K, 0), silver, metal)
 	volDownBtn = part("VolDown", Vector3.new(0.06 * K, 0.34 * K, 0.1 * K), CFrame.new(BW / 2 + 0.03 * K, BH / 2 - 1.2 * K, 0), silver, metal)
 
-	-- ===== SCREEN PART =====
 	screen = part("Screen", Vector3.new(SW, SH, E), CFrame.new(0, 0, FZ + 1.5 * E + E / 2), Color3.fromRGB(0, 0, 0))
 
 	sg = Instance.new("SurfaceGui")
@@ -144,7 +127,6 @@ do
 	sg.Parent = screen
 end
 
--- remember part transparency so the iPad can be hidden/shown
 local origTr = {}
 for _, d in ipairs(model:GetChildren()) do
 	if d:IsA("BasePart") then
@@ -353,14 +335,17 @@ local function ccReady()
 	return ccTarget == 1 and ccP > 0.85
 end
 
--- forward declarations (assigned further down)
+-- forward declarations
 local openApp, closeApp, startDownload, showAlert, hideAlert
 local refreshStoreStatus, flappyReset, flappyTap, flappyUpdate
 local setBrightness, setVolume, showVolHud
 local refreshWifi, showWifiView
 local showIPad, hideIPad, closeIPad
-local unlock, snapBack
-local setCC
+local unlock, snapBack, setCC
+local homeContent, lockContent
+local warm
+local brightTrack, brightFill, volTrack, volFill
+local ccPanel
 
 -- ===== APP ICON GLYPHS =====
 local glyphs = {}
@@ -395,7 +380,6 @@ glyphs.roblox = function(f, s, u)
 end
 
 glyphs.flappy = function(f, s, u)
-	-- little pipe stub
 	local pipe = ui("Frame", {
 		Size = UDim2.fromOffset(26 * u, 30 * u),
 		Position = UDim2.fromOffset(s - 46 * u, s - 44 * u),
@@ -404,7 +388,6 @@ glyphs.flappy = function(f, s, u)
 		ZIndex = 3,
 	}, f)
 	ui("UIStroke", { Color = Color3.fromRGB(70, 120, 30), Thickness = 2 }, pipe)
-	-- bird
 	dot(f, s / 2 - 4 * u, s / 2 - 6 * u, 54 * u, Color3.fromRGB(255, 214, 48), 4)
 	dot(f, s / 2 - 16 * u, s / 2 + 2 * u, 24 * u, Color3.fromRGB(240, 170, 30), 5)
 	dot(f, s / 2 + 10 * u, s / 2 - 16 * u, 20 * u, WHITE, 5)
@@ -531,7 +514,7 @@ local function makeAppIcon(parent, app, s, x, y, z)
 end
 
 -- ===== HOME SCREEN =====
-local homeContent, homeEntries, addHomeIcon
+local homeEntries, addHomeIcon
 
 do
 	local home = wallpaper("Home", Color3.fromRGB(14, 120, 170), Color3.fromRGB(52, 84, 210), Color3.fromRGB(150, 72, 215), 70, 1)
@@ -606,7 +589,6 @@ do
 		local lab = label(homeContent, app.name, x - 15, y + 118, 140, 24, 20, WHITE, Enum.Font.GothamMedium, nil, 3)
 		lab.TextStrokeTransparency = 0.85
 
-		-- invisible hit area (not faded, not scaled)
 		local hit = ui("Frame", {
 			Size = UDim2.fromOffset(130, 160),
 			Position = UDim2.fromOffset(x - 10, y - 10),
@@ -636,7 +618,7 @@ do
 	addHomeIcon(APPSById.store, true)
 end
 
--- ===== APP LAYER (store, flappy bird, generic apps) =====
+-- ===== APP LAYER =====
 local appLayer
 
 do
@@ -716,7 +698,7 @@ do
 			openApp(app.id)
 		elseif st.state == "none" then
 			if wifiState ~= "connected" then
-				showAlert() -- no downloads without Wi-Fi
+				showAlert()
 			else
 				startDownload(app)
 			end
@@ -768,7 +750,6 @@ do
 		end
 	end
 
-	-- "Wi-Fi required" alert
 	local alertFrame = ui("Frame", {
 		Size = UDim2.fromScale(1, 1),
 		BackgroundColor3 = BLACK,
@@ -835,7 +816,7 @@ do
 		if st.state ~= "none" then return end
 		st.state = "downloading"
 		st.p = 0
-		addHomeIcon(app, false) -- icon shows up on the home screen while it downloads
+		addHomeIcon(app, false)
 		refreshRow(app)
 	end
 
@@ -871,7 +852,6 @@ do
 		ZIndex = 1,
 	}, appLayer)
 
-	-- clouds
 	for _, c in ipairs({ { 60, 330, 150 }, { 380, 260, 190 }, { 240, 600, 140 } }) do
 		local cl = ui("Frame", {
 			Size = UDim2.fromOffset(c[3], c[3] * 0.35),
@@ -1012,7 +992,6 @@ do
 				by = 12
 				bv = 0
 			end
-			-- move pipes
 			local maxX = -1000
 			for _, p in ipairs(pipes) do
 				p.x = p.x - SPEED * dt
@@ -1026,7 +1005,6 @@ do
 					p.scored = false
 				end
 			end
-			-- score + collisions
 			local left, right, top, bottom = BIRD_X - 17, BIRD_X + 17, by - 15, by + 15
 			for _, p in ipairs(pipes) do
 				if not p.scored and p.x + PIPE_W < left then
@@ -1054,7 +1032,7 @@ do
 	end
 	flappyReset()
 
-	-- ---------- GENERIC APP SCREEN (Roblox, Minecraft, ...) ----------
+	-- ---------- GENERIC APP SCREEN ----------
 	local genericFrame = ui("Frame", {
 		Name = "Generic",
 		Size = UDim2.fromScale(1, 1),
@@ -1075,7 +1053,6 @@ do
 	local genSub = label(genericFrame, "", 0, 515, CW, 34, 24, GRAY, Enum.Font.GothamMedium, nil, 2)
 	label(genericFrame, "This app has no content yet", 0, 610, CW, 30, 20, Color3.fromRGB(100, 100, 115), Enum.Font.GothamMedium, nil, 2)
 
-	-- open / close apps
 	local appToken = 0
 
 	openApp = function(id)
@@ -1129,7 +1106,6 @@ do
 		tw:Play()
 	end
 
-	-- ===== DOWNLOADS (only while Wi-Fi is connected) =====
 	conns[#conns + 1] = RunService.Heartbeat:Connect(function(dt)
 		if not alive or dead then return end
 		for _, app in ipairs(APPS) do
@@ -1152,11 +1128,9 @@ do
 	end)
 end
 
--- ===== LOCK SCREEN (slides up) =====
-local lock, lockContent
-
+-- ===== LOCK SCREEN =====
 do
-	lock = wallpaper("Lock", Color3.fromRGB(24, 20, 84), Color3.fromRGB(132, 52, 172), Color3.fromRGB(255, 128, 118), 70, 5)
+	local lock = wallpaper("Lock", Color3.fromRGB(24, 20, 84), Color3.fromRGB(132, 52, 172), Color3.fromRGB(255, 128, 118), 70, 5)
 	blob(lock, -100, 60, 400, Color3.fromRGB(120, 140, 255), 0.82)
 	blob(lock, 340, 300, 440, Color3.fromRGB(255, 190, 120), 0.85)
 	blob(lock, 30, 620, 380, Color3.fromRGB(255, 110, 190), 0.82)
@@ -1237,9 +1211,11 @@ do
 		)
 		slideTween:Play()
 	end
+
+	_G.__iPadLock = lock
 end
 
--- ===== STATUS BAR (wifi + battery, battery stays at 100%) =====
+-- ===== STATUS BAR =====
 local dndLabel, statusWifi
 
 do
@@ -1291,9 +1267,7 @@ do
 	corner(battNub, UDim.new(0, 2))
 end
 
--- ===== OVERLAYS: volume HUD, brightness, eye protection =====
-local warm
-
+-- ===== OVERLAYS (vol HUD, brightness dim, warm, sliders) =====
 do
 	local volHud = ui("Frame", {
 		Name = "VolumeHud",
@@ -1355,20 +1329,12 @@ do
 		ZIndex = 91,
 	}, sg)
 
-	setBrightness = function(v)
-		brightV = math.clamp(v, 0, 1)
-		brightFill.Size = UDim2.new(brightV, 0, 1, 0)
-		dim.BackgroundTransparency = 1 - (1 - brightV) * 0.85
-	end
-	setVolume = function(v)
-		volV = math.clamp(v, 0, 1) -- stored here, nothing plays audio yet
-		volFill.Size = UDim2.new(volV, 0, 1, 0)
-	end
-
-	-- the sliders inside the control center need these, so create them first
-	local brightTrack, brightFill
-	local volTrack, volFill
-	local panelRef
+	-- Build sliders on a temporary hidden host; CC block moves them into the real panel.
+	local sliderHost = Instance.new("Frame")
+	sliderHost.Size = UDim2.fromScale(1, 1)
+	sliderHost.BackgroundTransparency = 1
+	sliderHost.Visible = false
+	sliderHost.Parent = sg
 
 	local function makeSlider(y, text, drawIcon, init)
 		local track = ui("Frame", {
@@ -1378,7 +1344,7 @@ do
 			BorderSizePixel = 0,
 			ClipsDescendants = true,
 			ZIndex = 3,
-		}, panelRef)
+		}, sliderHost)
 		corner(track, UDim.new(0, 30))
 		local fill = ui("Frame", {
 			Size = UDim2.new(init, 0, 1, 0),
@@ -1392,28 +1358,30 @@ do
 		return track, fill
 	end
 
-	-- Build a throwaway container so the slider frames exist for the CC below.
-	local sliderHost = Instance.new("Frame")
-	sliderHost.Size = UDim2.fromScale(1, 1)
-	sliderHost.BackgroundTransparency = 1
-	sliderHost.Visible = false
-	sliderHost.Parent = sg
-	panelRef = sliderHost
-
 	brightTrack, brightFill = makeSlider(215, "Brightness", drawSun, brightV)
 	volTrack, volFill = makeSlider(325, "Volume", drawSpeaker, volV)
 
-	-- expose for the control center build below
-	_G.__iPadSliders = { brightTrack = brightTrack, brightFill = brightFill, volTrack = volTrack, volFill = volFill, host = sliderHost }
+	-- NOW brightFill / volFill / dim all exist as real locals, so these functions capture them properly.
+	setBrightness = function(v)
+		brightV = math.clamp(v, 0, 1)
+		brightFill.Size = UDim2.new(brightV, 0, 1, 0)
+		dim.BackgroundTransparency = 1 - (1 - brightV) * 0.85
+	end
+	setVolume = function(v)
+		volV = math.clamp(v, 0, 1)
+		volFill.Size = UDim2.new(volV, 0, 1, 0)
+	end
 
 	setBrightness(brightV)
 	setVolume(volV)
+
+	_G.__iPadSliderHost = sliderHost
 end
 
 -- ===== CONTROL CENTER =====
 do
-	local sliders = _G.__iPadSliders
-	_G.__iPadSliders = nil
+	local sliderHost = _G.__iPadSliderHost
+	_G.__iPadSliderHost = nil
 
 	local PANEL_W, PANEL_H, PANEL_Y = 570, 450, 78
 
@@ -1446,10 +1414,12 @@ do
 	corner(panel, UDim.new(0, 40))
 	ui("UIStroke", { Color = WHITE, Thickness = 1.5, Transparency = 0.85 }, panel)
 
-	-- move the sliders we built earlier into the real panel
-	sliders.brightTrack.Parent = panel
-	sliders.volTrack.Parent = panel
-	sliders.host:Destroy()
+	ccPanel = panel  -- expose to input handler
+
+	-- Move prebuilt sliders into the real panel
+	brightTrack.Parent = panel
+	volTrack.Parent = panel
+	sliderHost:Destroy()
 
 	local ccMain = ui("Frame", {
 		Size = UDim2.fromScale(1, 1),
@@ -1519,9 +1489,6 @@ do
 	ui("UIStroke", { Color = WHITE, Thickness = 4 }, eyeOutline)
 	dot(eyeTile, TILE / 2, TILE / 2, 16, WHITE, 5)
 
-	local brightTrack, brightFill = sliders.brightTrack, sliders.brightFill
-	local volTrack, volFill = sliders.volTrack, sliders.volFill
-
 	-- Wi-Fi view
 	local wBack = ui("Frame", {
 		Size = UDim2.fromOffset(200, 64),
@@ -1575,7 +1542,6 @@ do
 
 	local netInfo = label(ccWifi, "Turn on Wi-Fi to see networks", 30, 235, 510, 84, 24, GRAY, Enum.Font.GothamMedium, nil, 3)
 
-	-- ===== WI-FI LOGIC =====
 	refreshWifi = function()
 		TweenService:Create(swTrack, TweenInfo.new(0.2), { BackgroundColor3 = wifiOn and GREEN or Color3.fromRGB(86, 86, 100) }):Play()
 		TweenService:Create(swKnob, TweenInfo.new(0.2), { Position = wifiOn and UDim2.fromOffset(94 - 50, 4) or UDim2.fromOffset(4, 4) }):Play()
@@ -1646,7 +1612,7 @@ do
 			end)
 		elseif wifiState == "connected" then
 			wifiToken = wifiToken + 1
-			wifiState = "idle" -- tap again to disconnect
+			wifiState = "idle"
 			refreshWifi()
 		end
 	end
@@ -1658,17 +1624,15 @@ do
 	end
 	refreshWifi()
 
-	-- ===== CONTROL CENTER LOGIC =====
 	setCC = function(p)
 		ccRoot.Visible = p > 0.002
 		frost.BackgroundTransparency = 1 - (appOpen and 0.8 or 0.5) * p
 		local closedY = -PANEL_H - 30
 		panel.Position = UDim2.fromOffset(30, closedY + (PANEL_Y - closedY) * p)
-		-- home/lock content fades out completely behind the menu (no overlapping icons)
 		homeContent.GroupTransparency = p
 		lockContent.GroupTransparency = p
 		for _, sc in ipairs(blobScales) do
-			sc.Scale = 1 + 0.4 * p -- blobs swell and soften = blur
+			sc.Scale = 1 + 0.4 * p
 		end
 	end
 
@@ -1736,7 +1700,7 @@ local function pulse()
 	end)
 end
 
--- ===== SHOW / HIDE THE IPAD (inventory item) =====
+-- ===== SHOW / HIDE =====
 local function setShown(v)
 	shown = v
 	for p, tr in pairs(origTr) do
@@ -1769,8 +1733,11 @@ hideIPad = function()
 	if RELOCK_ON_CLOSE then
 		locked = true
 		if slideTween then slideTween:Cancel() end
-		lock.Visible = true
-		lock.Position = UDim2.fromOffset(0, 0)
+		local lk = _G.__iPadLock
+		if lk then
+			lk.Visible = true
+			lk.Position = UDim2.fromOffset(0, 0)
+		end
 	end
 end
 
@@ -1782,7 +1749,7 @@ closeIPad = function()
 	hideIPad()
 end
 
--- ===== PLACE IN FRONT OF CAMERA (with sideways tilt) =====
+-- ===== RENDER LOOP =====
 model.PrimaryPart = body
 model.Parent = Workspace
 
@@ -1811,7 +1778,6 @@ conns[#conns + 1] = RunService.RenderStepped:Connect(function(dt)
 		tiltCF = CFrame.Angles(0, curTilt, 0)
 	end
 
-	-- the whole model (frame + screen + buttons) moves/tilts together
 	model:PivotTo(
 		cam.CFrame
 			* CFrame.new(0, -(1 - sOpen.p) * 3.8, -DIST)
@@ -1819,7 +1785,6 @@ conns[#conns + 1] = RunService.RenderStepped:Connect(function(dt)
 			* CFrame.new(0, 0, -sPush.p)
 	)
 
-	-- control center animation
 	if not ccDragging then
 		ccP = ccP + (ccTarget - ccP) * math.min(1, dt * 14)
 		if math.abs(ccTarget - ccP) < 0.003 then
@@ -1834,13 +1799,12 @@ conns[#conns + 1] = RunService.RenderStepped:Connect(function(dt)
 		showWifiView(false)
 	end
 
-	-- flappy bird (pauses while the control center is open)
 	if appOpen == "flappy" and ccP < 0.01 and not dead then
 		flappyUpdate(dt)
 	end
 end)
 
--- ===== INPUT (finger ray -> screen plane, works while tilted) =====
+-- ===== INPUT =====
 do
 	local startY, startT, lastDy = 0, 0, 0
 	local cy0, lastCx, lastCy = 0, 0, 0
@@ -1867,6 +1831,7 @@ do
 	end
 
 	local function inside(obj, cx, cy)
+		if not obj then return false end
 		local p, s = obj.AbsolutePosition, obj.AbsoluteSize
 		return cx >= p.X and cx <= p.X + s.X and cy >= p.Y and cy <= p.Y + s.Y
 	end
@@ -1885,14 +1850,11 @@ do
 		return math.clamp((cx - p.X) / s.X, 0, 1)
 	end
 
-	-- which physical button (if any) is under the finger? (screen-local coordinates)
 	local function hitButton(lp)
 		local x, y = lp.X, lp.Y
-		-- top button = close
 		if math.abs(x - (BW / 2 - 0.6 * K)) <= 0.4 * K and y >= BH / 2 - 0.12 * K and y <= BH / 2 + 0.5 * K then
 			return "power"
 		end
-		-- side buttons = volume
 		if x >= BW / 2 - 0.1 * K and x <= BW / 2 + 0.5 * K then
 			if math.abs(y - (BH / 2 - 0.8 * K)) <= 0.19 * K then return "volup" end
 			if math.abs(y - (BH / 2 - 1.2 * K)) <= 0.19 * K then return "voldown" end
@@ -1900,7 +1862,6 @@ do
 		return nil
 	end
 
-	-- little "button pressed" animation
 	local function nudge(p, v)
 		p.CFrame = p.CFrame * CFrame.new(v)
 		task.delay(0.12, function()
@@ -1956,7 +1917,6 @@ do
 				end
 				return
 			end
-			-- sideways tilt (frame / just outside it)
 			mode = "tilt"
 			tiltStartX = input.Position.X
 			tiltStart0 = tgtTilt
@@ -1966,10 +1926,9 @@ do
 
 		local cx, cy = canvasXY(lp)
 		lastCx, lastCy = cx, cy
-		pulse() -- push-back "force" on every tap
+		pulse()
 
 		if ccTarget == 1 then
-			-- control center is open
 			local tgt = nil
 			if ccP > 0.85 then
 				tgt = findTarget(cx, cy)
@@ -1987,16 +1946,14 @@ do
 				mode = "ccclose"
 				cy0 = cy
 				ccDragging = true
-				startedOutside = not inside(ccMainParent(), cx, cy)
+				startedOutside = not inside(ccPanel, cx, cy)
 			end
 		elseif cx >= CW - 300 and cy <= 80 then
-			-- pressed on the battery / wifi area: pull down for control center
 			mode = "ccpull"
 			cy0 = cy
 			startT = os.clock()
 			ccDragging = true
 		elseif appOpen and cy >= CH - 110 then
-			-- swipe up from the bottom = leave the app
 			mode = "appclose"
 			cy0 = cy
 			startT = os.clock()
@@ -2044,7 +2001,10 @@ do
 		if mode == "swipe" then
 			local dy = math.max(0, lp.Y - startY)
 			lastDy = dy
-			lock.Position = UDim2.fromOffset(0, -(dy / SH) * CH)
+			local lk = _G.__iPadLock
+			if lk then
+				lk.Position = UDim2.fromOffset(0, -(dy / SH) * CH)
+			end
 		elseif mode == "ccpull" then
 			ccP = math.clamp((cy - cy0) / 330, 0, 1)
 		elseif mode == "ccclose" then
@@ -2069,7 +2029,7 @@ do
 			repeatToken = repeatToken + 1
 			if btnName == "power" then
 				nudge(powerBtn, Vector3.new(0, -0.04 * K, 0))
-				closeIPad() -- top button closes the iPad
+				closeIPad()
 			end
 		elseif m == "swipe" then
 			local dt = math.max(os.clock() - startT, 0.05)
@@ -2122,7 +2082,7 @@ do
 			if tiltMoved < 12 then
 				local now = os.clock()
 				if now - lastTiltTap < 0.4 then
-					tgtTilt = 0 -- double-tap the frame to straighten
+					tgtTilt = 0
 				end
 				lastTiltTap = now
 			end
@@ -2130,7 +2090,7 @@ do
 	end)
 end
 
--- ===== THE IPAD ITEM (inventory / hotbar) =====
+-- ===== THE IPAD ITEM =====
 do
 	local function onToolParent()
 		if not alive or not tool then return end
@@ -2161,7 +2121,6 @@ do
 		t.Parent = player:WaitForChild("Backpack")
 	end
 
-	-- after respawn the backpack is reset, so give the item again
 	conns[#conns + 1] = player.CharacterAdded:Connect(function()
 		hideIPad()
 		task.wait(1)
@@ -2173,7 +2132,6 @@ do
 	task.spawn(makeTool)
 end
 
--- cleanup if the model is destroyed (re-execute)
 model.Destroying:Connect(function()
 	alive = false
 	for _, c in ipairs(conns) do
