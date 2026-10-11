@@ -1,602 +1,2074 @@
---[[
-    iPadOS-style GUI mockup for Roblox
-    Designed as a LocalScript for YOUR OWN Roblox experience / private testing.
-    It uses only normal Roblox GUI objects and client-side UI state.
-
-    Features:
-      - Responsive tablet frame with rounded bezel, wallpaper, status bar, icons
-      - Touch-friendly app buttons and bottom home indicator
-      - App Store mockup with local simulated installs
-      - Settings Wi-Fi toggle (App Store downloads require Wi-Fi)
-      - Close/power button on the top-right bezel and a reopen control
-
-    This does not install or launch real Roblox/iPad apps. It is a visual mockup.
-]]
+-- iPad GUI v5 | Delta compatible (client-side LocalScript)
+-- The whole iPad is made of GUI (landscape, black bezel, camera dot on the left,
+-- round home button on the right). Every screen is its own LAYER, and only the
+-- top layer receives touches, so the App Store, Wi-Fi menu and home screen can't overlap.
+--
+-- iPad is an ITEM: it shows up in your inventory (hotbar) as "iPad".
+--   * Tap the item = the iPad appears
+--   * TOP button on the iPad (bar on the top edge) = closes the iPad
+--   * SIDE buttons (right edge) = volume up / down (hold to repeat)
+--   * HOME button (round, right) = go home / close Control Center
+--   * Swipe up on the lock screen to unlock
+--   * Swipe DOWN from the battery / wifi icons = Control Center
+--   * Wi-Fi is OFF by default: Control Center > Wi-Fi > turn on > tap baseplate_5G
+--   * App Store: tap GET to download (only works while Wi-Fi is connected)
+--   * Swipe up from the very bottom of the screen to leave an app
+--   * Battery is fixed at 100%
 
 local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local GuiService = game:GetService("GuiService")
 
 local player = Players.LocalPlayer
-if not player then return end
 local playerGui = player:WaitForChild("PlayerGui")
 
--- Clean up an earlier copy if the script is run again.
-local previous = playerGui:FindFirstChild("iPadOSMockup")
-if previous then previous:Destroy() end
+-- ===== SETTINGS =====
+local FIT = 0.94               -- how much of the screen the iPad fills (bigger = larger iPad)
+local PUSH_SCALE = 0.988       -- tap push-back (1 = none, lower = stronger)
+local WIFI_NAME = "baseplate_5G"
+local VOL_STEP = 0.0625        -- volume change per button press
+local RELOCK_ON_CLOSE = true   -- closing the iPad locks it again
 
-local C = {
-    white = Color3.fromRGB(250, 250, 252),
-    black = Color3.fromRGB(15, 16, 20),
-    text = Color3.fromRGB(24, 25, 30),
-    muted = Color3.fromRGB(120, 123, 134),
-    blue = Color3.fromRGB(0, 122, 255),
-    green = Color3.fromRGB(48, 209, 88),
-    panel = Color3.fromRGB(245, 246, 250),
-    row = Color3.fromRGB(232, 234, 240),
-}
-
-local function addCorner(obj, radius)
-    local c = Instance.new("UICorner")
-    c.CornerRadius = UDim.new(0, radius)
-    c.Parent = obj
-    return c
+-- ===== CLEAN UP OLD COPIES =====
+local oldGui = playerGui:FindFirstChild("IPadGui5")
+if oldGui then oldGui:Destroy() end
+local old3d = Workspace:FindFirstChild("IPad3D_Swipe") -- old 3D version, if still running
+if old3d then old3d:Destroy() end
+for _, holderObj in ipairs({ player:FindFirstChildOfClass("Backpack"), player.Character }) do
+	if holderObj then
+		for _, c in ipairs(holderObj:GetChildren()) do
+			if c:IsA("Tool") and c:GetAttribute("IPad3D_Tool") then
+				c:Destroy()
+			end
+		end
+	end
 end
 
-local function addStroke(obj, color, thickness, transparency)
-    local s = Instance.new("UIStroke")
-    s.Color = color
-    s.Thickness = thickness or 1
-    s.Transparency = transparency or 0
-    s.Parent = obj
-    return s
+-- ===== DESIGN SIZES =====
+local DW, DH = 1000, 706       -- whole iPad
+local SX, SY = 86, 42          -- where the screen starts inside the iPad
+local SW, SH = 828, 620        -- screen size
+
+local WHITE = Color3.new(1, 1, 1)
+local BLACK = Color3.new(0, 0, 0)
+local BLUE = Color3.fromRGB(10, 132, 255)
+local GREEN = Color3.fromRGB(52, 199, 89)
+local PURPLE = Color3.fromRGB(94, 92, 230)
+local ORANGE = Color3.fromRGB(255, 159, 10)
+local RED = Color3.fromRGB(255, 69, 58)
+local GRAY = Color3.fromRGB(140, 140, 155)
+local TILE_OFF = Color3.fromRGB(66, 66, 80)
+local ROW = Color3.fromRGB(54, 54, 66)
+
+-- ===== SCREEN GUI =====
+local gui = Instance.new("ScreenGui")
+gui.Name = "IPadGui5"
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = false
+gui.DisplayOrder = 50
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+gui.Parent = playerGui
+
+local function ui(class, props, parent)
+	local o = Instance.new(class)
+	for k, v in pairs(props) do
+		o[k] = v
+	end
+	o.Parent = parent
+	return o
 end
 
-local function make(className, properties, parent)
-    local obj = Instance.new(className)
-    for key, value in pairs(properties) do
-        obj[key] = value
-    end
-    obj.Parent = parent
-    return obj
+local function corner(parent, r)
+	return ui("UICorner", { CornerRadius = r }, parent)
 end
 
-local function label(parent, text, pos, size, fontSize, color, align)
-    return make("TextLabel", {
-        BackgroundTransparency = 1,
-        Position = pos,
-        Size = size,
-        Font = Enum.Font.GothamMedium,
-        Text = text,
-        TextSize = fontSize or 16,
-        TextColor3 = color or C.text,
-        TextXAlignment = align or Enum.TextXAlignment.Left,
-        TextYAlignment = Enum.TextYAlignment.Center,
-        TextWrapped = true,
-        ZIndex = 8,
-    }, parent)
-end
-
-local function button(parent, text, pos, size, background, foreground, fontSize)
-    local b = make("TextButton", {
-        AutoButtonColor = true,
-        BackgroundColor3 = background or C.white,
-        BorderSizePixel = 0,
-        Position = pos,
-        Size = size,
-        Font = Enum.Font.GothamSemibold,
-        Text = text,
-        TextSize = fontSize or 16,
-        TextColor3 = foreground or C.text,
-        TextWrapped = true,
-        ZIndex = 9,
-    }, parent)
-    addCorner(b, 14)
-    return b
-end
-
-local gui = make("ScreenGui", {
-    Name = "iPadOSMockup",
-    ResetOnSpawn = false,
-    IgnoreGuiInset = true,
-    DisplayOrder = 900,
-    ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
-}, playerGui)
-
-local root = make("Frame", {
-    Name = "Root",
-    BackgroundTransparency = 1,
-    Size = UDim2.fromScale(1, 1),
+local holder = ui("Frame", {
+	Name = "Holder",
+	Size = UDim2.fromScale(1, 1),
+	BackgroundTransparency = 1,
+	BorderSizePixel = 0,
+	Visible = false,
 }, gui)
 
--- Reopen control remains on-screen while the tablet is powered off/closed.
-local reopen = button(root, "▣\n iPad", UDim2.new(1, -76, 0.52, -42), UDim2.fromOffset(62, 78), Color3.fromRGB(28, 30, 38), C.white, 15)
-reopen.Name = "ReopeniPad"
-reopen.Visible = false
-addStroke(reopen, Color3.fromRGB(110, 115, 130), 1, 0.25)
+local root = ui("Frame", {
+	Name = "Root",
+	Size = UDim2.fromOffset(DW, DH),
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.fromScale(0.5, 1.6),
+	BackgroundTransparency = 1,
+	BorderSizePixel = 0,
+}, holder)
+local fit = ui("UIScale", { Scale = 1 }, root)
 
--- Outer aluminum body.
-local tablet = make("Frame", {
-    Name = "TabletBody",
-    AnchorPoint = Vector2.new(0.5, 0.5),
-    Position = UDim2.fromScale(0.5, 0.5),
-    Size = UDim2.fromOffset(420, 660),
-    BackgroundColor3 = Color3.fromRGB(184, 188, 197),
-    BorderSizePixel = 0,
-    ClipsDescendants = false,
-    ZIndex = 2,
+local ipad = ui("Frame", {
+	Name = "IPad",
+	Size = UDim2.fromOffset(DW, DH),
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.fromScale(0.5, 0.5),
+	BackgroundTransparency = 1,
+	BorderSizePixel = 0,
 }, root)
-addCorner(tablet, 38)
-addStroke(tablet, Color3.fromRGB(225, 227, 233), 2, 0.15)
-local tabletScale = make("UIScale", { Scale = 1 }, tablet)
+local pushScale = ui("UIScale", { Scale = 1 }, ipad)
 
--- Screen and dark bezel.
-local screen = make("Frame", {
-    Name = "Display",
-    Position = UDim2.fromOffset(11, 11),
-    Size = UDim2.new(1, -22, 1, -22),
-    BackgroundColor3 = C.black,
-    BorderSizePixel = 0,
-    ClipsDescendants = true,
-    ZIndex = 3,
-}, tablet)
-addCorner(screen, 30)
+local conns = {}
 
-local wallpaper = make("Frame", {
-    Name = "Wallpaper",
-    Size = UDim2.fromScale(1, 1),
-    BackgroundColor3 = Color3.fromRGB(62, 93, 220),
-    BorderSizePixel = 0,
-    ClipsDescendants = true,
-    ZIndex = 3,
-}, screen)
-addCorner(wallpaper, 30)
-make("UIGradient", {
-    Rotation = 40,
-    Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(37, 198, 238)),
-        ColorSequenceKeypoint.new(0.48, Color3.fromRGB(76, 94, 231)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(161, 66, 205)),
-    }),
-}, wallpaper)
-
-local function blob(parent, position, size, color, transparency)
-    local circle = make("Frame", {
-        Position = position,
-        Size = size,
-        BackgroundColor3 = color,
-        BackgroundTransparency = transparency,
-        BorderSizePixel = 0,
-        ZIndex = 4,
-    }, parent)
-    addCorner(circle, 999)
-    return circle
+local function refit()
+	local cam = Workspace.CurrentCamera
+	if not cam then return end
+	local vp = cam.ViewportSize
+	local inset = GuiService:GetGuiInset()
+	fit.Scale = math.max(0.1, math.min(vp.X * FIT / DW, (vp.Y - inset.Y) * FIT / DH))
 end
-blob(wallpaper, UDim2.new(-0.22, 0, 0.08, 0), UDim2.fromOffset(250, 250), Color3.fromRGB(95, 235, 229), 0.47)
-blob(wallpaper, UDim2.new(0.47, 0, 0.34, 0), UDim2.fromOffset(320, 320), Color3.fromRGB(255, 149, 219), 0.60)
-blob(wallpaper, UDim2.new(0.05, 0, 0.65, 0), UDim2.fromOffset(250, 250), Color3.fromRGB(61, 185, 255), 0.47)
+refit()
+do
+	local cam = Workspace.CurrentCamera
+	if cam then
+		conns[#conns + 1] = cam:GetPropertyChangedSignal("ViewportSize"):Connect(refit)
+	end
+end
 
--- Views live inside the screen. The status bar and home indicator remain above them.
-local homeView = make("Frame", {
-    Name = "HomeScreen",
-    Size = UDim2.fromScale(1, 1),
-    BackgroundTransparency = 1,
-    ZIndex = 5,
-}, screen)
+-- ===== SHARED STATE =====
+local alive = true
+local isOpen = false
+local locked = true
+local wifiOn, wifiState, wifiView = false, "off", false
+local btOn, dndOn, eyeOn = false, false, false
+local ccP, ccTarget, ccDragging, ccDrawn = 0, 0, false, -1
+local appOpen = nil
+local alertOn = false
+local brightV, volV = 0.85, 0.5
+local tool = nil
+local slideTween = nil
 
-local storeView = make("Frame", {
-    Name = "AppStore",
-    Size = UDim2.fromScale(1, 1),
-    BackgroundColor3 = C.panel,
-    BorderSizePixel = 0,
-    Visible = false,
-    ZIndex = 5,
-}, screen)
+-- forward declarations (assigned further down)
+local openApp, closeApp, startDownload, showAlert, hideAlert
+local refreshStoreStatus, flappyReset, flappyTap
+local setBrightness, setVolume, showVolHud
+local refreshWifi, showWifiView
+local showIPad, hideIPad, closeIPad
 
-local settingsView = make("Frame", {
-    Name = "Settings",
-    Size = UDim2.fromScale(1, 1),
-    BackgroundColor3 = C.panel,
-    BorderSizePixel = 0,
-    Visible = false,
-    ZIndex = 5,
-}, screen)
+-- ===== INPUT HELPERS =====
+local function isPress(input)
+	local ut = input.UserInputType
+	return ut == Enum.UserInputType.Touch or ut == Enum.UserInputType.MouseButton1
+end
 
-local appView = make("Frame", {
-    Name = "AppView",
-    Size = UDim2.fromScale(1, 1),
-    BackgroundColor3 = C.white,
-    BorderSizePixel = 0,
-    Visible = false,
-    ZIndex = 5,
-}, screen)
+-- only one drag at a time (swipes, sliders)
+local drag = nil
+local function beginDrag(input, onMove, onEnd)
+	if drag then return false end
+	drag = { input = input, type = input.UserInputType, onMove = onMove, onEnd = onEnd }
+	return true
+end
 
--- Simulated iPad status bar.
-local status = make("Frame", {
-    Name = "StatusBar",
-    Position = UDim2.fromOffset(0, 0),
-    Size = UDim2.new(1, 0, 0, 38),
-    BackgroundTransparency = 1,
-    ZIndex = 20,
-}, screen)
-local timeLabel = label(status, "9:41", UDim2.fromOffset(23, 1), UDim2.fromOffset(70, 26), 14, C.white)
-timeLabel.Font = Enum.Font.GothamBold
-local statusRight = label(status, "●  ▮▮  ▰", UDim2.new(1, -130, 0, 1), UDim2.fromOffset(105, 26), 13, C.white, Enum.TextXAlignment.Right)
-statusRight.Font = Enum.Font.GothamBold
+conns[#conns + 1] = UIS.InputChanged:Connect(function(input)
+	if not drag then return end
+	local ut = input.UserInputType
+	local ok = false
+	if drag.type == Enum.UserInputType.Touch then
+		ok = (ut == Enum.UserInputType.Touch and input == drag.input)
+	else
+		ok = (ut == Enum.UserInputType.MouseMovement)
+	end
+	if ok then
+		drag.onMove(input.Position)
+	end
+end)
 
--- Home screen title and app grid.
-label(homeView, "", UDim2.fromOffset(18, 43), UDim2.fromOffset(350, 35), 18, C.white)
-local grid = make("Frame", {
-    Name = "AppGrid",
-    Position = UDim2.fromOffset(18, 100),
-    Size = UDim2.new(1, -36, 1, -175),
-    BackgroundTransparency = 1,
-    ZIndex = 6,
-}, homeView)
-local gridLayout = make("UIGridLayout", {
-    CellSize = UDim2.fromOffset(76, 100),
-    CellPadding = UDim2.fromOffset(10, 10),
-    SortOrder = Enum.SortOrder.LayoutOrder,
-    HorizontalAlignment = Enum.HorizontalAlignment.Center,
-    VerticalAlignment = Enum.VerticalAlignment.Top,
-}, grid)
+conns[#conns + 1] = UIS.InputEnded:Connect(function(input)
+	if not drag then return end
+	local ut = input.UserInputType
+	local ok = false
+	if drag.type == Enum.UserInputType.Touch then
+		ok = (ut == Enum.UserInputType.Touch and input == drag.input)
+	else
+		ok = (ut == Enum.UserInputType.MouseButton1)
+	end
+	if ok then
+		local d = drag
+		drag = nil
+		d.onEnd()
+	end
+end)
 
-local installed = { store = true, settings = true, photos = true, safari = true }
-local downloadBusy = {}
-local wifiEnabled = false
-local currentView = "home"
-local currentApp = nil
+-- little "push back" when you tap the iPad
+local function pulse()
+	TweenService:Create(pushScale, TweenInfo.new(0.05, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Scale = PUSH_SCALE }):Play()
+	task.delay(0.07, function()
+		TweenService:Create(pushScale, TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
+	end)
+end
 
-local appDefs = {
-    { id = "store", name = "App Store", glyph = "A", color = Color3.fromRGB(18, 143, 255), sub = "Discover apps and games." },
-    { id = "photos", name = "Photos", glyph = "🌈", color = Color3.fromRGB(255, 255, 255), sub = "Your photo library is empty in this demo." },
-    { id = "safari", name = "Safari", glyph = "🧭", color = Color3.fromRGB(255, 255, 255), sub = "A browser-style demo screen." },
-    { id = "settings", name = "Settings", glyph = "⚙", color = Color3.fromRGB(130, 137, 150), sub = "Manage Wi-Fi and the demo settings." },
-    { id = "roblox", name = "Roblox", glyph = "◇", color = Color3.fromRGB(30, 31, 37), sub = "This is a visual mockup, not the real Roblox app." },
-    { id = "flappy", name = "Flappy Bird", glyph = "🐤", color = Color3.fromRGB(117, 208, 244), sub = "Tap the bird area to flap in this simple demo." },
-    { id = "music", name = "Music", glyph = "♫", color = Color3.fromRGB(250, 55, 93), sub = "No music is playing in this mockup." },
-    { id = "files", name = "Files", glyph = "📁", color = Color3.fromRGB(68, 158, 255), sub = "Your demo files would appear here." },
+-- ===== UI HELPERS =====
+local blobScales = {}
+local function blob(parent, x, y, s, color, tr)
+	local f = ui("Frame", {
+		Size = UDim2.fromOffset(s, s),
+		Position = UDim2.fromOffset(x, y),
+		BackgroundColor3 = color,
+		BackgroundTransparency = tr,
+		BorderSizePixel = 0,
+	}, parent)
+	corner(f, UDim.new(1, 0))
+	table.insert(blobScales, ui("UIScale", { Scale = 1 }, f))
+end
+
+local function wallpaper(parent, name, c1, c2, c3, rot, z)
+	local w = ui("Frame", {
+		Name = name,
+		Size = UDim2.fromScale(1, 1),
+		BackgroundColor3 = WHITE,
+		BorderSizePixel = 0,
+		ClipsDescendants = true,
+		ZIndex = z,
+	}, parent)
+	ui("UIGradient", {
+		Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, c1),
+			ColorSequenceKeypoint.new(0.5, c2),
+			ColorSequenceKeypoint.new(1, c3),
+		}),
+		Rotation = rot,
+	}, w)
+	return w
+end
+
+local function group(parent, z)
+	return ui("CanvasGroup", {
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		GroupTransparency = 0,
+		ZIndex = z,
+	}, parent)
+end
+
+local function label(parent, text, x, y, w, h, size, color, font, align, z)
+	return ui("TextLabel", {
+		Size = UDim2.fromOffset(w, h),
+		Position = UDim2.fromOffset(x, y),
+		BackgroundTransparency = 1,
+		Font = font or Enum.Font.GothamMedium,
+		TextSize = size,
+		TextColor3 = color or WHITE,
+		TextXAlignment = align or Enum.TextXAlignment.Center,
+		Text = text,
+		ZIndex = z or 3,
+	}, parent)
+end
+
+-- a real tappable button (use .Activated)
+local function button(parent, x, y, w, h, color, tr, z)
+	local b = ui("TextButton", {
+		Size = UDim2.fromOffset(w, h),
+		Position = UDim2.fromOffset(x, y),
+		BackgroundColor3 = color or WHITE,
+		BackgroundTransparency = tr or 1,
+		BorderSizePixel = 0,
+		AutoButtonColor = false,
+		Text = "",
+		ZIndex = z or 3,
+	}, parent)
+	b.InputBegan:Connect(function(input)
+		if isPress(input) then
+			pulse()
+		end
+	end)
+	return b
+end
+
+local function pressFx(btn, sc, amt)
+	btn.InputBegan:Connect(function(input)
+		if isPress(input) then
+			TweenService:Create(sc, TweenInfo.new(0.08), { Scale = amt }):Play()
+		end
+	end)
+	btn.InputEnded:Connect(function(input)
+		if isPress(input) then
+			TweenService:Create(sc, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
+		end
+	end)
+end
+
+local function bar(parent, w, h, x, y, rot, z)
+	local f = ui("Frame", {
+		Size = UDim2.fromOffset(w, h),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromOffset(x, y),
+		Rotation = rot,
+		BackgroundColor3 = WHITE,
+		BorderSizePixel = 0,
+		ZIndex = z,
+	}, parent)
+	corner(f, UDim.new(0, 5))
+	return f
+end
+
+local function line(parent, x1, y1, x2, y2, th, color, z)
+	local dx, dy = x2 - x1, y2 - y1
+	local len = math.sqrt(dx * dx + dy * dy)
+	local f = ui("Frame", {
+		Size = UDim2.fromOffset(len + th * 0.6, th),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromOffset((x1 + x2) / 2, (y1 + y2) / 2),
+		Rotation = math.deg(math.atan2(dy, dx)),
+		BackgroundColor3 = color,
+		BorderSizePixel = 0,
+		ZIndex = z,
+	}, parent)
+	corner(f, UDim.new(0.5, 0))
+	return f
+end
+
+local function dot(parent, cx, cy, d, color, z)
+	local f = ui("Frame", {
+		Size = UDim2.fromOffset(d, d),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromOffset(cx, cy),
+		BackgroundColor3 = color,
+		BorderSizePixel = 0,
+		ZIndex = z,
+	}, parent)
+	corner(f, UDim.new(1, 0))
+	return f
+end
+
+local function drawWifi(parent, cx, cy, s, color, z)
+	local parts = {}
+	local th = math.max(2.5, 4 * s)
+	for _, r in ipairs({ 12, 21, 30 }) do
+		local prev = nil
+		for a = -45, 45, 15 do
+			local rad = math.rad(a)
+			local px, py = cx + math.sin(rad) * r * s, cy - math.cos(rad) * r * s
+			if prev then
+				table.insert(parts, line(parent, prev[1], prev[2], px, py, th, color, z))
+			end
+			prev = { px, py }
+		end
+	end
+	table.insert(parts, dot(parent, cx, cy, math.max(4, 8 * s), color, z))
+	return parts
+end
+
+local function drawBluetooth(parent, cx, cy, s, color, z)
+	local segs = {
+		{ 0, -24, 0, 24 },
+		{ 0, -24, 14, -10 },
+		{ 14, -10, -13, 12 },
+		{ 0, 24, 14, 10 },
+		{ 14, 10, -13, -12 },
+	}
+	for _, g in ipairs(segs) do
+		line(parent, cx + g[1] * s, cy + g[2] * s, cx + g[3] * s, cy + g[4] * s, 4 * s, color, z)
+	end
+end
+
+local function drawSun(parent, cx, cy, s, color, z)
+	dot(parent, cx, cy, 20 * s, color, z)
+	for i = 0, 7 do
+		local rad = math.rad(i * 45)
+		line(
+			parent,
+			cx + math.cos(rad) * 16 * s, cy + math.sin(rad) * 16 * s,
+			cx + math.cos(rad) * 23 * s, cy + math.sin(rad) * 23 * s,
+			3.5 * s, color, z
+		)
+	end
+end
+
+local function drawSpeaker(parent, cx, cy, s, color, z)
+	local pts = { { -13, -6 }, { -5, -6 }, { 4, -13 }, { 4, 13 }, { -5, 6 }, { -13, 6 }, { -13, -6 } }
+	for i = 1, #pts - 1 do
+		line(parent, cx + pts[i][1] * s, cy + pts[i][2] * s, cx + pts[i + 1][1] * s, cy + pts[i + 1][2] * s, 3 * s, color, z)
+	end
+	for _, r in ipairs({ 9, 17 }) do
+		local prev = nil
+		for a = -35, 35, 17.5 do
+			local rad = math.rad(a)
+			local px, py = cx + (4 + math.cos(rad) * r) * s, cy + math.sin(rad) * r * s
+			if prev then
+				line(parent, prev[1], prev[2], px, py, 3 * s, color, z)
+			end
+			prev = { px, py }
+		end
+	end
+end
+
+-- ===== THE IPAD BODY (like the picture) =====
+local body = ui("Frame", {
+	Name = "Body",
+	Size = UDim2.fromOffset(DW, DH),
+	BackgroundColor3 = Color3.fromRGB(30, 30, 33),
+	BorderSizePixel = 0,
+	ZIndex = 2,
+}, ipad)
+corner(body, UDim.new(0, 58))
+local bodyStroke = ui("UIStroke", { Color = WHITE, Thickness = 5 }, body)
+ui("UIGradient", {
+	Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(160, 160, 168)),
+		ColorSequenceKeypoint.new(0.5, Color3.fromRGB(70, 70, 76)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(105, 105, 112)),
+	}),
+	Rotation = 90,
+}, bodyStroke)
+
+local bezel = ui("Frame", {
+	Name = "Bezel",
+	Size = UDim2.fromOffset(DW - 28, DH - 28),
+	Position = UDim2.fromOffset(14, 14),
+	BackgroundColor3 = Color3.fromRGB(4, 4, 5),
+	BorderSizePixel = 0,
+	ZIndex = 3,
+}, ipad)
+corner(bezel, UDim.new(0, 46))
+
+-- front camera (left, middle)
+dot(ipad, 44, DH / 2, 22, Color3.fromRGB(14, 14, 18), 4)
+dot(ipad, 44, DH / 2, 11, Color3.fromRGB(28, 34, 62), 5)
+
+-- the screen
+local scr = ui("Frame", {
+	Name = "Screen",
+	Position = UDim2.fromOffset(SX, SY),
+	Size = UDim2.fromOffset(SW, SH),
+	BackgroundColor3 = BLACK,
+	BorderSizePixel = 0,
+	ClipsDescendants = true,
+	ZIndex = 4,
+}, ipad)
+corner(scr, UDim.new(0, 6))
+
+-- ===== APP ICON GLYPHS =====
+local glyphs = {}
+
+glyphs.store = function(f, s, u)
+	bar(f, 11 * u, 66 * u, s / 2 - 14 * u, 52 * u, 22, 4)
+	bar(f, 11 * u, 66 * u, s / 2 + 14 * u, 52 * u, -22, 4)
+	bar(f, 40 * u, 9 * u, s / 2, 64 * u, 0, 4)
+	dot(f, 78 * u, 22 * u, 8 * u, WHITE, 4)
+end
+
+glyphs.roblox = function(f, s, u)
+	local sq = ui("Frame", {
+		Size = UDim2.fromOffset(60 * u, 60 * u),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromOffset(s / 2, s / 2),
+		Rotation = -15,
+		BackgroundColor3 = WHITE,
+		BorderSizePixel = 0,
+		ZIndex = 4,
+	}, f)
+	corner(sq, UDim.new(0, 8 * u))
+	local hole = ui("Frame", {
+		Size = UDim2.fromOffset(20 * u, 20 * u),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		BackgroundColor3 = Color3.fromRGB(35, 36, 42),
+		BorderSizePixel = 0,
+		ZIndex = 5,
+	}, sq)
+	corner(hole, UDim.new(0, 3 * u))
+end
+
+glyphs.flappy = function(f, s, u)
+	local pipe = ui("Frame", {
+		Size = UDim2.fromOffset(26 * u, 30 * u),
+		Position = UDim2.fromOffset(s - 46 * u, s - 44 * u),
+		BackgroundColor3 = Color3.fromRGB(115, 190, 46),
+		BorderSizePixel = 0,
+		ZIndex = 3,
+	}, f)
+	ui("UIStroke", { Color = Color3.fromRGB(70, 120, 30), Thickness = 2 }, pipe)
+	dot(f, s / 2 - 4 * u, s / 2 - 6 * u, 54 * u, Color3.fromRGB(255, 214, 48), 4)
+	dot(f, s / 2 - 16 * u, s / 2 + 2 * u, 24 * u, Color3.fromRGB(240, 170, 30), 5)
+	dot(f, s / 2 + 10 * u, s / 2 - 16 * u, 20 * u, WHITE, 5)
+	dot(f, s / 2 + 14 * u, s / 2 - 16 * u, 9 * u, BLACK, 6)
+	local beak = ui("Frame", {
+		Size = UDim2.fromOffset(26 * u, 15 * u),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromOffset(s / 2 + 28 * u, s / 2),
+		BackgroundColor3 = Color3.fromRGB(255, 128, 40),
+		BorderSizePixel = 0,
+		ZIndex = 5,
+	}, f)
+	corner(beak, UDim.new(0.5, 0))
+end
+
+glyphs.minecraft = function(f, s, u)
+	local g1, g2 = Color3.fromRGB(96, 170, 60), Color3.fromRGB(78, 148, 48)
+	local d1, d2 = Color3.fromRGB(134, 96, 58), Color3.fromRGB(112, 78, 46)
+	local cols = {
+		{ g1, g2, g1 },
+		{ d1, g1, d1 },
+		{ d2, d1, d2 },
+	}
+	local px = 30 * u
+	local x0, y0 = (s - 3 * px) / 2, (s - 3 * px) / 2
+	for r = 1, 3 do
+		for c = 1, 3 do
+			ui("Frame", {
+				Size = UDim2.fromOffset(px, px),
+				Position = UDim2.fromOffset(x0 + (c - 1) * px, y0 + (r - 1) * px),
+				BackgroundColor3 = cols[r][c],
+				BorderSizePixel = 0,
+				ZIndex = 4,
+			}, f)
+		end
+	end
+end
+
+glyphs.amongus = function(f, s, u)
+	local red = Color3.fromRGB(197, 17, 17)
+	local function rr(w, h, x, y, color, rad, z)
+		local o = ui("Frame", {
+			Size = UDim2.fromOffset(w, h),
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromOffset(x, y),
+			BackgroundColor3 = color,
+			BorderSizePixel = 0,
+			ZIndex = z,
+		}, f)
+		corner(o, UDim.new(0, rad))
+		return o
+	end
+	rr(18 * u, 34 * u, s / 2 - 30 * u, s / 2 + 4 * u, red, 8 * u, 4)
+	rr(50 * u, 62 * u, s / 2, s / 2 - 2 * u, red, 22 * u, 5)
+	rr(22 * u, 22 * u, s / 2 - 12 * u, s / 2 + 30 * u, red, 6 * u, 4)
+	rr(22 * u, 22 * u, s / 2 + 12 * u, s / 2 + 30 * u, red, 6 * u, 4)
+	rr(32 * u, 20 * u, s / 2 + 8 * u, s / 2 - 14 * u, Color3.fromRGB(150, 225, 245), 10 * u, 6)
+end
+
+glyphs.spotify = function(f, s, u)
+	dot(f, s / 2, s / 2, 76 * u, Color3.fromRGB(30, 215, 96), 3)
+	local dark = Color3.fromRGB(18, 18, 20)
+	local arcs = { { 46, -14, 8 }, { 38, 0, 7 }, { 28, 13, 5.5 } }
+	for _, a in ipairs(arcs) do
+		local w, yo, d = a[1] * u, a[2] * u, a[3] * u
+		local prev = nil
+		for i = 0, 6 do
+			local t = (i / 6) * 2 - 1
+			local px = s / 2 + t * w / 2
+			local py = s / 2 + yo + t * t * d
+			if prev then
+				line(f, prev[1], prev[2], px, py, 5 * u, dark, 4)
+			end
+			prev = { px, py }
+		end
+	end
+end
+
+glyphs.youtube = function(f, s, u)
+	local r = ui("Frame", {
+		Size = UDim2.fromOffset(80 * u, 56 * u),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromOffset(s / 2, s / 2),
+		BackgroundColor3 = Color3.fromRGB(255, 0, 0),
+		BorderSizePixel = 0,
+		ZIndex = 3,
+	}, f)
+	corner(r, UDim.new(0, 16 * u))
+	local pts = { { -8, -14 }, { -8, 14 }, { 16, 0 } }
+	for i = 1, 3 do
+		local a, b = pts[i], pts[i % 3 + 1]
+		line(f, s / 2 + a[1] * u, s / 2 + a[2] * u, s / 2 + b[1] * u, s / 2 + b[2] * u, 7 * u, WHITE, 4)
+	end
+end
+
+-- ===== APP CATALOG =====
+local APPS = {
+	{ id = "store", name = "App Store", sub = "", c1 = Color3.fromRGB(80, 215, 255), c2 = Color3.fromRGB(10, 95, 250), glyph = glyphs.store, time = 0 },
+	{ id = "roblox", name = "Roblox", sub = "Play millions of games", c1 = Color3.fromRGB(78, 78, 88), c2 = Color3.fromRGB(22, 22, 28), glyph = glyphs.roblox, time = 14 },
+	{ id = "flappy", name = "Flappy Bird", sub = "Tap to flap, dodge the pipes", c1 = Color3.fromRGB(112, 205, 255), c2 = Color3.fromRGB(60, 165, 235), glyph = glyphs.flappy, time = 6 },
+	{ id = "minecraft", name = "Minecraft", sub = "Build and explore", c1 = Color3.fromRGB(134, 96, 58), c2 = Color3.fromRGB(90, 60, 36), glyph = glyphs.minecraft, time = 18 },
+	{ id = "amongus", name = "Among Us", sub = "Find the impostor", c1 = Color3.fromRGB(40, 48, 86), c2 = Color3.fromRGB(14, 18, 40), glyph = glyphs.amongus, time = 12 },
+	{ id = "spotify", name = "Spotify", sub = "Music for everyone", c1 = Color3.fromRGB(34, 34, 38), c2 = Color3.fromRGB(12, 12, 14), glyph = glyphs.spotify, time = 9 },
+	{ id = "youtube", name = "YouTube", sub = "Watch videos", c1 = Color3.fromRGB(255, 255, 255), c2 = Color3.fromRGB(232, 232, 240), glyph = glyphs.youtube, time = 8 },
 }
-local byId = {}
-for _, app in ipairs(appDefs) do byId[app.id] = app end
-
-local homeButtons = {}
--- Forward declarations used by app-button callbacks.
-local switchView, appTitle, appGlyph, appDescription, homeIndicatorHit, homeIndicatorBar
-
-local function createHomeIcon(app, order)
-    local tile = make("Frame", {
-        BackgroundTransparency = 1,
-        BorderSizePixel = 0,
-        LayoutOrder = order,
-        ZIndex = 7,
-    }, grid)
-    local icon = button(tile, app.glyph, UDim2.fromOffset(4, 0), UDim2.fromOffset(68, 68), app.color, (app.id == "photos" or app.id == "safari") and C.text or C.white, 31)
-    icon.Name = app.id .. "Icon"
-    icon.TextWrapped = false
-    addCorner(icon, 17)
-    if app.id == "store" then
-        addStroke(icon, Color3.fromRGB(255,255,255), 1, 0.75)
-        icon.TextColor3 = C.white
-    elseif app.id == "roblox" then
-        icon.Text = "◩"
-        icon.TextSize = 42
-        icon.Rotation = -12
-    end
-    local title = label(tile, app.name, UDim2.fromOffset(-8, 70), UDim2.fromOffset(84, 24), 11, C.white, Enum.TextXAlignment.Center)
-    title.TextTruncate = Enum.TextTruncate.AtEnd
-    title.TextStrokeTransparency = 0.7
-    icon.Activated:Connect(function()
-        if app.id == "store" then
-            currentView = "store"
-        elseif app.id == "settings" then
-            currentView = "settings"
-        elseif installed[app.id] then
-            currentView = "app"
-            currentApp = app
-        else
-            currentView = "store"
-        end
-        -- View visibility is updated below by switchView.
-        if app.id == "store" then
-            currentView = "store"
-        end
-        switchView(currentView, app)
-    end)
-    homeButtons[app.id] = icon
-    return tile
+local APPSById = {}
+for _, a in ipairs(APPS) do
+	APPSById[a.id] = a
 end
 
--- All local functions referenced by GUI events are declared before clicks can occur.
-switchView = function(which, app)
-    currentView = which
-    homeView.Visible = which == "home"
-    storeView.Visible = which == "store"
-    settingsView.Visible = which == "settings"
-    appView.Visible = which == "app"
-    if which == "app" and app then currentApp = app end
-    if which == "app" then
-        local chosen = currentApp or byId.roblox
-        appTitle.Text = chosen.name
-        appGlyph.Text = chosen.glyph
-        appDescription.Text = chosen.sub
-        if chosen.id == "flappy" then
-            appDescription.Text = "Tap anywhere in this panel to flap. This is only a small visual demo."
-        end
-    end
-    homeIndicatorHit.Visible = true
-    if which == "home" then
-        homeIndicatorBar.BackgroundTransparency = 0.18
-    else
-        homeIndicatorBar.BackgroundTransparency = 0
-    end
+local function makeAppIcon(parent, app, s, x, y, z)
+	local f = ui("Frame", {
+		Size = UDim2.fromOffset(s, s),
+		Position = UDim2.fromOffset(x, y),
+		BackgroundColor3 = WHITE,
+		BorderSizePixel = 0,
+		ZIndex = z,
+	}, parent)
+	corner(f, UDim.new(0, s * 0.235))
+	ui("UIGradient", { Color = ColorSequence.new(app.c1, app.c2), Rotation = 90 }, f)
+	ui("UIStroke", { Color = WHITE, Thickness = 1.2, Transparency = 0.8 }, f)
+	app.glyph(f, s, s / 110)
+	return f
 end
 
-for i, app in ipairs(appDefs) do
-    createHomeIcon(app, i)
+-- =====================================================================
+-- LAYER 1: HOME SCREEN
+-- =====================================================================
+local home = wallpaper(scr, "Home", Color3.fromRGB(14, 120, 170), Color3.fromRGB(52, 84, 210), Color3.fromRGB(150, 72, 215), 70, 1)
+blob(home, -80, 40, 340, Color3.fromRGB(120, 255, 235), 0.82)
+blob(home, 500, 200, 380, Color3.fromRGB(255, 170, 255), 0.84)
+blob(home, 200, 360, 320, Color3.fromRGB(110, 190, 255), 0.8)
+
+local homeBarV = ui("Frame", {
+	Size = UDim2.fromOffset(180, 6),
+	Position = UDim2.fromOffset(SW / 2 - 90, SH - 16),
+	BackgroundColor3 = WHITE,
+	BackgroundTransparency = 0.3,
+	BorderSizePixel = 0,
+	ZIndex = 2,
+}, home)
+corner(homeBarV, UDim.new(1, 0))
+
+local homeContent = group(home, 3)
+
+local homeEntries = {}
+local slotCount = 0
+
+local function slotPos(slot)
+	local col, row = (slot - 1) % 6, math.floor((slot - 1) / 6)
+	return 36 + col * 132, 84 + row * 150
 end
 
--- Subtle home-screen page dots.
-local pageDots = make("Frame", {
-    Position = UDim2.new(0.5, -25, 1, -79),
-    Size = UDim2.fromOffset(50, 12),
-    BackgroundTransparency = 1,
-    ZIndex = 8,
-}, homeView)
-for i = 1, 3 do
-    local d = make("Frame", {
-        Position = UDim2.fromOffset((i - 1) * 17, 3),
-        Size = UDim2.fromOffset(7, 7),
-        BackgroundColor3 = C.white,
-        BackgroundTransparency = i == 1 and 0.05 or 0.58,
-        BorderSizePixel = 0,
-        ZIndex = 8,
-    }, pageDots)
-    addCorner(d, 8)
+local function addHomeIcon(app, installed)
+	slotCount = slotCount + 1
+	local x, y = slotPos(slotCount)
+	local frame = makeAppIcon(homeContent, app, 96, x, y, 3)
+	local sc = ui("UIScale", { Scale = 1 }, frame)
+	local rad = UDim.new(0, 96 * 0.235)
+	local dimF = ui("Frame", {
+		Size = UDim2.fromScale(1, 1),
+		BackgroundColor3 = BLACK,
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		ZIndex = 8,
+	}, frame)
+	corner(dimF, rad)
+	local dl = ui("Frame", {
+		Size = UDim2.fromScale(1, 1),
+		BackgroundColor3 = BLACK,
+		BackgroundTransparency = installed and 1 or 0.45,
+		BorderSizePixel = 0,
+		ZIndex = 9,
+	}, frame)
+	corner(dl, rad)
+	local track = ui("Frame", {
+		Size = UDim2.fromOffset(72, 7),
+		Position = UDim2.fromOffset(12, 76),
+		BackgroundColor3 = WHITE,
+		BackgroundTransparency = 0.6,
+		BorderSizePixel = 0,
+		Visible = not installed,
+		ZIndex = 10,
+	}, frame)
+	corner(track, UDim.new(1, 0))
+	local fill = ui("Frame", {
+		Size = UDim2.fromScale(0, 1),
+		BackgroundColor3 = WHITE,
+		BorderSizePixel = 0,
+		ZIndex = 11,
+	}, track)
+	corner(fill, UDim.new(1, 0))
+
+	local lab = label(homeContent, app.name, x - 12, y + 102, 120, 22, 17, WHITE, Enum.Font.GothamMedium, nil, 3)
+	lab.TextStrokeTransparency = 0.85
+
+	-- real button on top of the icon
+	local hit = button(home, x - 12, y - 8, 120, 134, WHITE, 1, 4)
+	hit.InputBegan:Connect(function(input)
+		if isPress(input) then
+			TweenService:Create(sc, TweenInfo.new(0.08), { Scale = 0.88 }):Play()
+			TweenService:Create(dimF, TweenInfo.new(0.1), { BackgroundTransparency = 0.75 }):Play()
+		end
+	end)
+	hit.InputEnded:Connect(function(input)
+		if isPress(input) then
+			TweenService:Create(sc, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
+			TweenService:Create(dimF, TweenInfo.new(0.1), { BackgroundTransparency = 1 }):Play()
+		end
+	end)
+
+	local entry = { app = app, installed = installed, frame = frame, scale = sc, dl = dl, track = track, fill = fill }
+	homeEntries[app.id] = entry
+
+	hit.Activated:Connect(function()
+		if entry.installed then
+			openApp(app.id)
+		end
+	end)
+	return entry
 end
 
--- App Store header and scrollable app catalogue.
-label(storeView, "App Store", UDim2.fromOffset(22, 48), UDim2.new(1, -44, 0, 42), 29, C.text).Font = Enum.Font.GothamBold
-label(storeView, "Discover", UDim2.fromOffset(23, 90), UDim2.new(1, -46, 0, 26), 15, C.muted)
-local search = make("TextBox", {
-    Name = "Search",
-    Position = UDim2.fromOffset(20, 119),
-    Size = UDim2.new(1, -40, 0, 38),
-    BackgroundColor3 = Color3.fromRGB(226, 228, 234),
-    BorderSizePixel = 0,
-    ClearTextOnFocus = false,
-    Font = Enum.Font.Gotham,
-    PlaceholderText = "⌕  Search apps",
-    PlaceholderColor3 = C.muted,
-    Text = "",
-    TextColor3 = C.text,
-    TextSize = 14,
-    ZIndex = 7,
-}, storeView)
-addCorner(search, 11)
+addHomeIcon(APPSById.store, true)
 
-local storeScroll = make("ScrollingFrame", {
-    Name = "Catalogue",
-    Position = UDim2.fromOffset(14, 168),
-    Size = UDim2.new(1, -28, 1, -220),
-    BackgroundTransparency = 1,
-    BorderSizePixel = 0,
-    CanvasSize = UDim2.fromOffset(0, 0),
-    AutomaticCanvasSize = Enum.AutomaticSize.Y,
-    ScrollBarThickness = 3,
-    ScrollBarImageColor3 = C.muted,
-    ZIndex = 7,
-}, storeView)
-local storeListLayout = make("UIListLayout", {
-    Padding = UDim.new(0, 9),
-    SortOrder = Enum.SortOrder.LayoutOrder,
-}, storeScroll)
+-- =====================================================================
+-- LAYER 2: APPS (store, flappy bird, generic)
+-- =====================================================================
+local appLayer = ui("Frame", {
+	Name = "AppLayer",
+	Size = UDim2.fromScale(1, 1),
+	Position = UDim2.fromOffset(0, SH),
+	BackgroundTransparency = 1,
+	BorderSizePixel = 0,
+	Visible = false,
+	ZIndex = 2,
+}, scr)
 
+-- background catcher: blocks touches from reaching the home screen, handles taps
+local appCatcher = ui("Frame", {
+	Size = UDim2.fromScale(1, 1),
+	BackgroundTransparency = 1,
+	BorderSizePixel = 0,
+	Active = true,
+	ZIndex = 1,
+}, appLayer)
+appCatcher.InputBegan:Connect(function(input)
+	if isPress(input) then
+		pulse()
+		if appOpen == "flappy" then
+			flappyTap()
+		end
+	end
+end)
+
+-- ---------- APP STORE ----------
+local storeFrame = ui("Frame", {
+	Name = "Store",
+	Size = UDim2.fromScale(1, 1),
+	BackgroundColor3 = Color3.fromRGB(20, 20, 28),
+	BorderSizePixel = 0,
+	Visible = false,
+	ZIndex = 2,
+}, appLayer)
+
+label(storeFrame, "App Store", 28, 54, 400, 50, 40, WHITE, Enum.Font.GothamBold, Enum.TextXAlignment.Left, 2)
+local storeStatus = label(storeFrame, "", 28, 106, 560, 26, 18, GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Left, 2)
+
+local installState = {}
 local storeRows = {}
-local function makeStoreRow(app, order)
-    local row = make("Frame", {
-        Size = UDim2.new(1, -2, 0, 82),
-        BackgroundColor3 = C.white,
-        BorderSizePixel = 0,
-        LayoutOrder = order,
-        ZIndex = 8,
-    }, storeScroll)
-    addCorner(row, 15)
-    local ic = button(row, app.glyph, UDim2.fromOffset(9, 11), UDim2.fromOffset(58, 58), app.color, C.white, 27)
-    addCorner(ic, 14)
-    if app.id == "photos" or app.id == "safari" then ic.TextColor3 = C.text end
-    local nm = label(row, app.name, UDim2.fromOffset(77, 10), UDim2.new(1, -170, 0, 27), 14, C.text)
-    nm.Font = Enum.Font.GothamBold
-    label(row, app.sub, UDim2.fromOffset(77, 36), UDim2.new(1, -170, 0, 36), 10, C.muted)
-    local action = button(row, installed[app.id] and "OPEN" or "GET", UDim2.new(1, -78, 0.5, -15), UDim2.fromOffset(66, 30), Color3.fromRGB(235, 237, 242), C.blue, 12)
-    addCorner(action, 16)
-    storeRows[app.id] = { button = action, row = row, app = app }
-    action.Activated:Connect(function()
-        if installed[app.id] then
-            switchView("app", app)
-            return
-        end
-        if not wifiEnabled then
-            statusRight.Text = "Wi-Fi Off"
-            statusRight.TextColor3 = Color3.fromRGB(255, 190, 70)
-            action.Text = "Wi-Fi Off"
-            task.delay(1.4, function()
-                if action and action.Parent and not installed[app.id] then action.Text = "GET" end
-            end)
-            return
-        end
-        if downloadBusy[app.id] then return end
-        downloadBusy[app.id] = true
-        action.Text = "GETTING…"
-        action.TextColor3 = C.muted
-        task.wait(1.0)
-        installed[app.id] = true
-        downloadBusy[app.id] = nil
-        if action and action.Parent then
-            action.Text = "OPEN"
-            action.TextColor3 = C.blue
-        end
-        local homeIcon = homeButtons[app.id]
-        if homeIcon then
-            homeIcon.BackgroundColor3 = app.color
-            homeIcon.Text = app.glyph
-        end
-    end)
+
+local function refreshRow(app)
+	local r, st = storeRows[app.id], installState[app.id]
+	if not r then return end
+	if st.state == "none" then
+		r.btn.BackgroundColor3 = BLUE
+		r.fill.Visible = false
+		r.txt.Text = "GET"
+		r.txt.TextSize = 20
+		r.txt.TextColor3 = WHITE
+	elseif st.state == "downloading" then
+		r.btn.BackgroundColor3 = Color3.fromRGB(60, 60, 76)
+		r.fill.Visible = true
+		r.fill.Size = UDim2.fromScale(st.p, 1)
+		if wifiState == "connected" then
+			r.txt.Text = math.floor(st.p * 100) .. "%"
+			r.txt.TextSize = 20
+		else
+			r.txt.Text = "Waiting..."
+			r.txt.TextSize = 14
+		end
+		r.txt.TextColor3 = WHITE
+	else
+		r.btn.BackgroundColor3 = Color3.fromRGB(60, 60, 76)
+		r.fill.Visible = false
+		r.txt.Text = "OPEN"
+		r.txt.TextSize = 20
+		r.txt.TextColor3 = BLUE
+	end
 end
 
-for i, app in ipairs(appDefs) do
-    if app.id ~= "store" and app.id ~= "settings" then
-        makeStoreRow(app, i)
-    end
+local function onStoreButton(app)
+	local st = installState[app.id]
+	if st.state == "installed" then
+		openApp(app.id)
+	elseif st.state == "none" then
+		if wifiState ~= "connected" then
+			showAlert() -- no downloads without Wi-Fi
+		else
+			startDownload(app)
+		end
+	end
 end
 
-search:GetPropertyChangedSignal("Text"):Connect(function()
-    local q = string.lower(search.Text)
-    for _, item in pairs(storeRows) do
-        item.row.Visible = q == "" or string.find(string.lower(item.app.name), q, 1, true) ~= nil
-    end
+local idx = 0
+for _, app in ipairs(APPS) do
+	if app.id ~= "store" then
+		local cx, cy = 28 + (idx % 2) * 400, 150 + math.floor(idx / 2) * 120
+		idx = idx + 1
+		makeAppIcon(storeFrame, app, 72, cx, cy, 2)
+		label(storeFrame, app.name, cx + 88, cy + 2, 180, 28, 22, WHITE, Enum.Font.GothamBold, Enum.TextXAlignment.Left, 2)
+		local subL = label(storeFrame, app.sub, cx + 88, cy + 34, 180, 38, 14, GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Left, 2)
+		subL.TextWrapped = true
+		subL.TextYAlignment = Enum.TextYAlignment.Top
+
+		local btn = button(storeFrame, cx + 276, cy + 17, 84, 38, BLUE, 0, 2)
+		btn.ClipsDescendants = true
+		corner(btn, UDim.new(1, 0))
+		local fill = ui("Frame", {
+			Size = UDim2.fromScale(0, 1),
+			BackgroundColor3 = BLUE,
+			BorderSizePixel = 0,
+			Visible = false,
+			ZIndex = 3,
+		}, btn)
+		corner(fill, UDim.new(1, 0))
+		local txt = label(btn, "GET", 0, 0, 84, 38, 20, WHITE, Enum.Font.GothamBold, nil, 4)
+
+		storeRows[app.id] = { btn = btn, fill = fill, txt = txt }
+		installState[app.id] = { state = "none", p = 0 }
+
+		btn.InputBegan:Connect(function(input)
+			if isPress(input) then btn.BackgroundTransparency = 0.3 end
+		end)
+		btn.InputEnded:Connect(function(input)
+			if isPress(input) then btn.BackgroundTransparency = 0 end
+		end)
+		btn.Activated:Connect(function()
+			onStoreButton(app)
+		end)
+	end
+end
+
+-- "Wi-Fi required" alert (its own layer inside the store)
+local alertFrame = ui("Frame", {
+	Size = UDim2.fromScale(1, 1),
+	BackgroundColor3 = BLACK,
+	BackgroundTransparency = 0.45,
+	BorderSizePixel = 0,
+	Active = true,
+	Visible = false,
+	ZIndex = 30,
+}, storeFrame)
+local alertBox = ui("Frame", {
+	Size = UDim2.fromOffset(440, 220),
+	Position = UDim2.fromOffset((SW - 440) / 2, 170),
+	BackgroundColor3 = Color3.fromRGB(46, 46, 60),
+	BorderSizePixel = 0,
+	ZIndex = 31,
+}, alertFrame)
+corner(alertBox, UDim.new(0, 28))
+label(alertBox, "Wi-Fi Required", 0, 24, 440, 36, 28, WHITE, Enum.Font.GothamBold, nil, 32)
+local alertMsg = label(alertBox, "Connect to Wi-Fi to download apps.", 40, 68, 360, 70, 20, GRAY, Enum.Font.GothamMedium, nil, 32)
+alertMsg.TextWrapped = true
+ui("Frame", {
+	Size = UDim2.fromOffset(440, 1),
+	Position = UDim2.fromOffset(0, 150),
+	BackgroundColor3 = WHITE,
+	BackgroundTransparency = 0.85,
+	BorderSizePixel = 0,
+	ZIndex = 32,
+}, alertBox)
+local alertOk = button(alertBox, 0, 151, 440, 69, WHITE, 1, 32)
+label(alertOk, "OK", 0, 0, 440, 69, 28, BLUE, Enum.Font.GothamBold, nil, 33)
+
+showAlert = function()
+	alertOn = true
+	alertFrame.Visible = true
+end
+hideAlert = function()
+	alertOn = false
+	alertFrame.Visible = false
+end
+alertOk.Activated:Connect(function()
+	hideAlert()
 end)
 
--- Settings screen.
-label(settingsView, "Settings", UDim2.fromOffset(22, 48), UDim2.new(1, -44, 0, 42), 29, C.text).Font = Enum.Font.GothamBold
-label(settingsView, "Connectivity", UDim2.fromOffset(23, 103), UDim2.new(1, -46, 0, 24), 14, C.muted)
-local wifiCard = make("Frame", {
-    Position = UDim2.fromOffset(16, 135),
-    Size = UDim2.new(1, -32, 0, 76),
-    BackgroundColor3 = C.white,
-    BorderSizePixel = 0,
-    ZIndex = 7,
-}, settingsView)
-addCorner(wifiCard, 15)
-local wifiGlyph = label(wifiCard, "◔", UDim2.fromOffset(14, 10), UDim2.fromOffset(46, 54), 24, C.blue, Enum.TextXAlignment.Center)
-wifiGlyph.Font = Enum.Font.GothamBold
-label(wifiCard, "Wi-Fi", UDim2.fromOffset(67, 7), UDim2.fromOffset(150, 30), 15, C.text).Font = Enum.Font.GothamBold
-local wifiStateLabel = label(wifiCard, "Off", UDim2.fromOffset(67, 37), UDim2.fromOffset(150, 25), 11, C.muted)
-local wifiToggle = button(wifiCard, "OFF", UDim2.new(1, -80, 0.5, -16), UDim2.fromOffset(65, 32), Color3.fromRGB(230, 232, 237), C.muted, 12)
-addCorner(wifiToggle, 18)
-local wifiExplanation = label(settingsView, "Turn Wi-Fi on to simulate App Store downloads. This setting only affects this mockup.", UDim2.fromOffset(22, 220), UDim2.new(1, -44, 0, 62), 12, C.muted)
-wifiExplanation.TextYAlignment = Enum.TextYAlignment.Top
+refreshStoreStatus = function()
+	if wifiState == "connected" then
+		storeStatus.Text = "Connected to " .. WIFI_NAME
+		storeStatus.TextColor3 = GREEN
+	else
+		storeStatus.Text = "No Wi-Fi connection. Connect to download apps."
+		storeStatus.TextColor3 = ORANGE
+	end
+end
+refreshStoreStatus()
 
-local infoCard = make("Frame", {
-    Position = UDim2.fromOffset(16, 300),
-    Size = UDim2.new(1, -32, 0, 80),
-    BackgroundColor3 = C.white,
-    BorderSizePixel = 0,
-    ZIndex = 7,
-}, settingsView)
-addCorner(infoCard, 15)
-label(infoCard, "About This iPad", UDim2.fromOffset(16, 8), UDim2.new(1, -32, 0, 28), 14, C.text).Font = Enum.Font.GothamBold
-label(infoCard, "iPadOS-style local UI demo", UDim2.fromOffset(16, 38), UDim2.new(1, -32, 0, 26), 11, C.muted)
+startDownload = function(app)
+	local st = installState[app.id]
+	if st.state ~= "none" then return end
+	st.state = "downloading"
+	st.p = 0
+	addHomeIcon(app, false) -- icon shows up on the home screen while it downloads
+	refreshRow(app)
+end
 
+local function finishInstall(app)
+	local st = installState[app.id]
+	st.state = "installed"
+	st.p = 1
+	local e = homeEntries[app.id]
+	if e then
+		e.installed = true
+		TweenService:Create(e.dl, TweenInfo.new(0.3), { BackgroundTransparency = 1 }):Play()
+		e.track.Visible = false
+		TweenService:Create(e.scale, TweenInfo.new(0.15), { Scale = 1.12 }):Play()
+		task.delay(0.15, function()
+			TweenService:Create(e.scale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
+		end)
+	end
+	refreshRow(app)
+end
+
+-- ---------- FLAPPY BIRD ----------
+local GROUND_Y, PIPE_W, GAP, SPACING = 520, 84, 190, 270
+local SPEED, GRAV, FLAP = 170, 1300, -430
+local BIRD_X = 190
+
+local flappyFrame = ui("Frame", {
+	Name = "Flappy",
+	Size = UDim2.fromScale(1, 1),
+	BackgroundColor3 = Color3.fromRGB(112, 197, 206),
+	BorderSizePixel = 0,
+	ClipsDescendants = true,
+	Visible = false,
+	ZIndex = 2,
+}, appLayer)
+
+for _, c in ipairs({ { 60, 180, 140 }, { 420, 120, 180 }, { 650, 300, 130 } }) do
+	local cl = ui("Frame", {
+		Size = UDim2.fromOffset(c[3], c[3] * 0.35),
+		Position = UDim2.fromOffset(c[1], c[2]),
+		BackgroundColor3 = WHITE,
+		BackgroundTransparency = 0.35,
+		BorderSizePixel = 0,
+		ZIndex = 1,
+	}, flappyFrame)
+	corner(cl, UDim.new(1, 0))
+end
+
+local pipes = {}
+for i = 1, 4 do
+	local top = ui("Frame", { BackgroundColor3 = Color3.fromRGB(115, 190, 46), BorderSizePixel = 0, ZIndex = 2 }, flappyFrame)
+	ui("UIStroke", { Color = Color3.fromRGB(70, 120, 30), Thickness = 4 }, top)
+	local bot = ui("Frame", { BackgroundColor3 = Color3.fromRGB(115, 190, 46), BorderSizePixel = 0, ZIndex = 2 }, flappyFrame)
+	ui("UIStroke", { Color = Color3.fromRGB(70, 120, 30), Thickness = 4 }, bot)
+	pipes[i] = { x = 0, gap = 300, top = top, bot = bot, scored = false }
+end
+
+local ground = ui("Frame", {
+	Size = UDim2.fromOffset(SW, SH - GROUND_Y),
+	Position = UDim2.fromOffset(0, GROUND_Y),
+	BackgroundColor3 = Color3.fromRGB(222, 216, 150),
+	BorderSizePixel = 0,
+	ZIndex = 3,
+}, flappyFrame)
+ui("Frame", {
+	Size = UDim2.fromOffset(SW, 16),
+	BackgroundColor3 = Color3.fromRGB(100, 200, 60),
+	BorderSizePixel = 0,
+	ZIndex = 4,
+}, ground)
+
+local bird = ui("Frame", {
+	Size = UDim2.fromOffset(44, 34),
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.fromOffset(BIRD_X, 290),
+	BackgroundColor3 = Color3.fromRGB(255, 214, 48),
+	BorderSizePixel = 0,
+	ZIndex = 5,
+}, flappyFrame)
+corner(bird, UDim.new(1, 0))
+dot(bird, 14, 21, 16, Color3.fromRGB(240, 170, 30), 6)
+dot(bird, 32, 11, 13, WHITE, 6)
+dot(bird, 35, 11, 6, BLACK, 7)
+local beak = ui("Frame", {
+	Size = UDim2.fromOffset(16, 10),
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.fromOffset(42, 21),
+	BackgroundColor3 = Color3.fromRGB(255, 128, 40),
+	BorderSizePixel = 0,
+	ZIndex = 6,
+}, bird)
+corner(beak, UDim.new(0.5, 0))
+
+local fScoreLabel = label(flappyFrame, "0", 0, 60, SW, 90, 76, WHITE, Enum.Font.GothamBold, nil, 6)
+fScoreLabel.TextStrokeColor3 = BLACK
+fScoreLabel.TextStrokeTransparency = 0.3
+local fHint = label(flappyFrame, "Tap to flap", 0, 350, SW, 46, 30, WHITE, Enum.Font.GothamBold, nil, 6)
+fHint.TextStrokeColor3 = BLACK
+fHint.TextStrokeTransparency = 0.3
+
+local BROWN = Color3.fromRGB(84, 56, 71)
+local fOver = ui("Frame", {
+	Size = UDim2.fromOffset(400, 250),
+	Position = UDim2.fromOffset((SW - 400) / 2, 130),
+	BackgroundColor3 = Color3.fromRGB(222, 216, 150),
+	BorderSizePixel = 0,
+	Visible = false,
+	ZIndex = 7,
+}, flappyFrame)
+corner(fOver, UDim.new(0, 22))
+ui("UIStroke", { Color = BROWN, Thickness = 5 }, fOver)
+label(fOver, "GAME OVER", 0, 20, 400, 46, 36, Color3.fromRGB(230, 110, 30), Enum.Font.GothamBold, nil, 8)
+local fOverScore = label(fOver, "Score: 0", 0, 86, 400, 36, 28, BROWN, Enum.Font.GothamBold, nil, 8)
+local fOverBest = label(fOver, "Best: 0", 0, 128, 400, 36, 28, BROWN, Enum.Font.GothamBold, nil, 8)
+label(fOver, "Tap to retry", 0, 192, 400, 32, 22, BROWN, Enum.Font.GothamMedium, nil, 8)
+
+local fState, by, bv, fScore, fBest, deadAt = "ready", 290, 0, 0, 0, 0
+
+local function flappyApply()
+	bird.Position = UDim2.fromOffset(BIRD_X, by)
+	bird.Rotation = math.clamp(bv * 0.08, -25, 80)
+	for _, p in ipairs(pipes) do
+		local topH = p.gap - GAP / 2
+		p.top.Position = UDim2.fromOffset(p.x, 0)
+		p.top.Size = UDim2.fromOffset(PIPE_W, topH)
+		p.bot.Position = UDim2.fromOffset(p.x, p.gap + GAP / 2)
+		p.bot.Size = UDim2.fromOffset(PIPE_W, GROUND_Y - (p.gap + GAP / 2))
+	end
+end
+
+flappyReset = function()
+	fState = "ready"
+	by, bv, fScore = 290, 0, 0
+	for i, p in ipairs(pipes) do
+		p.x = SW + 100 + (i - 1) * SPACING
+		p.gap = math.random(175, 420)
+		p.scored = false
+	end
+	fScoreLabel.Text = "0"
+	fHint.Visible = true
+	fOver.Visible = false
+	flappyApply()
+end
+
+local function flappyDie()
+	fState = "dead"
+	deadAt = os.clock()
+	if fScore > fBest then fBest = fScore end
+	fOverScore.Text = "Score: " .. fScore
+	fOverBest.Text = "Best: " .. fBest
+	fOver.Visible = true
+end
+
+flappyTap = function()
+	if fState == "ready" then
+		fState = "playing"
+		fHint.Visible = false
+		bv = FLAP
+	elseif fState == "playing" then
+		bv = FLAP
+	elseif fState == "dead" and os.clock() - deadAt > 0.5 then
+		flappyReset()
+	end
+end
+
+local function flappyUpdate(dt)
+	if fState == "ready" then
+		by = 290 + math.sin(os.clock() * 5) * 9
+		bv = 0
+	elseif fState == "playing" then
+		bv = bv + GRAV * dt
+		by = by + bv * dt
+		if by < 10 then
+			by = 10
+			bv = 0
+		end
+		local maxX = -1000
+		for _, p in ipairs(pipes) do
+			p.x = p.x - SPEED * dt
+			if p.x > maxX then maxX = p.x end
+		end
+		for _, p in ipairs(pipes) do
+			if p.x < -PIPE_W then
+				p.x = maxX + SPACING
+				maxX = p.x
+				p.gap = math.random(175, 420)
+				p.scored = false
+			end
+		end
+		local left, right, top, bottom = BIRD_X - 15, BIRD_X + 15, by - 13, by + 13
+		for _, p in ipairs(pipes) do
+			if not p.scored and p.x + PIPE_W < left then
+				p.scored = true
+				fScore = fScore + 1
+				fScoreLabel.Text = tostring(fScore)
+			end
+			if right > p.x and left < p.x + PIPE_W then
+				if top < p.gap - GAP / 2 or bottom > p.gap + GAP / 2 then
+					flappyDie()
+				end
+			end
+		end
+		if bottom >= GROUND_Y then
+			by = GROUND_Y - 13
+			flappyDie()
+		end
+	elseif fState == "dead" then
+		if by < GROUND_Y - 13 then
+			bv = bv + GRAV * dt
+			by = math.min(by + bv * dt, GROUND_Y - 13)
+		end
+	end
+	flappyApply()
+end
+flappyReset()
+
+-- ---------- GENERIC APP SCREEN (Roblox, Minecraft, ...) ----------
+local genericFrame = ui("Frame", {
+	Name = "Generic",
+	Size = UDim2.fromScale(1, 1),
+	BackgroundColor3 = Color3.fromRGB(18, 18, 26),
+	BorderSizePixel = 0,
+	Visible = false,
+	ZIndex = 2,
+}, appLayer)
+local bigIcons = {}
+for _, app in ipairs(APPS) do
+	if app.id ~= "store" and app.id ~= "flappy" then
+		local ic = makeAppIcon(genericFrame, app, 150, (SW - 150) / 2, 110, 2)
+		ic.Visible = false
+		bigIcons[app.id] = ic
+	end
+end
+local genName = label(genericFrame, "", 0, 285, SW, 50, 40, WHITE, Enum.Font.GothamBold, nil, 2)
+local genSub = label(genericFrame, "", 0, 338, SW, 30, 22, GRAY, Enum.Font.GothamMedium, nil, 2)
+label(genericFrame, "This app has no content yet", 0, 430, SW, 26, 18, Color3.fromRGB(100, 100, 115), Enum.Font.GothamMedium, nil, 2)
+
+-- swipe up from the very bottom to leave the app
+local bottomZone = ui("Frame", {
+	Name = "BottomZone",
+	Size = UDim2.fromOffset(SW, 60),
+	Position = UDim2.fromOffset(0, SH - 60),
+	BackgroundTransparency = 1,
+	BorderSizePixel = 0,
+	Active = true,
+	ZIndex = 10,
+}, appLayer)
+local appBarV = ui("Frame", {
+	Size = UDim2.fromOffset(180, 6),
+	Position = UDim2.fromOffset(SW / 2 - 90, SH - 16),
+	BackgroundColor3 = WHITE,
+	BackgroundTransparency = 0.35,
+	BorderSizePixel = 0,
+	ZIndex = 11,
+}, appLayer)
+corner(appBarV, UDim.new(1, 0))
+
+local appToken = 0
+
+openApp = function(id)
+	local app = APPSById[id]
+	if not app then return end
+	local generic = id ~= "store" and id ~= "flappy"
+	storeFrame.Visible = id == "store"
+	flappyFrame.Visible = id == "flappy"
+	genericFrame.Visible = generic
+	if generic then
+		for k, ic in pairs(bigIcons) do
+			ic.Visible = (k == id)
+		end
+		genName.Text = app.name
+		genSub.Text = app.sub
+	end
+	if id == "flappy" then flappyReset() end
+	if id == "store" then
+		hideAlert()
+		refreshStoreStatus()
+	end
+	local already = appOpen ~= nil
+	appOpen = id
+	appToken = appToken + 1
+	if not already then
+		appLayer.Position = UDim2.fromOffset(0, SH)
+		appLayer.Visible = true
+		TweenService:Create(appLayer, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Position = UDim2.fromOffset(0, 0) }):Play()
+	end
+end
+
+closeApp = function(instant)
+	if not appOpen then return end
+	appOpen = nil
+	appToken = appToken + 1
+	local my = appToken
+	hideAlert()
+	flappyReset()
+	if instant then
+		appLayer.Visible = false
+		appLayer.Position = UDim2.fromOffset(0, SH)
+		return
+	end
+	local tw = TweenService:Create(appLayer, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Position = UDim2.fromOffset(0, -SH) })
+	tw.Completed:Connect(function()
+		if appToken == my then
+			appLayer.Visible = false
+			appLayer.Position = UDim2.fromOffset(0, SH)
+		end
+	end)
+	tw:Play()
+end
+
+bottomZone.InputBegan:Connect(function(input)
+	if not isPress(input) then return end
+	pulse()
+	local startY, startT, lastDy = input.Position.Y, os.clock(), 0
+	beginDrag(input, function(pos)
+		lastDy = math.max(0, (startY - pos.Y) / fit.Scale)
+		appLayer.Position = UDim2.fromOffset(0, -lastDy)
+	end, function()
+		local dt = math.max(os.clock() - startT, 0.05)
+		if lastDy > 110 or (lastDy > 30 and lastDy / dt > 700) then
+			closeApp(false)
+		else
+			TweenService:Create(
+				appLayer,
+				TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+				{ Position = UDim2.fromOffset(0, 0) }
+			):Play()
+		end
+	end)
+end)
+
+-- =====================================================================
+-- LAYER 3: LOCK SCREEN (slides up)
+-- =====================================================================
+local lock = wallpaper(scr, "Lock", Color3.fromRGB(24, 20, 84), Color3.fromRGB(132, 52, 172), Color3.fromRGB(255, 128, 118), 70, 3)
+lock.Active = true
+blob(lock, -80, 30, 340, Color3.fromRGB(120, 140, 255), 0.82)
+blob(lock, 520, 180, 380, Color3.fromRGB(255, 190, 120), 0.85)
+blob(lock, 150, 340, 320, Color3.fromRGB(255, 110, 190), 0.82)
+
+local lockContent = group(lock, 6)
+
+local shackle = ui("Frame", {
+	Size = UDim2.fromOffset(22, 22),
+	Position = UDim2.fromOffset(SW / 2 - 11, 66),
+	BackgroundTransparency = 1,
+	BorderSizePixel = 0,
+	ZIndex = 6,
+}, lockContent)
+corner(shackle, UDim.new(1, 0))
+ui("UIStroke", { Color = WHITE, Thickness = 4, Transparency = 0.1 }, shackle)
+local lockBody = ui("Frame", {
+	Size = UDim2.fromOffset(36, 26),
+	Position = UDim2.fromOffset(SW / 2 - 18, 82),
+	BackgroundColor3 = WHITE,
+	BackgroundTransparency = 0.1,
+	BorderSizePixel = 0,
+	ZIndex = 7,
+}, lockContent)
+corner(lockBody, UDim.new(0, 7))
+
+local dateLabel = label(lockContent, "", 0, 124, SW, 34, 28, WHITE, Enum.Font.GothamMedium, nil, 6)
+dateLabel.TextTransparency = 0.1
+local timeLabel = label(lockContent, "", 0, 156, SW, 130, 118, WHITE, Enum.Font.GothamBold, nil, 6)
+
+local hint = label(lockContent, "Swipe up to unlock", 0, SH - 74, SW, 30, 22, WHITE, Enum.Font.GothamMedium, nil, 6)
+hint.TextTransparency = 0.15
+TweenService:Create(
+	hint,
+	TweenInfo.new(1.1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
+	{ TextTransparency = 0.7 }
+):Play()
+
+local lockBar = ui("Frame", {
+	Size = UDim2.fromOffset(180, 6),
+	Position = UDim2.fromOffset(SW / 2 - 90, SH - 16),
+	BackgroundColor3 = WHITE,
+	BackgroundTransparency = 0.2,
+	BorderSizePixel = 0,
+	ZIndex = 6,
+}, lockContent)
+corner(lockBar, UDim.new(1, 0))
+
+local function unlock()
+	locked = false
+	if slideTween then slideTween:Cancel() end
+	slideTween = TweenService:Create(
+		lock,
+		TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+		{ Position = UDim2.fromOffset(0, -SH - 20) }
+	)
+	slideTween.Completed:Connect(function()
+		if not locked then
+			lock.Visible = false
+		end
+	end)
+	slideTween:Play()
+end
+
+local function snapBack()
+	if slideTween then slideTween:Cancel() end
+	slideTween = TweenService:Create(
+		lock,
+		TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+		{ Position = UDim2.fromOffset(0, 0) }
+	)
+	slideTween:Play()
+end
+
+lock.InputBegan:Connect(function(input)
+	if not isPress(input) then return end
+	pulse()
+	if slideTween then slideTween:Cancel() end
+	local startY, startT, lastDy = input.Position.Y, os.clock(), 0
+	beginDrag(input, function(pos)
+		lastDy = math.max(0, (startY - pos.Y) / fit.Scale)
+		lock.Position = UDim2.fromOffset(0, -lastDy)
+	end, function()
+		local dt = math.max(os.clock() - startT, 0.05)
+		if lastDy > SH * 0.3 or (lastDy > SH * 0.08 and lastDy / dt > SH * 1.4) then
+			unlock()
+		else
+			snapBack()
+		end
+	end)
+end)
+
+-- =====================================================================
+-- LAYER 4: CONTROL CENTER
+-- =====================================================================
+local PANEL_W, PANEL_H = 600, 360
+local PANEL_X, PANEL_Y = (SW - PANEL_W) / 2, 64
+
+local ccRoot = ui("Frame", {
+	Name = "ControlCenter",
+	Size = UDim2.fromScale(1, 1),
+	BackgroundTransparency = 1,
+	BorderSizePixel = 0,
+	Visible = false,
+	ZIndex = 4,
+}, scr)
+
+-- frosted layer behind the menu (tap it / swipe up on it to close)
+local frost = ui("Frame", {
+	Size = UDim2.fromScale(1, 1),
+	BackgroundColor3 = Color3.fromRGB(110, 115, 145),
+	BackgroundTransparency = 1,
+	BorderSizePixel = 0,
+	Active = true,
+	ZIndex = 1,
+}, ccRoot)
+
+local panel = ui("Frame", {
+	Name = "Panel",
+	Size = UDim2.fromOffset(PANEL_W, PANEL_H),
+	Position = UDim2.fromOffset(PANEL_X, -PANEL_H - 30),
+	BackgroundColor3 = Color3.fromRGB(32, 32, 42),
+	BackgroundTransparency = 0.1,
+	BorderSizePixel = 0,
+	ZIndex = 2,
+}, ccRoot)
+corner(panel, UDim.new(0, 36))
+ui("UIStroke", { Color = WHITE, Thickness = 1.5, Transparency = 0.85 }, panel)
+
+-- empty panel background (catches touches on blank areas)
+local panelBg = ui("Frame", {
+	Size = UDim2.fromScale(1, 1),
+	BackgroundTransparency = 1,
+	BorderSizePixel = 0,
+	Active = true,
+	ZIndex = 1,
+}, panel)
+
+local ccMain = ui("Frame", {
+	Size = UDim2.fromScale(1, 1),
+	BackgroundTransparency = 1,
+	BorderSizePixel = 0,
+	ZIndex = 2,
+}, panel)
+local ccWifi = ui("Frame", {
+	Size = UDim2.fromScale(1, 1),
+	BackgroundTransparency = 1,
+	BorderSizePixel = 0,
+	Visible = false,
+	ZIndex = 2,
+}, panel)
+
+local function ccDragBegin(input, inPanel)
+	if not isPress(input) then return end
+	pulse()
+	local startY = input.Position.Y
+	local moved = 0
+	local started = beginDrag(input, function(pos)
+		local dy = (pos.Y - startY) / fit.Scale
+		moved = math.max(moved, math.abs(dy))
+		ccP = math.clamp(1 + dy / 240, 0, 1)
+	end, function()
+		ccDragging = false
+		if (not inPanel and moved < 14) or ccP < 0.6 then
+			ccTarget = 0
+		else
+			ccTarget = 1
+		end
+	end)
+	if started then
+		ccDragging = true
+	end
+end
+frost.InputBegan:Connect(function(input) ccDragBegin(input, false) end)
+panelBg.InputBegan:Connect(function(input) ccDragBegin(input, true) end)
+
+local function setToggle(tile, carve, on, onColor)
+	local c = on and onColor or TILE_OFF
+	TweenService:Create(tile, TweenInfo.new(0.15), { BackgroundColor3 = c }):Play()
+	if carve then
+		TweenService:Create(carve, TweenInfo.new(0.15), { BackgroundColor3 = c }):Play()
+	end
+end
+
+local TILE = 100
+local function makeTile(i, text)
+	local x = 30 + (i - 1) * (TILE + 46.67)
+	local t = button(ccMain, x, 26, TILE, TILE, TILE_OFF, 0, 3)
+	corner(t, UDim.new(0, 28))
+	local sc = ui("UIScale", { Scale = 1 }, t)
+	pressFx(t, sc, 0.92)
+	local lab = label(ccMain, text, x - 12, 26 + TILE + 8, TILE + 24, 20, 14, WHITE, Enum.Font.GothamMedium, nil, 3)
+	lab.TextTransparency = 0.1
+	return t, sc, lab
+end
+
+local wifiTile, wifiSc, wifiLab = makeTile(1, "Wi-Fi")
+drawWifi(wifiTile, TILE / 2, 62, 0.9, WHITE, 5)
+
+local btTile = makeTile(2, "Bluetooth")
+drawBluetooth(btTile, TILE / 2, TILE / 2, 0.9, WHITE, 5)
+
+local dndTile = makeTile(3, "Do Not Disturb")
+dot(dndTile, TILE / 2, TILE / 2, 40, WHITE, 5)
+local dndCarve = dot(dndTile, TILE / 2 + 11, TILE / 2 - 7, 34, TILE_OFF, 6)
+
+local eyeTile = makeTile(4, "Eye Protection")
+local eyeOutline = ui("Frame", {
+	Size = UDim2.fromOffset(52, 30),
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.fromOffset(TILE / 2, TILE / 2),
+	BackgroundTransparency = 1,
+	BorderSizePixel = 0,
+	ZIndex = 5,
+}, eyeTile)
+corner(eyeOutline, UDim.new(1, 0))
+ui("UIStroke", { Color = WHITE, Thickness = 4 }, eyeOutline)
+dot(eyeTile, TILE / 2, TILE / 2, 14, WHITE, 5)
+
+local function makeSlider(y, text, drawIcon, init)
+	local track = ui("Frame", {
+		Size = UDim2.fromOffset(540, 68),
+		Position = UDim2.fromOffset(30, y),
+		BackgroundColor3 = Color3.fromRGB(78, 78, 92),
+		BorderSizePixel = 0,
+		ClipsDescendants = true,
+		Active = true,
+		ZIndex = 3,
+	}, ccMain)
+	corner(track, UDim.new(0, 26))
+	local fill = ui("Frame", {
+		Size = UDim2.new(init, 0, 1, 0),
+		BackgroundColor3 = WHITE,
+		BorderSizePixel = 0,
+		ZIndex = 4,
+	}, track)
+	corner(fill, UDim.new(0, 26))
+	drawIcon(track, 40, 34, 0.85, Color3.fromRGB(120, 120, 135), 6)
+	label(track, text, 84, 0, 300, 68, 22, Color3.fromRGB(125, 125, 140), Enum.Font.GothamMedium, Enum.TextXAlignment.Left, 6)
+	return track, fill
+end
+
+local brightTrack, brightFill = makeSlider(176, "Brightness", drawSun, brightV)
+local volTrack, volFill = makeSlider(260, "Volume", drawSpeaker, volV)
+
+local function bindSlider(track, setFn)
+	track.InputBegan:Connect(function(input)
+		if not isPress(input) then return end
+		pulse()
+		local function setFromX(x)
+			setFn(math.clamp((x - track.AbsolutePosition.X) / track.AbsoluteSize.X, 0, 1))
+		end
+		setFromX(input.Position.X)
+		beginDrag(input, function(pos)
+			setFromX(pos.X)
+		end, function() end)
+	end)
+end
+
+-- brightness dims the screen, eye protection adds a warm tint (overlays are created below)
+local dim, warm
+setBrightness = function(v)
+	brightV = math.clamp(v, 0, 1)
+	brightFill.Size = UDim2.new(brightV, 0, 1, 0)
+	if dim then
+		dim.BackgroundTransparency = 1 - (1 - brightV) * 0.85
+	end
+end
+setVolume = function(v)
+	volV = math.clamp(v, 0, 1) -- stored here, nothing plays audio yet
+	volFill.Size = UDim2.new(volV, 0, 1, 0)
+end
+bindSlider(brightTrack, function(v) setBrightness(v) end)
+bindSlider(volTrack, function(v) setVolume(v) end)
+
+-- ---------- Wi-Fi view (its own layer inside the control center) ----------
+local wBack = button(ccWifi, 12, 12, 180, 56, WHITE, 1, 3)
+label(wBack, "< Back", 10, 0, 160, 56, 24, BLUE, Enum.Font.GothamMedium, Enum.TextXAlignment.Left, 4)
+label(ccWifi, "Wi-Fi", 0, 18, PANEL_W, 44, 28, WHITE, Enum.Font.GothamBold, nil, 3)
+
+local swRow = button(ccWifi, 30, 84, 540, 68, ROW, 0, 3)
+corner(swRow, UDim.new(0, 24))
+label(swRow, "Wi-Fi", 26, 0, 200, 68, 26, WHITE, Enum.Font.GothamMedium, Enum.TextXAlignment.Left, 4)
+local swTrack = ui("Frame", {
+	Size = UDim2.fromOffset(88, 50),
+	Position = UDim2.fromOffset(540 - 88 - 22, 9),
+	BackgroundColor3 = Color3.fromRGB(86, 86, 100),
+	BorderSizePixel = 0,
+	ZIndex = 4,
+}, swRow)
+corner(swTrack, UDim.new(1, 0))
+local swKnob = ui("Frame", {
+	Size = UDim2.fromOffset(42, 42),
+	Position = UDim2.fromOffset(4, 4),
+	BackgroundColor3 = WHITE,
+	BorderSizePixel = 0,
+	ZIndex = 5,
+}, swTrack)
+corner(swKnob, UDim.new(1, 0))
+
+local netHeader = label(ccWifi, "NETWORKS", 44, 166, 300, 22, 15, GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Left, 3)
+
+local netRow = button(ccWifi, 30, 194, 540, 68, ROW, 0, 3)
+corner(netRow, UDim.new(0, 24))
+drawWifi(netRow, 46, 46, 0.55, WHITE, 5)
+label(netRow, WIFI_NAME, 82, 0, 260, 68, 26, WHITE, Enum.Font.GothamMedium, Enum.TextXAlignment.Left, 4)
+local netStatus = label(netRow, "", 320, 0, 200, 68, 20, GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Right, 4)
+
+local netInfo = label(ccWifi, "Turn on Wi-Fi to see networks", 30, 194, 540, 68, 22, GRAY, Enum.Font.GothamMedium, nil, 3)
+
+-- ---------- Wi-Fi logic ----------
+local statusWifi = {} -- filled by the status bar below
+
+refreshWifi = function()
+	TweenService:Create(swTrack, TweenInfo.new(0.2), { BackgroundColor3 = wifiOn and GREEN or Color3.fromRGB(86, 86, 100) }):Play()
+	TweenService:Create(swKnob, TweenInfo.new(0.2), { Position = wifiOn and UDim2.fromOffset(88 - 46, 4) or UDim2.fromOffset(4, 4) }):Play()
+
+	local showList = wifiOn and wifiState ~= "scanning"
+	netHeader.Visible = showList
+	netRow.Visible = showList
+	netInfo.Visible = not showList
+	netInfo.Text = wifiOn and "Searching..." or "Turn on Wi-Fi to see networks"
+
+	if wifiState == "connecting" then
+		netStatus.Text = "Connecting..."
+		netStatus.TextColor3 = GRAY
+	elseif wifiState == "connected" then
+		netStatus.Text = "Connected"
+		netStatus.TextColor3 = BLUE
+	else
+		netStatus.Text = ""
+	end
+
+	setToggle(wifiTile, nil, wifiOn, BLUE)
+	if wifiState == "connected" then
+		wifiLab.Text = WIFI_NAME
+	elseif wifiOn then
+		wifiLab.Text = "Not Connected"
+	else
+		wifiLab.Text = "Wi-Fi"
+	end
+
+	for _, p in ipairs(statusWifi) do
+		p.BackgroundTransparency = wifiState == "connected" and 0 or 0.7
+	end
+
+	refreshStoreStatus()
+end
+
+local wifiToken = 0
 local function setWifi(on)
-    wifiEnabled = on
-    wifiToggle.Text = on and "ON" or "OFF"
-    wifiToggle.BackgroundColor3 = on and C.green or Color3.fromRGB(230, 232, 237)
-    wifiToggle.TextColor3 = on and C.white or C.muted
-    wifiStateLabel.Text = on and "Connected (simulated)" or "Off"
-    statusRight.Text = on and "●  Wi-Fi  ▰" or "●  ▮▮  ▰"
-    statusRight.TextColor3 = C.white
+	wifiToken = wifiToken + 1
+	local my = wifiToken
+	wifiOn = on
+	if on then
+		wifiState = "scanning"
+		refreshWifi()
+		task.delay(1.2, function()
+			if wifiToken == my and wifiOn then
+				wifiState = "idle"
+				refreshWifi()
+			end
+		end)
+	else
+		wifiState = "off"
+		refreshWifi()
+	end
 end
-wifiToggle.Activated:Connect(function() setWifi(not wifiEnabled) end)
 
--- Generic app screen; a bottom home gesture/tap returns from this view.
-local appTopIcon = make("Frame", {
-    AnchorPoint = Vector2.new(0.5, 0),
-    Position = UDim2.new(0.5, 0, 0, 125),
-    Size = UDim2.fromOffset(110, 110),
-    BackgroundColor3 = Color3.fromRGB(235, 238, 244),
-    BorderSizePixel = 0,
-    ZIndex = 7,
-}, appView)
-addCorner(appTopIcon, 26)
-appGlyph = label(appTopIcon, "◇", UDim2.fromScale(0, 0), UDim2.fromScale(1, 1), 58, C.blue, Enum.TextXAlignment.Center)
-appGlyph.TextYAlignment = Enum.TextYAlignment.Center
-appTitle = label(appView, "App", UDim2.fromOffset(20, 250), UDim2.new(1, -40, 0, 42), 25, C.text, Enum.TextXAlignment.Center)
-appTitle.Font = Enum.Font.GothamBold
-appDescription = label(appView, "Demo app", UDim2.fromOffset(34, 298), UDim2.new(1, -68, 0, 90), 14, C.muted, Enum.TextXAlignment.Center)
-appDescription.TextYAlignment = Enum.TextYAlignment.Top
-
-local demoAction = button(appView, "Tap here", UDim2.new(0.5, -80, 0, 410), UDim2.fromOffset(160, 44), C.blue, C.white, 15)
-addCorner(demoAction, 22)
-demoAction.Activated:Connect(function()
-    if currentApp and currentApp.id == "flappy" then
-        demoAction.Text = "FLAP! 🐤"
-        task.delay(0.35, function()
-            if demoAction and demoAction.Parent then demoAction.Text = "Tap here" end
-        end)
-    else
-        demoAction.Text = "This is a demo"
-        task.delay(1.0, function()
-            if demoAction and demoAction.Parent then demoAction.Text = "Tap here" end
-        end)
-    end
-end)
-
--- Bottom home indicator: generous invisible hit-area so it is easy to tap on mobile.
-homeIndicatorHit = button(screen, "", UDim2.new(0.5, -88, 1, -45), UDim2.fromOffset(176, 34), Color3.fromRGB(255,255,255), C.white, 1)
-homeIndicatorHit.Name = "HomeIndicatorHitArea"
-homeIndicatorHit.BackgroundTransparency = 1
-homeIndicatorHit.Text = ""
-homeIndicatorHit.ZIndex = 40
-homeIndicatorBar = make("Frame", {
-    AnchorPoint = Vector2.new(0.5, 0.5),
-    Position = UDim2.new(0.5, 0, 0.5, 0),
-    Size = UDim2.fromOffset(106, 5),
-    BackgroundColor3 = C.white,
-    BackgroundTransparency = 0.18,
-    BorderSizePixel = 0,
-    ZIndex = 41,
-}, homeIndicatorHit)
-addCorner(homeIndicatorBar, 10)
-homeIndicatorHit.Activated:Connect(function()
-    if currentView ~= "home" then
-        switchView("home")
-    end
-end)
-
--- Power button on the top-right of the tablet shell (not an extra icon on the left).
-local power = button(tablet, "⏻", UDim2.new(1, -61, 0, -9), UDim2.fromOffset(34, 25), Color3.fromRGB(73, 76, 85), C.white, 16)
-power.Name = "PowerButton"
-addCorner(power, 8)
-power.ZIndex = 30
-power.Activated:Connect(function()
-    tablet.Visible = false
-    reopen.Visible = true
-end)
-reopen.Activated:Connect(function()
-    tablet.Visible = true
-    reopen.Visible = false
-end)
-
--- Keep the tablet small enough for phone/tablet viewports, without filling the screen.
-local cameraConnection
-local function updateScale()
-    local camera = Workspace.CurrentCamera
-    if not camera then return end
-    local viewport = camera.ViewportSize
-    local scale = math.min(1, (viewport.X * 0.88) / 420, (viewport.Y * 0.88) / 660)
-    tabletScale.Scale = math.max(0.52, scale)
+local function tapNetwork()
+	if wifiState == "idle" then
+		wifiToken = wifiToken + 1
+		local my = wifiToken
+		wifiState = "connecting"
+		refreshWifi()
+		task.delay(1.6, function()
+			if wifiToken == my and wifiOn then
+				wifiState = "connected"
+				refreshWifi()
+			end
+		end)
+	elseif wifiState == "connected" then
+		wifiToken = wifiToken + 1
+		wifiState = "idle" -- tap again to disconnect
+		refreshWifi()
+	end
 end
-updateScale()
-if Workspace.CurrentCamera then
-    cameraConnection = Workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(updateScale)
+
+showWifiView = function(v)
+	wifiView = v
+	ccMain.Visible = not v
+	ccWifi.Visible = v
 end
-Workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
-    if cameraConnection then cameraConnection:Disconnect() end
-    if Workspace.CurrentCamera then
-        cameraConnection = Workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(updateScale)
-        updateScale()
-    end
+
+wifiTile.Activated:Connect(function() showWifiView(true) end)
+wBack.Activated:Connect(function() showWifiView(false) end)
+swRow.Activated:Connect(function() setWifi(not wifiOn) end)
+netRow.Activated:Connect(function() tapNetwork() end)
+
+btTile.Activated:Connect(function()
+	btOn = not btOn
+	setToggle(btTile, nil, btOn, BLUE)
 end)
 
--- Digital clock, refreshed once per second.
+-- =====================================================================
+-- LAYER 5/6: STATUS ZONE + STATUS BAR (wifi + battery at 100%)
+-- =====================================================================
+-- swipe down from the battery / wifi area = Control Center
+local statusZone = ui("Frame", {
+	Name = "StatusZone",
+	Size = UDim2.fromOffset(250, 48),
+	Position = UDim2.fromOffset(SW - 250, 0),
+	BackgroundTransparency = 1,
+	BorderSizePixel = 0,
+	Active = true,
+	ZIndex = 5,
+}, scr)
+
+statusZone.InputBegan:Connect(function(input)
+	if not isPress(input) then return end
+	if ccTarget ~= 0 then return end
+	pulse()
+	local startY, startT = input.Position.Y, os.clock()
+	local started = beginDrag(input, function(pos)
+		ccP = math.clamp((pos.Y - startY) / fit.Scale / 240, 0, 1)
+	end, function()
+		ccDragging = false
+		local dt = math.max(os.clock() - startT, 0.05)
+		local speed = ccP * 240 / dt
+		if ccP > 0.4 or (speed > 700 and ccP > 0.08) then
+			ccTarget = 1
+		else
+			ccTarget = 0
+		end
+	end)
+	if started then
+		ccDragging = true
+	end
+end)
+
+local status = ui("Frame", {
+	Name = "StatusBar",
+	Size = UDim2.fromOffset(SW, 48),
+	BackgroundTransparency = 1,
+	BorderSizePixel = 0,
+	ZIndex = 6,
+}, scr)
+
+local dndLabel = label(status, "Do Not Disturb", 24, 9, 220, 26, 18, WHITE, Enum.Font.GothamMedium, Enum.TextXAlignment.Left, 7)
+dndLabel.Visible = false
+
+local statusTime = label(status, "", SW / 2 - 60, 8, 120, 28, 19, WHITE, Enum.Font.GothamBold, nil, 7)
+
+for _, p in ipairs(drawWifi(status, SW - 176, 32, 0.5, WHITE, 7)) do
+	p.BackgroundTransparency = 0.7
+	table.insert(statusWifi, p)
+end
+
+label(status, "100%", SW - 150, 9, 64, 26, 18, WHITE, Enum.Font.GothamMedium, Enum.TextXAlignment.Right, 7)
+
+local battOutline = ui("Frame", {
+	Size = UDim2.fromOffset(46, 24),
+	Position = UDim2.fromOffset(SW - 76, 10),
+	BackgroundTransparency = 1,
+	BorderSizePixel = 0,
+	ZIndex = 7,
+}, status)
+corner(battOutline, UDim.new(0, 7))
+ui("UIStroke", { Color = WHITE, Thickness = 2.5, Transparency = 0.2 }, battOutline)
+local battFill = ui("Frame", {
+	Size = UDim2.fromOffset(38, 16),
+	Position = UDim2.fromOffset(SW - 76 + 4, 10 + 4),
+	BackgroundColor3 = WHITE,
+	BorderSizePixel = 0,
+	ZIndex = 8,
+}, status)
+corner(battFill, UDim.new(0, 4))
+local battNub = ui("Frame", {
+	Size = UDim2.fromOffset(4, 10),
+	Position = UDim2.fromOffset(SW - 29, 17),
+	BackgroundColor3 = WHITE,
+	BackgroundTransparency = 0.2,
+	BorderSizePixel = 0,
+	ZIndex = 7,
+}, status)
+corner(battNub, UDim.new(0, 2))
+
 task.spawn(function()
-    while gui.Parent do
-        timeLabel.Text = os.date("%H:%M")
-        task.wait(1)
-    end
+	while alive do
+		local t = os.date("%H:%M")
+		timeLabel.Text = t
+		statusTime.Text = t
+		dateLabel.Text = os.date("%A, %B %d")
+		task.wait(1)
+	end
 end)
 
--- Start on the home screen; Wi-Fi stays off until toggled in Settings.
-switchView("home")
-setWifi(false)
+-- ---------- volume HUD + overlays ----------
+local volHud = ui("Frame", {
+	Name = "VolumeHud",
+	Size = UDim2.fromOffset(280, 56),
+	Position = UDim2.fromOffset((SW - 280) / 2, 56),
+	BackgroundColor3 = Color3.fromRGB(34, 34, 44),
+	BackgroundTransparency = 0.08,
+	BorderSizePixel = 0,
+	Visible = false,
+	ZIndex = 7,
+}, scr)
+corner(volHud, UDim.new(1, 0))
+ui("UIStroke", { Color = WHITE, Thickness = 1.5, Transparency = 0.85 }, volHud)
+drawSpeaker(volHud, 40, 28, 0.8, WHITE, 8)
+local hudTrack = ui("Frame", {
+	Size = UDim2.fromOffset(170, 10),
+	Position = UDim2.fromOffset(76, 23),
+	BackgroundColor3 = Color3.fromRGB(90, 90, 104),
+	BorderSizePixel = 0,
+	ZIndex = 8,
+}, volHud)
+corner(hudTrack, UDim.new(1, 0))
+local hudFill = ui("Frame", {
+	Size = UDim2.fromScale(0.5, 1),
+	BackgroundColor3 = WHITE,
+	BorderSizePixel = 0,
+	ZIndex = 9,
+}, hudTrack)
+corner(hudFill, UDim.new(1, 0))
+
+local hudToken = 0
+showVolHud = function()
+	hudFill.Size = UDim2.fromScale(volV, 1)
+	volHud.Visible = true
+	hudToken = hudToken + 1
+	local my = hudToken
+	task.delay(1.4, function()
+		if hudToken == my then
+			volHud.Visible = false
+		end
+	end)
+end
+
+dim = ui("Frame", {
+	Name = "BrightnessDim",
+	Size = UDim2.fromScale(1, 1),
+	BackgroundColor3 = BLACK,
+	BackgroundTransparency = 1,
+	BorderSizePixel = 0,
+	ZIndex = 8,
+}, scr)
+warm = ui("Frame", {
+	Name = "EyeProtection",
+	Size = UDim2.fromScale(1, 1),
+	BackgroundColor3 = Color3.fromRGB(255, 160, 40),
+	BackgroundTransparency = 1,
+	BorderSizePixel = 0,
+	ZIndex = 9,
+}, scr)
+setBrightness(brightV)
+
+dndTile.Activated:Connect(function()
+	dndOn = not dndOn
+	setToggle(dndTile, dndCarve, dndOn, PURPLE)
+	dndLabel.Visible = dndOn
+end)
+eyeTile.Activated:Connect(function()
+	eyeOn = not eyeOn
+	setToggle(eyeTile, nil, eyeOn, ORANGE)
+	TweenService:Create(warm, TweenInfo.new(0.3), { BackgroundTransparency = eyeOn and 0.86 or 1 }):Play()
+end)
+
+-- Control Center animation (0 = closed, 1 = open)
+local function setCC(p)
+	ccRoot.Visible = p > 0.002
+	frost.BackgroundTransparency = 1 - (appOpen and 0.8 or 0.5) * p
+	local closedY = -PANEL_H - 30
+	panel.Position = UDim2.fromOffset(PANEL_X, closedY + (PANEL_Y - closedY) * p)
+	-- home / lock content fades out behind the menu so nothing overlaps
+	homeContent.GroupTransparency = p
+	lockContent.GroupTransparency = p
+	for _, sc in ipairs(blobScales) do
+		sc.Scale = 1 + 0.4 * p -- blobs swell and soften = blur look
+	end
+	statusZone.Visible = (p < 0.02 and ccTarget == 0)
+end
+refreshWifi()
+setCC(0)
+
+-- =====================================================================
+-- BUTTONS ON THE IPAD (top = close, side = volume, round = home)
+-- =====================================================================
+local btnColor = Color3.fromRGB(96, 96, 104)
+
+-- TOP button: closes the iPad
+local powerBar = ui("Frame", {
+	Size = UDim2.fromOffset(100, 11),
+	Position = UDim2.fromOffset(700, -8),
+	BackgroundColor3 = btnColor,
+	BorderSizePixel = 0,
+	ZIndex = 1,
+}, ipad)
+corner(powerBar, UDim.new(0, 4))
+local powerHit = button(ipad, 680, -30, 140, 48, WHITE, 1, 6)
+
+-- SIDE buttons: volume up / down
+local volUpBar = ui("Frame", {
+	Size = UDim2.fromOffset(11, 56),
+	Position = UDim2.fromOffset(DW - 3, 130),
+	BackgroundColor3 = btnColor,
+	BorderSizePixel = 0,
+	ZIndex = 1,
+}, ipad)
+corner(volUpBar, UDim.new(0, 4))
+local volDownBar = ui("Frame", {
+	Size = UDim2.fromOffset(11, 56),
+	Position = UDim2.fromOffset(DW - 3, 210),
+	BackgroundColor3 = btnColor,
+	BorderSizePixel = 0,
+	ZIndex = 1,
+}, ipad)
+corner(volDownBar, UDim.new(0, 4))
+local volUpHit = button(ipad, DW - 24, 116, 52, 76, WHITE, 1, 6)
+local volDownHit = button(ipad, DW - 24, 196, 52, 76, WHITE, 1, 6)
+
+-- ROUND home button (like the picture)
+local homeBtn = button(ipad, DW - 72 - 0, DH / 2 - 29, 58, 58, Color3.fromRGB(6, 6, 8), 0, 5)
+corner(homeBtn, UDim.new(1, 0))
+ui("UIStroke", { Color = Color3.fromRGB(88, 88, 96), Thickness = 3 }, homeBtn)
+local homeInner = ui("Frame", {
+	Size = UDim2.fromOffset(20, 20),
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.fromScale(0.5, 0.5),
+	BackgroundTransparency = 1,
+	BorderSizePixel = 0,
+	ZIndex = 6,
+}, homeBtn)
+corner(homeInner, UDim.new(0, 5))
+ui("UIStroke", { Color = Color3.fromRGB(62, 62, 70), Thickness = 2 }, homeInner)
+
+homeBtn.Activated:Connect(function()
+	if ccTarget == 1 then
+		ccTarget = 0
+	elseif appOpen then
+		closeApp(false)
+	end
+end)
+
+local function nudge(barFrame, dx, dy)
+	local p0 = barFrame.Position
+	barFrame.Position = UDim2.new(p0.X.Scale, p0.X.Offset + dx, p0.Y.Scale, p0.Y.Offset + dy)
+	task.delay(0.12, function()
+		barFrame.Position = p0
+	end)
+end
+
+local holdToken = 0
+local function bindVolume(hit, barFrame, delta)
+	hit.InputBegan:Connect(function(input)
+		if not isPress(input) then return end
+		holdToken = holdToken + 1
+		local my = holdToken
+		local function step()
+			setVolume(volV + delta)
+			showVolHud()
+			nudge(barFrame, -4, 0)
+		end
+		step()
+		task.spawn(function()
+			task.wait(0.4)
+			while holdToken == my and alive and isOpen do
+				step()
+				task.wait(0.12)
+			end
+		end)
+	end)
+end
+bindVolume(volUpHit, volUpBar, VOL_STEP)
+bindVolume(volDownHit, volDownBar, -VOL_STEP)
+conns[#conns + 1] = UIS.InputEnded:Connect(function(input)
+	if isPress(input) then
+		holdToken = holdToken + 1
+	end
+end)
+
+powerHit.Activated:Connect(function()
+	nudge(powerBar, 0, 4)
+	closeIPad()
+end)
+
+-- =====================================================================
+-- SHOW / HIDE THE IPAD (inventory item)
+-- =====================================================================
+local openToken = 0
+
+showIPad = function()
+	if isOpen then return end
+	isOpen = true
+	openToken = openToken + 1
+	refit()
+	holder.Visible = true
+	root.Position = UDim2.fromScale(0.5, 1.6)
+	TweenService:Create(root, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Position = UDim2.fromScale(0.5, 0.5) }):Play()
+end
+
+hideIPad = function()
+	if not isOpen then return end
+	isOpen = false
+	openToken = openToken + 1
+	local my = openToken
+	-- reset everything for next time
+	ccTarget, ccP, ccDragging = 0, 0, false
+	setCC(0)
+	ccDrawn = 0
+	showWifiView(false)
+	closeApp(true)
+	if RELOCK_ON_CLOSE then
+		locked = true
+		if slideTween then slideTween:Cancel() end
+		lock.Visible = true
+		lock.Position = UDim2.fromOffset(0, 0)
+	end
+	local tw = TweenService:Create(root, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Position = UDim2.fromScale(0.5, 1.6) })
+	tw.Completed:Connect(function()
+		if openToken == my then
+			holder.Visible = false
+		end
+	end)
+	tw:Play()
+end
+
+closeIPad = function()
+	local bp = player:FindFirstChildOfClass("Backpack")
+	if tool and bp and tool.Parent ~= bp then
+		tool.Parent = bp
+	end
+	hideIPad()
+end
+
+-- =====================================================================
+-- LOOPS
+-- =====================================================================
+conns[#conns + 1] = RunService.RenderStepped:Connect(function(dt)
+	if not alive or not isOpen then return end
+	dt = math.min(dt, 1 / 30)
+
+	-- control center animation
+	if not ccDragging then
+		ccP = ccP + (ccTarget - ccP) * math.min(1, dt * 14)
+		if math.abs(ccTarget - ccP) < 0.003 then
+			ccP = ccTarget
+		end
+	end
+	if ccP ~= ccDrawn then
+		ccDrawn = ccP
+		setCC(ccP)
+	end
+	if ccP == 0 and wifiView then
+		showWifiView(false)
+	end
+
+	-- flappy bird (pauses while the control center is open)
+	if appOpen == "flappy" and ccP < 0.01 then
+		flappyUpdate(dt)
+	end
+end)
+
+-- downloads only progress while Wi-Fi is connected
+conns[#conns + 1] = RunService.Heartbeat:Connect(function(dt)
+	if not alive then return end
+	for _, app in ipairs(APPS) do
+		local st = installState[app.id]
+		if st and st.state == "downloading" then
+			if wifiState == "connected" then
+				st.p = math.min(1, st.p + dt / app.time)
+			end
+			local e = homeEntries[app.id]
+			if e then
+				e.fill.Size = UDim2.fromScale(st.p, 1)
+			end
+			if st.p >= 1 then
+				finishInstall(app)
+			else
+				refreshRow(app)
+			end
+		end
+	end
+end)
+
+-- =====================================================================
+-- THE IPAD ITEM (inventory / hotbar)
+-- =====================================================================
+local function onToolParent()
+	if not alive or not tool then return end
+	local char = player.Character
+	if char and tool.Parent == char then
+		showIPad()
+	else
+		hideIPad()
+	end
+end
+
+local function makeTool()
+	if tool then
+		local oldTool = tool
+		tool = nil
+		pcall(function()
+			oldTool:Destroy()
+		end)
+	end
+	local t = Instance.new("Tool")
+	t.Name = "iPad"
+	t.ToolTip = "iPad"
+	t.RequiresHandle = false
+	t.CanBeDropped = false
+	t:SetAttribute("IPad3D_Tool", true)
+	tool = t
+	t:GetPropertyChangedSignal("Parent"):Connect(onToolParent)
+	t.Parent = player:WaitForChild("Backpack")
+end
+
+-- after respawn the backpack is reset, so give the item again
+conns[#conns + 1] = player.CharacterAdded:Connect(function()
+	hideIPad()
+	task.wait(1)
+	if alive then
+		makeTool()
+	end
+end)
+
+task.spawn(makeTool)
+
+-- cleanup if the gui is destroyed (re-execute)
+gui.Destroying:Connect(function()
+	alive = false
+	for _, c in ipairs(conns) do
+		c:Disconnect()
+	end
+	if tool then
+		pcall(function()
+			tool:Destroy()
+		end)
+	end
+end)
