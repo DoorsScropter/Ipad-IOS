@@ -398,7 +398,7 @@ local function drawSpeaker(parent, cx, cy, s, color, z)
 	end
 end
 
--- ===== THE IPAD BODY (like the picture) =====
+-- ===== THE IPAD BODY =====
 local body = ui("Frame", {
 	Name = "Body",
 	Size = UDim2.fromOffset(DW, DH),
@@ -427,11 +427,9 @@ local bezel = ui("Frame", {
 }, ipad)
 corner(bezel, UDim.new(0, 46))
 
--- front camera (left, middle)
 dot(ipad, 44, DH / 2, 22, Color3.fromRGB(14, 14, 18), 4)
 dot(ipad, 44, DH / 2, 11, Color3.fromRGB(28, 34, 62), 5)
 
--- the screen
 local scr = ui("Frame", {
 	Name = "Screen",
 	Position = UDim2.fromOffset(SX, SY),
@@ -680,7 +678,6 @@ local function addHomeIcon(app, installed)
 	local lab = label(homeContent, app.name, x - 12, y + 102, 120, 22, 17, WHITE, Enum.Font.GothamMedium, nil, 3)
 	lab.TextStrokeTransparency = 0.85
 
-	-- real button on top of the icon
 	local hit = button(home, x - 12, y - 8, 120, 134, WHITE, 1, 4)
 	hit.InputBegan:Connect(function(input)
 		if isPress(input) then
@@ -709,7 +706,7 @@ end
 addHomeIcon(APPSById.store, true)
 
 -- =====================================================================
--- LAYER 2: APPS (store, flappy bird, generic)
+-- LAYER 2: APPS
 -- =====================================================================
 local appLayer = ui("Frame", {
 	Name = "AppLayer",
@@ -721,7 +718,6 @@ local appLayer = ui("Frame", {
 	ZIndex = 2,
 }, scr)
 
--- background catcher: blocks touches from reaching the home screen, handles taps
 local appCatcher = ui("Frame", {
 	Size = UDim2.fromScale(1, 1),
 	BackgroundTransparency = 1,
@@ -738,7 +734,6 @@ appCatcher.InputBegan:Connect(function(input)
 	end
 end)
 
--- ---------- APP STORE ----------
 local storeFrame = ui("Frame", {
 	Name = "Store",
 	Size = UDim2.fromScale(1, 1),
@@ -790,7 +785,7 @@ local function onStoreButton(app)
 		openApp(app.id)
 	elseif st.state == "none" then
 		if wifiState ~= "connected" then
-			showAlert() -- no downloads without Wi-Fi
+			showAlert()
 		else
 			startDownload(app)
 		end
@@ -836,7 +831,6 @@ for _, app in ipairs(APPS) do
 	end
 end
 
--- "Wi-Fi required" alert (its own layer inside the store)
 local alertFrame = ui("Frame", {
 	Size = UDim2.fromScale(1, 1),
 	BackgroundColor3 = BLACK,
@@ -896,7 +890,7 @@ startDownload = function(app)
 	if st.state ~= "none" then return end
 	st.state = "downloading"
 	st.p = 0
-	addHomeIcon(app, false) -- icon shows up on the home screen while it downloads
+	addHomeIcon(app, false)
 	refreshRow(app)
 end
 
@@ -917,7 +911,7 @@ local function finishInstall(app)
 	refreshRow(app)
 end
 
--- ---------- FLAPPY BIRD ----------
+-- FLAPPY BIRD
 local GROUND_Y, PIPE_W, GAP, SPACING = 520, 84, 190, 270
 local SPEED, GRAV, FLAP = 170, 1300, -430
 local BIRD_X = 190
@@ -1112,7 +1106,6 @@ local function flappyUpdate(dt)
 end
 flappyReset()
 
--- ---------- GENERIC APP SCREEN (Roblox, Minecraft, ...) ----------
 local genericFrame = ui("Frame", {
 	Name = "Generic",
 	Size = UDim2.fromScale(1, 1),
@@ -1133,7 +1126,6 @@ local genName = label(genericFrame, "", 0, 285, SW, 50, 40, WHITE, Enum.Font.Got
 local genSub = label(genericFrame, "", 0, 338, SW, 30, 22, GRAY, Enum.Font.GothamMedium, nil, 2)
 label(genericFrame, "This app has no content yet", 0, 430, SW, 26, 18, Color3.fromRGB(100, 100, 115), Enum.Font.GothamMedium, nil, 2)
 
--- swipe up from the very bottom to leave the app
 local bottomZone = ui("Frame", {
 	Name = "BottomZone",
 	Size = UDim2.fromOffset(SW, 60),
@@ -1228,7 +1220,7 @@ bottomZone.InputBegan:Connect(function(input)
 end)
 
 -- =====================================================================
--- LAYER 3: LOCK SCREEN (slides up)
+-- LAYER 3: LOCK SCREEN
 -- =====================================================================
 local lock = wallpaper(scr, "Lock", Color3.fromRGB(24, 20, 84), Color3.fromRGB(132, 52, 172), Color3.fromRGB(255, 128, 118), 70, 3)
 lock.Active = true
@@ -1338,7 +1330,6 @@ local ccRoot = ui("Frame", {
 	ZIndex = 4,
 }, scr)
 
--- frosted layer behind the menu (tap it / swipe up on it to close)
 local frost = ui("Frame", {
 	Size = UDim2.fromScale(1, 1),
 	BackgroundColor3 = Color3.fromRGB(110, 115, 145),
@@ -1360,7 +1351,6 @@ local panel = ui("Frame", {
 corner(panel, UDim.new(0, 36))
 ui("UIStroke", { Color = WHITE, Thickness = 1.5, Transparency = 0.85 }, panel)
 
--- empty panel background (catches touches on blank areas)
 local panelBg = ui("Frame", {
 	Size = UDim2.fromScale(1, 1),
 	BackgroundTransparency = 1,
@@ -1490,7 +1480,6 @@ local function bindSlider(track, setFn)
 	end)
 end
 
--- brightness dims the screen, eye protection adds a warm tint (overlays are created below)
 local dim, warm
 setBrightness = function(v)
 	brightV = math.clamp(v, 0, 1)
@@ -1500,13 +1489,12 @@ setBrightness = function(v)
 	end
 end
 setVolume = function(v)
-	volV = math.clamp(v, 0, 1) -- stored here, nothing plays audio yet
+	volV = math.clamp(v, 0, 1)
 	volFill.Size = UDim2.new(volV, 0, 1, 0)
 end
 bindSlider(brightTrack, function(v) setBrightness(v) end)
 bindSlider(volTrack, function(v) setVolume(v) end)
 
--- ---------- Wi-Fi view (its own layer inside the control center) ----------
 local wBack = button(ccWifi, 12, 12, 180, 56, WHITE, 1, 3)
 label(wBack, "< Back", 10, 0, 160, 56, 24, BLUE, Enum.Font.GothamMedium, Enum.TextXAlignment.Left, 4)
 label(ccWifi, "Wi-Fi", 0, 18, PANEL_W, 44, 28, WHITE, Enum.Font.GothamBold, nil, 3)
@@ -1541,8 +1529,7 @@ local netStatus = label(netRow, "", 320, 0, 200, 68, 20, GRAY, Enum.Font.GothamM
 
 local netInfo = label(ccWifi, "Turn on Wi-Fi to see networks", 30, 194, 540, 68, 22, GRAY, Enum.Font.GothamMedium, nil, 3)
 
--- ---------- Wi-Fi logic ----------
-local statusWifi = {} -- filled by the status bar below
+local statusWifi = {}
 
 refreshWifi = function()
 	TweenService:Create(swTrack, TweenInfo.new(0.2), { BackgroundColor3 = wifiOn and GREEN or Color3.fromRGB(86, 86, 100) }):Play()
@@ -1614,7 +1601,7 @@ local function tapNetwork()
 		end)
 	elseif wifiState == "connected" then
 		wifiToken = wifiToken + 1
-		wifiState = "idle" -- tap again to disconnect
+		wifiState = "idle"
 		refreshWifi()
 	end
 end
@@ -1635,10 +1622,6 @@ btTile.Activated:Connect(function()
 	setToggle(btTile, nil, btOn, BLUE)
 end)
 
--- =====================================================================
--- LAYER 5/6: STATUS ZONE + STATUS BAR (wifi + battery at 100%)
--- =====================================================================
--- swipe down from the battery / wifi area = Control Center
 local statusZone = ui("Frame", {
 	Name = "StatusZone",
 	Size = UDim2.fromOffset(250, 48),
@@ -1728,7 +1711,6 @@ task.spawn(function()
 	end
 end)
 
--- ---------- volume HUD + overlays ----------
 local volHud = ui("Frame", {
 	Name = "VolumeHud",
 	Size = UDim2.fromOffset(280, 56),
@@ -1800,29 +1782,23 @@ eyeTile.Activated:Connect(function()
 	TweenService:Create(warm, TweenInfo.new(0.3), { BackgroundTransparency = eyeOn and 0.86 or 1 }):Play()
 end)
 
--- Control Center animation (0 = closed, 1 = open)
 local function setCC(p)
 	ccRoot.Visible = p > 0.002
 	frost.BackgroundTransparency = 1 - (appOpen and 0.8 or 0.5) * p
 	local closedY = -PANEL_H - 30
 	panel.Position = UDim2.fromOffset(PANEL_X, closedY + (PANEL_Y - closedY) * p)
-	-- home / lock content fades out behind the menu so nothing overlaps
 	homeContent.GroupTransparency = p
 	lockContent.GroupTransparency = p
 	for _, sc in ipairs(blobScales) do
-		sc.Scale = 1 + 0.4 * p -- blobs swell and soften = blur look
+		sc.Scale = 1 + 0.4 * p
 	end
 	statusZone.Visible = (p < 0.02 and ccTarget == 0)
 end
 refreshWifi()
 setCC(0)
 
--- =====================================================================
--- BUTTONS ON THE IPAD (top = close, side = volume, round = home)
--- =====================================================================
 local btnColor = Color3.fromRGB(96, 96, 104)
 
--- TOP button: closes the iPad
 local powerBar = ui("Frame", {
 	Size = UDim2.fromOffset(100, 11),
 	Position = UDim2.fromOffset(700, -8),
@@ -1833,7 +1809,6 @@ local powerBar = ui("Frame", {
 corner(powerBar, UDim.new(0, 4))
 local powerHit = button(ipad, 680, -30, 140, 48, WHITE, 1, 6)
 
--- SIDE buttons: volume up / down
 local volUpBar = ui("Frame", {
 	Size = UDim2.fromOffset(11, 56),
 	Position = UDim2.fromOffset(DW - 3, 130),
@@ -1853,8 +1828,7 @@ corner(volDownBar, UDim.new(0, 4))
 local volUpHit = button(ipad, DW - 24, 116, 52, 76, WHITE, 1, 6)
 local volDownHit = button(ipad, DW - 24, 196, 52, 76, WHITE, 1, 6)
 
--- ROUND home button (like the picture)
-local homeBtn = button(ipad, DW - 72 - 0, DH / 2 - 29, 58, 58, Color3.fromRGB(6, 6, 8), 0, 5)
+local homeBtn = button(ipad, DW - 72, DH / 2 - 29, 58, 58, Color3.fromRGB(6, 6, 8), 0, 5)
 corner(homeBtn, UDim.new(1, 0))
 ui("UIStroke", { Color = Color3.fromRGB(88, 88, 96), Thickness = 3 }, homeBtn)
 local homeInner = ui("Frame", {
@@ -1918,9 +1892,6 @@ powerHit.Activated:Connect(function()
 	closeIPad()
 end)
 
--- =====================================================================
--- SHOW / HIDE THE IPAD (inventory item)
--- =====================================================================
 local openToken = 0
 
 showIPad = function()
@@ -1938,7 +1909,6 @@ hideIPad = function()
 	isOpen = false
 	openToken = openToken + 1
 	local my = openToken
-	-- reset everything for next time
 	ccTarget, ccP, ccDragging = 0, 0, false
 	setCC(0)
 	ccDrawn = 0
@@ -1967,14 +1937,10 @@ closeIPad = function()
 	hideIPad()
 end
 
--- =====================================================================
--- LOOPS
--- =====================================================================
 conns[#conns + 1] = RunService.RenderStepped:Connect(function(dt)
 	if not alive or not isOpen then return end
 	dt = math.min(dt, 1 / 30)
 
-	-- control center animation
 	if not ccDragging then
 		ccP = ccP + (ccTarget - ccP) * math.min(1, dt * 14)
 		if math.abs(ccTarget - ccP) < 0.003 then
@@ -1989,13 +1955,11 @@ conns[#conns + 1] = RunService.RenderStepped:Connect(function(dt)
 		showWifiView(false)
 	end
 
-	-- flappy bird (pauses while the control center is open)
 	if appOpen == "flappy" and ccP < 0.01 then
 		flappyUpdate(dt)
 	end
 end)
 
--- downloads only progress while Wi-Fi is connected
 conns[#conns + 1] = RunService.Heartbeat:Connect(function(dt)
 	if not alive then return end
 	for _, app in ipairs(APPS) do
@@ -2017,9 +1981,6 @@ conns[#conns + 1] = RunService.Heartbeat:Connect(function(dt)
 	end
 end)
 
--- =====================================================================
--- THE IPAD ITEM (inventory / hotbar)
--- =====================================================================
 local function onToolParent()
 	if not alive or not tool then return end
 	local char = player.Character
@@ -2049,7 +2010,6 @@ local function makeTool()
 	t.Parent = player:WaitForChild("Backpack")
 end
 
--- after respawn the backpack is reset, so give the item again
 conns[#conns + 1] = player.CharacterAdded:Connect(function()
 	hideIPad()
 	task.wait(1)
@@ -2060,7 +2020,6 @@ end)
 
 task.spawn(makeTool)
 
--- cleanup if the gui is destroyed (re-execute)
 gui.Destroying:Connect(function()
 	alive = false
 	for _, c in ipairs(conns) do
