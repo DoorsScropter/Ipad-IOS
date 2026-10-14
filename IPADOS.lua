@@ -72,22 +72,21 @@ local R=F({Name="iPad",Size=u(0,500,0,354),AnchorPoint=V2(.5,.5),Position=u(.5,0
 local sc=N("UIScale",{Scale=.8},R)
 local av=N("NumberValue",{Value=0}) local base=1
 local function apply() local v=av.Value R.Position=u(.5,0,.5+(1-v)*1.2,0) sc.Scale=math.max(base*(.8+.2*v),.01) end
-local function fit() local cm=workspace.CurrentCamera if not cm then return end local v=cm.ViewportSize base=math.min(v.X*.94/452,v.Y*.86/356,1.8) apply() end fit()
+local function fit() local cm=workspace.CurrentCamera if not cm then return end local v=cm.ViewportSize base=math.min(v.X*.94/510,v.Y*.86/372,1.6) apply() end fit()
 if workspace.CurrentCamera then workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(fit) end
 av.Changed:Connect(apply)
-local sd=F({Size=u(0,442,0,338),Position=u(0,29,0,20),BackgroundColor3=C(0,0,0),BackgroundTransparency=.62},R) Cr(28,sd)
-local O=F({Size=u(0,442,0,338),Position=u(0,29,0,8),BackgroundColor3=C(70,70,75)},R) Cr(28,O)
-N("UIGradient",{Rotation=35,Color=ColorSequence.new({ColorSequenceKeypoint.new(0,C(132,132,138)),ColorSequenceKeypoint.new(.35,C(78,78,84)),ColorSequenceKeypoint.new(.65,C(110,110,116)),ColorSequenceKeypoint.new(1,C(52,52,58))})},O)
+local sd=F({Size=u(1,0,1,0),Position=u(0,0,0,12),BackgroundColor3=C(0,0,0),BackgroundTransparency=.65},R) Cr(28,sd)
+local O=F({Size=u(1,0,1,0),BackgroundColor3=C(70,70,75)},R) Cr(26,O)
+N("UIGradient",{Rotation=90,Color=ColorSequence.new(C(140,140,146),C(48,48,52))},O)
 N("UIStroke",{Color=C(200,200,208),Thickness=1.2,Transparency=.55},O)
-local Bz=F({Size=u(1,-6,1,-6),Position=u(0,3,0,3),BackgroundColor3=C(8,8,10)},O) Cr(25,Bz)
+local Bz=F({Size=u(1,-6,1,-6),Position=u(0,3,0,3),BackgroundColor3=C(8,8,10)},O) Cr(23,Bz)
 N("UIGradient",{Rotation=90,Color=ColorSequence.new(C(18,18,22),C(4,4,6))},Bz) N("UIStroke",{Color=C(28,28,32),Thickness=1.5},Bz)
-local Sc=F({Name="Screen",Size=u(0,414,0,310),Position=u(0,43,0,22),BackgroundColor3=C(0,0,0),ClipsDescendants=true},R) Cr(12,Sc) N("UIStroke",{Color=C(0,0,0),Thickness=2},Sc)
-local mk=F({Position=u(0,43,0,22),Size=u(0,414,0,310),BackgroundTransparency=1,ZIndex=3},R) Cr(12,mk) N("UIStroke",{Color=C(5,5,7),Thickness=11},mk)
-for _,d in ipairs({{232,4},{241,4},{259,3},{268,4}}) do local dt=F({AnchorPoint=V2(.5,.5),Position=u(0,d[1],0,16),Size=u(0,d[2],0,d[2]),BackgroundColor3=C(20,20,26),ZIndex=4},R) Cr(d[2],dt) end
-local lens=F({AnchorPoint=V2(.5,.5),Position=u(0,250,0,16),Size=u(0,7,0,7),BackgroundColor3=C(10,10,14),ZIndex=4},R) Cr(4,lens) N("UIStroke",{Color=C(50,50,60),Thickness=1},lens) F({Position=u(0,1,0,1),Size=u(0,2,0,2),BackgroundColor3=C(60,90,160)},lens)
-local HB=B({Position=u(0,473,0,164),Size=u(0,24,0,24),BackgroundColor3=C(0,0,0)},R) Cr(12,HB) N("UIStroke",{Color=C(100,100,106),Thickness=2},HB) local hq=F({AnchorPoint=V2(.5,.5),Position=u(.5,0,.5,0),Size=u(0,9,0,9),BackgroundTransparency=1},HB) Cr(2,hq) N("UIStroke",{Color=C(90,90,96),Thickness=1},hq) HB.Visible=false
+local Sc=F({Name="Screen",Size=u(0,414,0,310),Position=u(0,43,0,22),BackgroundColor3=C(0,0,0),ClipsDescendants=true},R) Cr(4,Sc) N("UIStroke",{Color=C(0,0,0),Thickness=2},Sc)
+local cam=F({Size=u(0,7,0,7),Position=u(0,20,0,176),BackgroundColor3=C(28,28,34)},R) Cr(4,cam) N("UIStroke",{Color=C(70,70,78),Thickness=1},cam) local sn=F({Size=u(0,3,0,3),Position=u(0,22,0,160),BackgroundColor3=C(22,22,28)},R) Cr(2,sn)
+F({Size=u(0,2,0,2),Position=u(0,2,0,2),BackgroundColor3=C(60,90,160)},cam)
+local HB=B({Position=u(0,473,0,164),Size=u(0,24,0,24),BackgroundColor3=C(0,0,0)},R) Cr(12,HB) N("UIStroke",{Color=C(100,100,106),Thickness=2},HB) local hq=F({AnchorPoint=V2(.5,.5),Position=u(.5,0,.5,0),Size=u(0,9,0,9),BackgroundTransparency=1},HB) Cr(2,hq) N("UIStroke",{Color=C(90,90,96),Thickness=1},hq)
 local function press(b) local p=b.Position tw(b,.07,{Position=p+u(0,0,0,2)}).Completed:Connect(function() tw(b,.12,{Position=p}) end) end
-local function HW(x,w,cb) local b=B({Position=u(0,x,0,2),Size=u(0,w,0,10),BackgroundColor3=C(105,105,112)},R) Cr(3,b) N("UIStroke",{Color=C(40,40,44),Thickness=1},b) b.MouseButton1Click:Connect(function() press(b) cb() end) return b end
+local function HW(x,w,cb) local b=B({Position=u(0,x,0,-6),Size=u(0,w,0,10),BackgroundColor3=C(105,105,112)},R) Cr(3,b) N("UIStroke",{Color=C(40,40,44),Thickness=1},b) b.MouseButton1Click:Connect(function() press(b) cb() end) return b end
 
 function geom(b) local k=sc.Scale return (b.AbsolutePosition-Sc.AbsolutePosition)/k,b.AbsoluteSize/k end
 local function wall(par)
@@ -228,7 +227,7 @@ end
 function lockNow() S.locked=true LS.Position=u(0,0,0,0) LS.Visible=true setBar(false) end
 function unlock() if not S.locked then return end S.locked=false tw(LS,.5,{Position=u(0,0,-1,0)}).Completed:Connect(function() if not S.locked then LS.Visible=false end end) end
 HW(40,34,function() setSleep(not S.isSleep) end) HW(392,30,function() vol(6.25) end) HW(430,30,function() vol(-6.25) end)
-for i,tx in ipairs({"+","-"}) do T({Text=tx,Position=u(0,i==1 and 392 or 430,0,2),Size=u(0,30,0,10),TextSize=9,Font=FB,ZIndex=2},R) end
+for i,tx in ipairs({"+","-"}) do T({Text=tx,Position=u(0,i==1 and 392 or 430,0,-6),Size=u(0,30,0,10),TextSize=9,Font=FB,ZIndex=2},R) end
 
 local function slider(par,x,y,w,h,lab,get,put,key)
  local tr=B({Position=u(0,x,0,y),Size=u(0,w,0,h),BackgroundColor3=WH,BackgroundTransparency=.82,ClipsDescendants=true},par) Cr(14,tr)
@@ -787,7 +786,7 @@ build.settings=function(b,a)
   elseif p=="sounds" then title("Sounds",true) srow("Volume",function() return S.currentVolume/100 end,function(v) set("currentVolume",math.floor(v*100+.5)) end,"currentVolume")
   elseif p=="battery" then title("Battery",true) group({{t="Battery Level",v=function() return S.battery.."%" end,vk={}},{t="Power Source",v=function() return "Battery" end}})
   elseif p=="about" then title("About",true)
-   group({{t="Name",v=function() return "iPad Pro Max" end},{t="Software Version",v=function() return "iPadOS 17.4" end},{t="Apps",v=function() return tostring(#S.installedApps) end}})
+   group({{t="Name",v=function() return "iPad" end},{t="Software Version",v=function() return "iPadOS 17.4" end},{t="Apps",v=function() return tostring(#S.installedApps) end}})
   else
    local x=byId[p:sub(5)] title(x.name,true)
    local hd=F({Size=u(0,374,0,70),BackgroundTransparency=1,LayoutOrder=nxo()},sf) tile(x,hd,0,6,58,false)
@@ -1181,12 +1180,12 @@ local function showPad(v)
 end
 local function mkPad()
  local tool=N("Tool",{Name="iPad",RequiresHandle=true,CanBeDropped=false,ToolTip="iPad"})
- local h=N("Part",{Name="Handle",Size=Vector3.new(1.55,.09,1.18),Color=C(66,66,72),Material=Enum.Material.Metal,CanCollide=false},tool)
- local sg=N("SurfaceGui",{Face=Enum.NormalId.Top,CanvasSize=V2(442,338)},h)
- local sbz=F({Size=u(1,0,1,0),BackgroundColor3=C(8,8,10)},sg) Cr(26,sbz)
- local ssc=F({Position=u(0,14,0,14),Size=u(0,414,0,310),BackgroundColor3=WH},sg) wall(ssc) local m2=F({Position=u(0,14,0,14),Size=u(0,414,0,310),BackgroundTransparency=1,ZIndex=3},sg) Cr(12,m2) N("UIStroke",{Color=C(8,8,10),Thickness=11},m2)
+ local h=N("Part",{Name="Handle",Size=Vector3.new(1.6,.09,1.15),Color=C(28,28,32),Material=Enum.Material.SmoothPlastic,CanCollide=false},tool)
+ local sg=N("SurfaceGui",{Face=Enum.NormalId.Top,CanvasSize=V2(500,354)},h)
+ local sbz=F({Size=u(1,0,1,0),BackgroundColor3=C(8,8,10)},sg) Cr(24,sbz)
+ local ssc=F({Position=u(0,43,0,22),Size=u(0,414,0,310),BackgroundColor3=WH},sg) wall(ssc)
  T({Text="iPadOS",Size=u(1,0,1,0),TextSize=40,Font=FB},ssc)
- local sc2=F({Position=u(.5,-3,0,5),Size=u(0,6,0,6),BackgroundColor3=C(10,10,14)},sg) Cr(3,sc2)
+ local sh2=F({Position=u(0,473,0,164),Size=u(0,24,0,24),BackgroundColor3=C(0,0,0)},sg) Cr(12,sh2) N("UIStroke",{Color=C(100,100,106),Thickness=2},sh2)
  tool.Equipped:Connect(function() showPad(true) end)
  tool.Unequipped:Connect(function() showPad(false) end)
  return tool
