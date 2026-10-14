@@ -31,7 +31,7 @@ local TR={{"Sunset Drive","Baseplate Beats"},{"Neon Studs","Roblox Radio"},{"Lo-
 
 local function A(id,n,col,cat,light,sub,sys) return {id=id,name=n,col=col,cat=cat,light=light,sub=sub,sys=sys} end
 local ALL={A("camera","Camera",C(110,110,118),"Creativity",false,nil,true),A("maps","Maps",C(96,200,110),"Utilities",false,nil,true),A("store","App Store",C(21,126,251),"Utilities",true,nil,true),A("settings","Settings",C(120,120,128),"Utilities",true,nil,true),
-A("photos","Photos",C(248,248,250),"Creativity",true,nil,true),A("notes","Notes",C(252,252,250),"Productivity",true,nil,true),A("music","Music",C(252,60,90),"Entertainment",false,nil,true),A("clock","Clock",C(22,22,24),"Utilities",false,nil,true),A("facetime","FaceTime",C(52,199,89),"Utilities",false,nil,true),
+A("photos","Photos",C(248,248,250),"Creativity",true,nil,true),A("notes","Notes",C(252,252,250),"Productivity",true,nil,true),A("music","Music",C(252,60,90),"Entertainment",false,nil,true),A("clock","Clock",C(22,22,24),"Utilities",false,nil,true),A("facetime","FaceTime",C(52,199,89),"Utilities",false,nil,true),A("safari","Safari",C(10,132,255),"Productivity",true,nil,true),A("messages","Messages",C(52,199,89),"Productivity",true,nil,true),
 A("flappy","Flappy Bird",C(112,197,206),"Entertainment",false,"Tap to flap. Don't crash."),A("calc","Calculator",C(40,40,44),"Productivity",false,"Fast, simple maths"),A("stopwatch","Stopwatch",C(30,30,32),"Utilities",false,"Time anything"),A("weather","Weather",C(62,150,240),"Utilities",false,"Live forecast"),A("amazon","Amazon",C(35,47,62),"Utilities",true,"Shop everything you need")}
 local byId={} for _,a in ipairs(ALL) do byId[a.id]=a if a.sys then table.insert(S.installedApps,a) end end
 local function hasApp(id) for _,a in ipairs(S.installedApps) do if a.id==id then return true end end return false end
@@ -55,6 +55,8 @@ calc=function(p) rc(p,.5,.22,.72,.2,C(80,80,86),.2) for r=0,2 do for c=0,2 do rc
 stopwatch=function(p) local r=rc(p,.5,.56,.64,.64,C(30,30,32),.5) N("UIStroke",{Color=WH,Thickness=2},r) rc(p,.5,.46,.04,.22,C(255,159,10),.5) rc(p,.5,.16,.14,.08,WH,.3) end,
 weather=function(p) rc(p,.38,.4,.3,.3,C(255,214,10),.5) rc(p,.55,.64,.5,.22,WH,.5) rc(p,.45,.56,.26,.26,WH,.5) rc(p,.64,.58,.22,.22,WH,.5) end,
 facetime=function(p) rc(p,.4,.5,.5,.36,WH,.2) rc(p,.74,.5,.2,.2,WH,.15,45) end,
+messages=function(p) rc(p,.5,.46,.68,.5,WH,.4) rc(p,.32,.76,.16,.16,WH,0,45) end,
+safari=function(p) rc(p,.5,.5,.78,.78,WH,.5) rc(p,.5,.5,.68,.68,C(40,150,255),.5) rc(p,.56,.44,.12,.3,C(255,69,58),.5,45) rc(p,.44,.56,.12,.3,WH,.5,45) end,
 amazon=function(p) gt(p,"a",.5,.42,.5,.6,WH) rc(p,.5,.72,.52,.08,C(255,153,0),.5) rc(p,.76,.68,.1,.1,C(255,153,0),.2,0,0) end}
 local function tile(a,par,x,y,sz,isb)
  local t=N(isb and "TextButton" or "Frame",{Position=u(0,x,0,y),Size=u(0,sz,0,sz),BackgroundColor3=a.col,BorderSizePixel=0},par)
@@ -70,21 +72,22 @@ local R=F({Name="iPad",Size=u(0,500,0,354),AnchorPoint=V2(.5,.5),Position=u(.5,0
 local sc=N("UIScale",{Scale=.8},R)
 local av=N("NumberValue",{Value=0}) local base=1
 local function apply() local v=av.Value R.Position=u(.5,0,.5+(1-v)*1.2,0) sc.Scale=math.max(base*(.8+.2*v),.01) end
-local function fit() local cm=workspace.CurrentCamera if not cm then return end local v=cm.ViewportSize base=math.min(v.X*.94/510,v.Y*.86/372,1.6) apply() end fit()
+local function fit() local cm=workspace.CurrentCamera if not cm then return end local v=cm.ViewportSize base=math.min(v.X*.94/452,v.Y*.86/356,1.8) apply() end fit()
 if workspace.CurrentCamera then workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(fit) end
 av.Changed:Connect(apply)
-local sd=F({Size=u(1,0,1,0),Position=u(0,0,0,12),BackgroundColor3=C(0,0,0),BackgroundTransparency=.65},R) Cr(28,sd)
-local O=F({Size=u(1,0,1,0),BackgroundColor3=C(70,70,75)},R) Cr(26,O)
-N("UIGradient",{Rotation=90,Color=ColorSequence.new(C(140,140,146),C(48,48,52))},O)
+local sd=F({Size=u(0,442,0,338),Position=u(0,29,0,20),BackgroundColor3=C(0,0,0),BackgroundTransparency=.62},R) Cr(28,sd)
+local O=F({Size=u(0,442,0,338),Position=u(0,29,0,8),BackgroundColor3=C(70,70,75)},R) Cr(28,O)
+N("UIGradient",{Rotation=35,Color=ColorSequence.new({ColorSequenceKeypoint.new(0,C(132,132,138)),ColorSequenceKeypoint.new(.35,C(78,78,84)),ColorSequenceKeypoint.new(.65,C(110,110,116)),ColorSequenceKeypoint.new(1,C(52,52,58))})},O)
 N("UIStroke",{Color=C(200,200,208),Thickness=1.2,Transparency=.55},O)
-local Bz=F({Size=u(1,-6,1,-6),Position=u(0,3,0,3),BackgroundColor3=C(8,8,10)},O) Cr(23,Bz)
+local Bz=F({Size=u(1,-6,1,-6),Position=u(0,3,0,3),BackgroundColor3=C(8,8,10)},O) Cr(25,Bz)
 N("UIGradient",{Rotation=90,Color=ColorSequence.new(C(18,18,22),C(4,4,6))},Bz) N("UIStroke",{Color=C(28,28,32),Thickness=1.5},Bz)
-local Sc=F({Name="Screen",Size=u(0,414,0,310),Position=u(0,43,0,22),BackgroundColor3=C(0,0,0),ClipsDescendants=true},R) Cr(4,Sc) N("UIStroke",{Color=C(0,0,0),Thickness=2},Sc)
-local cam=F({Size=u(0,7,0,7),Position=u(0,20,0,176),BackgroundColor3=C(28,28,34)},R) Cr(4,cam) N("UIStroke",{Color=C(70,70,78),Thickness=1},cam) local sn=F({Size=u(0,3,0,3),Position=u(0,22,0,160),BackgroundColor3=C(22,22,28)},R) Cr(2,sn)
-F({Size=u(0,2,0,2),Position=u(0,2,0,2),BackgroundColor3=C(60,90,160)},cam)
-local HB=B({Position=u(0,473,0,164),Size=u(0,24,0,24),BackgroundColor3=C(0,0,0)},R) Cr(12,HB) N("UIStroke",{Color=C(100,100,106),Thickness=2},HB) local hq=F({AnchorPoint=V2(.5,.5),Position=u(.5,0,.5,0),Size=u(0,9,0,9),BackgroundTransparency=1},HB) Cr(2,hq) N("UIStroke",{Color=C(90,90,96),Thickness=1},hq)
+local Sc=F({Name="Screen",Size=u(0,414,0,310),Position=u(0,43,0,22),BackgroundColor3=C(0,0,0),ClipsDescendants=true},R) Cr(12,Sc) N("UIStroke",{Color=C(0,0,0),Thickness=2},Sc)
+local mk=F({Position=u(0,43,0,22),Size=u(0,414,0,310),BackgroundTransparency=1,ZIndex=3},R) Cr(12,mk) N("UIStroke",{Color=C(5,5,7),Thickness=11},mk)
+for _,d in ipairs({{232,4},{241,4},{259,3},{268,4}}) do local dt=F({AnchorPoint=V2(.5,.5),Position=u(0,d[1],0,16),Size=u(0,d[2],0,d[2]),BackgroundColor3=C(20,20,26),ZIndex=4},R) Cr(d[2],dt) end
+local lens=F({AnchorPoint=V2(.5,.5),Position=u(0,250,0,16),Size=u(0,7,0,7),BackgroundColor3=C(10,10,14),ZIndex=4},R) Cr(4,lens) N("UIStroke",{Color=C(50,50,60),Thickness=1},lens) F({Position=u(0,1,0,1),Size=u(0,2,0,2),BackgroundColor3=C(60,90,160)},lens)
+local HB=B({Position=u(0,473,0,164),Size=u(0,24,0,24),BackgroundColor3=C(0,0,0)},R) Cr(12,HB) N("UIStroke",{Color=C(100,100,106),Thickness=2},HB) local hq=F({AnchorPoint=V2(.5,.5),Position=u(.5,0,.5,0),Size=u(0,9,0,9),BackgroundTransparency=1},HB) Cr(2,hq) N("UIStroke",{Color=C(90,90,96),Thickness=1},hq) HB.Visible=false
 local function press(b) local p=b.Position tw(b,.07,{Position=p+u(0,0,0,2)}).Completed:Connect(function() tw(b,.12,{Position=p}) end) end
-local function HW(x,w,cb) local b=B({Position=u(0,x,0,-6),Size=u(0,w,0,10),BackgroundColor3=C(105,105,112)},R) Cr(3,b) N("UIStroke",{Color=C(40,40,44),Thickness=1},b) b.MouseButton1Click:Connect(function() press(b) cb() end) return b end
+local function HW(x,w,cb) local b=B({Position=u(0,x,0,2),Size=u(0,w,0,10),BackgroundColor3=C(105,105,112)},R) Cr(3,b) N("UIStroke",{Color=C(40,40,44),Thickness=1},b) b.MouseButton1Click:Connect(function() press(b) cb() end) return b end
 
 function geom(b) local k=sc.Scale return (b.AbsolutePosition-Sc.AbsolutePosition)/k,b.AbsoluteSize/k end
 local function wall(par)
@@ -225,7 +228,7 @@ end
 function lockNow() S.locked=true LS.Position=u(0,0,0,0) LS.Visible=true setBar(false) end
 function unlock() if not S.locked then return end S.locked=false tw(LS,.5,{Position=u(0,0,-1,0)}).Completed:Connect(function() if not S.locked then LS.Visible=false end end) end
 HW(40,34,function() setSleep(not S.isSleep) end) HW(392,30,function() vol(6.25) end) HW(430,30,function() vol(-6.25) end)
-for i,tx in ipairs({"+","-"}) do T({Text=tx,Position=u(0,i==1 and 392 or 430,0,-6),Size=u(0,30,0,10),TextSize=9,Font=FB,ZIndex=2},R) end
+for i,tx in ipairs({"+","-"}) do T({Text=tx,Position=u(0,i==1 and 392 or 430,0,2),Size=u(0,30,0,10),TextSize=9,Font=FB,ZIndex=2},R) end
 
 local function slider(par,x,y,w,h,lab,get,put,key)
  local tr=B({Position=u(0,x,0,y),Size=u(0,w,0,h),BackgroundColor3=WH,BackgroundTransparency=.82,ClipsDescendants=true},par) Cr(14,tr)
@@ -328,26 +331,92 @@ build.camera=function(b,a)
    end
   end
  end)
- local cn=RS.RenderStepped:Connect(function() local wc=workspace.CurrentCamera if wc then cm.CFrame=wc.CFrame cm.FieldOfView=wc.FieldOfView end end)
- F({Position=u(0,0,0,232),Size=u(0,414,0,78),BackgroundColor3=C(0,0,0),BackgroundTransparency=.4},b)
- T({Text="PHOTO",Position=u(0,0,0,236),Size=u(0,414,0,14),TextSize=10,Font=FB,TextColor3=C(255,214,10),TextXAlignment=XC},b)
- local th=F({Position=u(0,22,0,250),Size=u(0,44,0,44),BackgroundColor3=C(30,30,32),ClipsDescendants=true},b) Cr(8,th) N("UIStroke",{Color=WH,Thickness=1.5},th)
- local ring=B({Position=u(0,179,0,252),Size=u(0,56,0,56),BackgroundTransparency=1},b) Cr(28,ring) N("UIStroke",{Color=WH,Thickness=3},ring)
+ local mode,pool="pic",{}
+ local lay=F({Size=u(1,0,1,0),BackgroundTransparency=1,ZIndex=2},b)
+ local function proj(pos)
+  local rel=cm.CFrame:PointToObjectSpace(pos) if rel.Z>=-.1 then return nil end
+  local hh=math.tan(math.rad(cm.FieldOfView)/2)
+  return (rel.X/(-rel.Z)/(hh*(414/310))*.5+.5)*414,(.5-rel.Y/(-rel.Z)/hh*.5)*310
+ end
+ local function boxes()
+  local out={} local me=LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+  for _,pl in ipairs(P:GetPlayers()) do if pl~=LP then
+   local hr=pl.Character and pl.Character:FindFirstChild("HumanoidRootPart")
+   if hr then
+    local x1,y1=proj(hr.Position+Vector3.new(0,3,0)) local x2,y2=proj(hr.Position-Vector3.new(0,3,0))
+    if x1 and x2 then local h2=math.abs(y2-y1) local w2=h2*.5
+     table.insert(out,{x=(x1+x2)/2-w2/2,y=math.min(y1,y2),w=w2,h=h2,name=pl.DisplayName,dist=me and math.floor((hr.Position-me.Position).Magnitude) or 0}) end
+   end
+  end end
+  return out
+ end
+ local function mk(i)
+  local bx=F({BackgroundTransparency=1,Visible=false},lay) N("UIStroke",{Color=C(255,59,48),Thickness=1.5},bx)
+  local lb=T({AnchorPoint=V2(0,1),Position=u(0,0,0,-2),Size=u(0,150,0,12),TextSize=9,Font=FB,TextColor3=C(255,90,80),TextStrokeTransparency=.2,TextXAlignment=XL},bx)
+  pool[i]={bx=bx,lb=lb} return pool[i]
+ end
+ local cn=RS.RenderStepped:Connect(function()
+  local wc=workspace.CurrentCamera if wc then cm.CFrame=wc.CFrame cm.FieldOfView=wc.FieldOfView end
+  local l=mode=="esp" and boxes() or {}
+  for i,e in ipairs(l) do local p=pool[i] or mk(i) p.bx.Visible=true p.bx.Position=u(0,e.x,0,e.y) p.bx.Size=u(0,e.w,0,e.h) p.lb.Text=e.name.." "..e.dist.." studs" end
+  for i=#l+1,#pool do pool[i].bx.Visible=false end
+ end)
+ F({Position=u(0,0,0,232),Size=u(0,414,0,78),BackgroundColor3=C(0,0,0),BackgroundTransparency=.4,ZIndex=3},b)
+ local mb={}
+ local function setMode(m) mode=m for k,bt in pairs(mb) do bt.TextColor3=(k==m) and C(255,214,10) or C(205,205,210) end end
+ for _,d in ipairs({{"pic","Picture",126,70},{"esp","ESP Picture",204,96}}) do
+  local bt=B({Position=u(0,d[3],0,236),Size=u(0,d[4],0,16),BackgroundTransparency=1,Text=d[2],TextSize=10,ZIndex=4},b) mb[d[1]]=bt bt.MouseButton1Click:Connect(function() setMode(d[1]) end)
+ end
+ setMode("pic")
+ local th=F({Position=u(0,22,0,252),Size=u(0,44,0,44),BackgroundColor3=C(30,30,32),ClipsDescendants=true,ZIndex=4},b) Cr(8,th) N("UIStroke",{Color=WH,Thickness=1.5},th)
+ local ring=B({Position=u(0,179,0,254),Size=u(0,56,0,56),BackgroundTransparency=1,ZIndex=4},b) Cr(28,ring) N("UIStroke",{Color=WH,Thickness=3},ring)
  local inn=F({Position=u(0,6,0,6),Size=u(0,44,0,44),BackgroundColor3=WH,Active=false},ring) Cr(22,inn)
  local fl=F({Size=u(1,0,1,0),BackgroundColor3=WH,BackgroundTransparency=1,ZIndex=30,Active=false},b)
  ring.MouseButton1Click:Connect(function()
   fl.BackgroundTransparency=0 tw(fl,.4,{BackgroundTransparency=1}) inn.Size=u(0,36,0,36) inn.Position=u(0,10,0,10) tw(inn,.25,{Size=u(0,44,0,44),Position=u(0,6,0,6)})
   for _,c in ipairs(th:GetChildren()) do if c:IsA("ViewportFrame") then c:Destroy() end end
   local cp=vp:Clone() cp.Size=u(0,59,0,44) cp.Position=u(0,-7,0,0) cp.Parent=th cp.CurrentCamera=cp:FindFirstChildOfClass("Camera")
-  local sn=cp:Clone() table.insert(S.photos,sn) if #S.photos>12 then table.remove(S.photos,1) end
+  table.insert(S.photos,{vp=cp:Clone(),mode=mode,esp=mode=="esp" and boxes() or nil,t=os.date("%b %d, %I:%M %p")})
+  if #S.photos>12 then table.remove(S.photos,1).vp:Destroy() end
  end)
  return function() cn:Disconnect() end
 end
-build.photos=function(b,a) hdr(b,"Photos",C(0,0,0))
- T({Text=#S.photos==0 and "No photos yet. Take some with Camera." or #S.photos.." photo"..(#S.photos==1 and "" or "s"),Position=u(0,20,0,68),Size=u(0,374,0,14),TextSize=10,TextColor3=C(142,142,147),TextXAlignment=XL},b)
- local g=F({Position=u(0,20,0,90),Size=u(0,374,0,210),BackgroundTransparency=1},b) N("UIGridLayout",{CellSize=u(0,86,0,64),CellPadding=u(0,6,0,6)},g)
- for _,sn in ipairs(S.photos) do local cell=F({BackgroundColor3=C(30,30,32),ClipsDescendants=true},g) Cr(6,cell) local c=sn:Clone() c.Size=u(0,86,0,64) c.Position=u(0,0,0,0) c.Parent=cell c.CurrentCamera=c:FindFirstChildOfClass("Camera") end
- return function() end
+build.photos=function(b,a)
+ local root=F({Size=u(1,0,1,0),BackgroundTransparency=1},b) local list,view
+ local function clr() for _,c in ipairs(root:GetChildren()) do c:Destroy() end end
+ local function put(par,ph,w,h) local c=ph.vp:Clone() c.Size=u(0,w,0,h) c.Position=u(0,0,0,0) c.Parent=par c.CurrentCamera=c:FindFirstChildOfClass("Camera") return c end
+ local function esp(par,ph,w,th,names)
+  if not ph.esp then return end local k=w/414
+  for _,e in ipairs(ph.esp) do
+   local bx=F({Position=u(0,e.x*k,0,e.y*k),Size=u(0,e.w*k,0,e.h*k),BackgroundTransparency=1,ZIndex=3},par) N("UIStroke",{Color=C(255,59,48),Thickness=th},bx)
+   if names then T({AnchorPoint=V2(0,1),Position=u(0,0,0,-2),Size=u(0,150,0,12),Text=e.name.." "..e.dist.." studs",TextSize=9,Font=FB,TextColor3=C(255,90,80),TextStrokeTransparency=.2,TextXAlignment=XL},bx) end
+  end
+ end
+ function list()
+  clr() hdr(root,"Photos",C(0,0,0))
+  T({Text=#S.photos==0 and "No photos yet. Take some with Camera." or #S.photos.." photo"..(#S.photos==1 and "" or "s"),Position=u(0,20,0,68),Size=u(0,374,0,14),TextSize=10,TextColor3=C(142,142,147),TextXAlignment=XL},root)
+  local sf=N("ScrollingFrame",{Position=u(0,0,0,86),Size=u(1,0,1,-90),BackgroundTransparency=1,BorderSizePixel=0,ScrollBarThickness=3,AutomaticCanvasSize=Enum.AutomaticSize.Y,CanvasSize=u(0,0,0,0)},root)
+  N("UIPadding",{PaddingLeft=UDim.new(0,20),PaddingTop=UDim.new(0,4),PaddingBottom=UDim.new(0,16)},sf)
+  local g=F({Size=u(0,374,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1},sf) N("UIGridLayout",{CellSize=u(0,86,0,64),CellPadding=u(0,6,0,6),SortOrder=Enum.SortOrder.LayoutOrder},g)
+  for i=#S.photos,1,-1 do
+   local ph=S.photos[i] local cell=B({BackgroundColor3=C(30,30,32),ClipsDescendants=true,LayoutOrder=#S.photos-i},g) Cr(6,cell) put(cell,ph,86,64) esp(cell,ph,86,1,false)
+   if ph.mode=="esp" then local tg=F({Position=u(0,3,1,-14),Size=u(0,26,0,11),BackgroundColor3=C(255,59,48),ZIndex=5},cell) Cr(4,tg) T({Text="ESP",Size=u(1,0,1,0),TextSize=7,Font=FB},tg) end
+   cell.MouseButton1Click:Connect(function() view(i) end)
+  end
+ end
+ function view(i)
+  local ph=S.photos[i] if not ph then return list() end
+  clr() F({Size=u(1,0,1,0),BackgroundColor3=C(0,0,0)},root)
+  local v=put(root,ph,414,310) esp(root,ph,414,1.5,true)
+  local tp=F({Position=u(0,0,0,20),Size=u(0,414,0,40),BackgroundColor3=C(0,0,0),BackgroundTransparency=.45,ZIndex=6},root)
+  local bk=B({Position=u(0,12,0,0),Size=u(0,90,0,40),BackgroundTransparency=1,Text="< Photos",TextSize=12,TextColor3=C(10,132,255),Font=FM,TextXAlignment=XL},tp) bk.MouseButton1Click:Connect(list)
+  T({Text=ph.t..(ph.mode=="esp" and "  (ESP)" or ""),Size=u(1,0,1,0),TextSize=12,Font=FB,TextXAlignment=XC},tp)
+  local bt=F({Position=u(0,0,0,258),Size=u(0,414,0,44),BackgroundColor3=C(0,0,0),BackgroundTransparency=.45,ZIndex=6},root)
+  T({Text=(#S.photos-i+1).." of "..#S.photos,Size=u(1,0,1,0),TextSize=11,Font=FM,TextTransparency=.2,TextXAlignment=XC},bt)
+  local tr=B({Position=u(0,364,0,4),Size=u(0,36,0,36),BackgroundTransparency=1},bt) rc(tr,.5,.3,.6,.1,C(255,69,58),.3) rc(tr,.5,.62,.46,.5,C(255,69,58),.12) rc(tr,.5,.2,.22,.08,C(255,69,58),.3)
+  tr.MouseButton1Click:Connect(function() alert("Delete Photo?","This photo will be deleted.",{{"Cancel"},{"Delete",C(255,59,48),function() local x=table.remove(S.photos,i) if x then x.vp:Destroy() end list() end}}) end)
+ end
+ list() return function() end
 end
 build.notes=function(b,a) hdr(b,"Notes",C(0,0,0))
  local tb=N("TextBox",{Position=u(0,20,0,76),Size=u(0,374,0,200),BackgroundColor3=C(255,252,235),Text=S.note,PlaceholderText="Tap to write...",MultiLine=true,ClearTextOnFocus=false,TextWrapped=true,TextXAlignment=XL,TextYAlignment=Enum.TextYAlignment.Top,Font=FM,TextSize=13,TextColor3=C(0,0,0),BorderSizePixel=0},b) Cr(10,tb) N("UIPadding",{PaddingLeft=UDim.new(0,10),PaddingTop=UDim.new(0,8)},tb)
@@ -718,7 +787,7 @@ build.settings=function(b,a)
   elseif p=="sounds" then title("Sounds",true) srow("Volume",function() return S.currentVolume/100 end,function(v) set("currentVolume",math.floor(v*100+.5)) end,"currentVolume")
   elseif p=="battery" then title("Battery",true) group({{t="Battery Level",v=function() return S.battery.."%" end,vk={}},{t="Power Source",v=function() return "Battery" end}})
   elseif p=="about" then title("About",true)
-   group({{t="Name",v=function() return "iPad" end},{t="Software Version",v=function() return "iPadOS 17.4" end},{t="Apps",v=function() return tostring(#S.installedApps) end}})
+   group({{t="Name",v=function() return "iPad Pro Max" end},{t="Software Version",v=function() return "iPadOS 17.4" end},{t="Apps",v=function() return tostring(#S.installedApps) end}})
   else
    local x=byId[p:sub(5)] title(x.name,true)
    local hd=F({Size=u(0,374,0,70),BackgroundTransparency=1,LayoutOrder=nxo()},sf) tile(x,hd,0,6,58,false)
@@ -810,6 +879,282 @@ build.amazon=function(b,a)
  render() return function() end
 end
 
+build.safari=function(b,a)
+ local alive,ptok,hist,hi,n=true,0,{},0,0
+ local bar=F({Position=u(0,0,0,20),Size=u(0,414,0,40),BackgroundColor3=C(246,246,248)},b) F({Position=u(0,0,1,-1),Size=u(1,0,0,1),BackgroundColor3=C(210,210,214)},bar)
+ local function nb(x,t) return B({Position=u(0,x,0,6),Size=u(0,26,0,28),BackgroundTransparency=1,Text=t,TextSize=18,TextColor3=C(10,132,255)},bar) end
+ local bk,fw=nb(6,"<"),nb(34,">")
+ local tb=N("TextBox",{Position=u(0,66,0,7),Size=u(0,282,0,26),BackgroundColor3=C(228,228,233),Text="",PlaceholderText="Search or enter website name",PlaceholderColor3=C(120,120,128),TextColor3=C(0,0,0),Font=FM,TextSize=11,ClearTextOnFocus=false,TextXAlignment=XL,BorderSizePixel=0},bar) Cr(8,tb) N("UIPadding",{PaddingLeft=UDim.new(0,24),PaddingRight=UDim.new(0,64)},tb)
+ local lk=F({Position=u(0,72,0,0),Size=u(0,14,0,40),BackgroundTransparency=1,ZIndex=3},bar) lockI(lk,0,9)
+ local sec=T({Position=u(0,284,0,0),Size=u(0,60,0,40),TextSize=9,Font=FB,TextColor3=C(220,40,40),TextXAlignment=XR,ZIndex=3},bar)
+ local hm=B({Position=u(0,352,0,6),Size=u(0,56,0,28),BackgroundTransparency=1,Text="Home",TextSize=11,Font=FM,TextColor3=C(10,132,255)},bar)
+ local area=F({Position=u(0,0,0,60),Size=u(0,414,0,240),BackgroundTransparency=1,ClipsDescendants=true},b)
+ local pages,nav,show={}
+ local function ord() n+=1 return n end
+ local function base(bg)
+  ptok+=1 n=0 for _,c in ipairs(area:GetChildren()) do c:Destroy() end
+  local s=N("ScrollingFrame",{Size=u(1,0,1,0),BackgroundColor3=bg,BorderSizePixel=0,ScrollBarThickness=3,AutomaticCanvasSize=Enum.AutomaticSize.Y,CanvasSize=u(0,0,0,0)},area)
+  N("UIListLayout",{Padding=UDim.new(0,8),HorizontalAlignment=Enum.HorizontalAlignment.Center,SortOrder=Enum.SortOrder.LayoutOrder},s) N("UIPadding",{PaddingTop=UDim.new(0,8),PaddingBottom=UDim.new(0,16)},s)
+  return s
+ end
+ local function txt(s,t,sz,fnt,col,h,al) return T({Text=t,Size=u(0,390,0,h or sz+6),TextSize=sz,Font=fnt or FG,TextColor3=col,TextXAlignment=al or XL,TextWrapped=true,TextYAlignment=Enum.TextYAlignment.Top,LayoutOrder=ord()},s) end
+ local function btn(s,t,col,fg,w,h,cb) local k=B({Size=u(0,w,0,h),BackgroundColor3=col,Text=t,TextSize=12,TextColor3=fg,LayoutOrder=ord()},s) Cr(math.min(h/2,12),k) k.MouseButton1Click:Connect(cb) return k end
+ local function hero(s,h,c1,c2) local f=F({Size=u(0,390,0,h),BackgroundColor3=WH,LayoutOrder=ord()},s) Cr(10,f) N("UIGradient",{Rotation=30,Color=ColorSequence.new(c1,c2)},f) return f end
+ local function sim(t) alert("Simulation",t,{{"OK"}}) end
+
+ function pages.start()
+  local s=base(C(242,242,247))
+  local function grid(title,list)
+   txt(s,title,15,FB,C(20,20,24),20)
+   local g=F({Size=u(0,390,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,LayoutOrder=ord()},s) N("UIGridLayout",{CellSize=u(0,88,0,82),CellPadding=u(0,10,0,6)},g)
+   for _,f in ipairs(list) do
+    local cell=F({BackgroundTransparency=1},g)
+    local k=B({Position=u(0,16,0,0),Size=u(0,56,0,56),BackgroundColor3=f[3],Text=f[4],TextSize=26},cell) Cr(14,k)
+    T({Text=f[1],Position=u(0,0,0,60),Size=u(1,0,0,14),TextSize=10,TextColor3=C(30,30,34),TextXAlignment=XC},cell)
+    k.MouseButton1Click:Connect(function() nav(f[2],true,false) end)
+   end
+  end
+  grid("Favorites",{{"Roblox","www.roblox.com",C(35,37,39),"R"},{"YouTube","www.youtube.com",C(255,0,0),"Y"},{"Minecraft","www.minecraft.net",C(98,160,62),"M"},{"News","www.baseplate-news.com",C(60,60,66),"N"}})
+  grid("Sus Sites",{{"Free Robux","free-robux-now.biz",C(255,200,0),"$"},{"Virus Check","your-ipad-has-virus.net",C(200,30,30),"!"},{"Prizes","totally-legit-prizes.xyz",C(150,60,200),"?"}})
+ end
+
+ function pages.roblox()
+  local s=base(C(18,18,20))
+  local hd=F({Size=u(0,414,0,36),BackgroundColor3=C(35,37,39),LayoutOrder=ord()},s)
+  T({Text="ROBLOX",Position=u(0,14,0,0),Size=u(0,100,1,0),TextSize=16,Font=FB,TextXAlignment=XL},hd)
+  for i,l in ipairs({"Discover","Avatar Shop","Create"}) do T({Text=l,Position=u(0,120+(i-1)*76,0,0),Size=u(0,76,1,0),TextSize=10,Font=FM,TextColor3=C(190,192,196)},hd) end
+  local h=hero(s,110,C(0,162,255),C(80,60,220))
+  T({Text="Play. Create. Explore.",Position=u(0,16,0,16),Size=u(0,300,0,30),TextSize=20,Font=FB,TextXAlignment=XL},h)
+  T({Text="Millions of worlds made by players.",Position=u(0,16,0,48),Size=u(0,300,0,16),TextSize=11,Font=FG,TextXAlignment=XL},h)
+  btn(h,"Sign Up",WH,C(0,100,200),90,26,function() sim("Sign up isn't real in this simulation.") end).Position=u(0,16,0,74)
+  txt(s,"Popular Experiences",13,FB,WH,20)
+  local g=F({Size=u(0,390,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,LayoutOrder=ord()},s) N("UIGridLayout",{CellSize=u(0,122,0,96),CellPadding=u(0,8,0,8)},g)
+  for _,e in ipairs({{"Obby Tower",C(235,90,70)},{"Brookside Town",C(70,170,110)},{"Blox Racers",C(240,170,40)},{"Sword Arena",C(110,110,200)},{"Pet Island",C(230,110,170)},{"Tycoon City",C(60,150,200)}}) do
+   local c=B({BackgroundColor3=e[2]},g) Cr(8,c) N("UIGradient",{Rotation=90,Color=ColorSequence.new(WH,C(140,140,140))},c)
+   T({Text=e[1],Position=u(0,6,1,-24),Size=u(1,-12,0,20),TextSize=11,Font=FB,TextXAlignment=XL,TextStrokeTransparency=.5},c)
+   c.MouseButton1Click:Connect(function() sim("Joining games isn't available here.") end)
+  end
+ end
+
+ local VIDS={{"a1","Top 10 Obby Fails","BloxBuddy","1.2M views",C(235,90,70)},{"b2","I Built a Castle in 24 Hours","PixelPete","3.4M views",C(70,150,220)},{"c3","Server Crash Compilation","LagLord","890K views",C(110,90,200)},{"d4","Funny Cats Being Cats","Whiskers TV","5.1M views",C(240,160,60)},{"e5","Lo-Fi Beats to Relax To","ChillCloud","12M views",C(60,170,140)}}
+ function pages.youtube(path)
+  local s=base(C(249,249,249))
+  local hd=F({Size=u(0,414,0,38),BackgroundColor3=WH,LayoutOrder=ord()},s)
+  local lg=F({Position=u(0,12,0,9),Size=u(0,28,0,20),BackgroundColor3=C(255,0,0)},hd) Cr(6,lg) tri(lg,10,4,12,1,WH)
+  T({Text="YouTube",Position=u(0,46,0,0),Size=u(0,100,1,0),TextSize=15,Font=FB,TextColor3=C(20,20,20),TextXAlignment=XL},hd)
+  local sb=F({Position=u(0,170,0,6),Size=u(0,150,0,26),BackgroundColor3=C(238,238,238)},hd) Cr(13,sb) T({Text="Search",Position=u(0,12,0,0),Size=u(1,-12,1,0),TextSize=10,TextColor3=C(120,120,120),TextXAlignment=XL},sb)
+  local function card(v)
+   local c=B({Size=u(0,390,0,148),BackgroundColor3=WH,LayoutOrder=ord()},s) Cr(8,c)
+   local th=F({Size=u(1,0,0,100),BackgroundColor3=WH},c) Cr(8,th) N("UIGradient",{Rotation=35,Color=ColorSequence.new(v[5],C(30,30,40))},th) tri(th,187,34,32,1,WH)
+   T({Text=v[2],Position=u(0,8,0,104),Size=u(1,-16,0,16),TextSize=12,Font=FB,TextColor3=C(20,20,20),TextXAlignment=XL,TextTruncate=Enum.TextTruncate.AtEnd},c)
+   T({Text=v[3].."  -  "..v[4],Position=u(0,8,0,122),Size=u(1,-16,0,14),TextSize=10,TextColor3=C(100,100,100),TextXAlignment=XL},c)
+   c.MouseButton1Click:Connect(function() nav("www.youtube.com/watch?v="..v[1],true,false) end)
+  end
+  local wid=path:match("watch%?v=(%w+)")
+  if wid then
+   local v=VIDS[1] for _,x in ipairs(VIDS) do if x[1]==wid then v=x end end
+   local pl=F({Size=u(0,414,0,200),BackgroundColor3=WH,LayoutOrder=ord()},s) N("UIGradient",{Rotation=45,Color=ColorSequence.new(v[5],C(10,10,14))},pl) tri(pl,191,72,56,1,WH)
+   local tr=F({Position=u(0,12,1,-14),Size=u(0,390,0,4),BackgroundColor3=C(90,90,95)},pl) local fl=F({Size=u(0,0,1,0),BackgroundColor3=C(255,0,0)},tr)
+   local my=ptok task.spawn(function() local t=0 while alive and ptok==my do t=(t+.3)%100 fl.Size=u(t/100,0,1,0) task.wait(.1) end end)
+   txt(s,v[2],14,FB,C(20,20,20),20) txt(s,v[3].."  -  "..v[4],10,FM,C(100,100,100),14)
+   btn(s,"Like",C(235,235,235),C(20,20,20),90,26,function() sim("Likes aren't saved in this simulation.") end)
+   txt(s,"Up next",13,FB,C(20,20,20),20)
+  end
+  for _,v in ipairs(VIDS) do if v[1]~=wid then card(v) end end
+ end
+
+ function pages.minecraft()
+  local s=base(C(30,30,34))
+  local hd=F({Size=u(0,414,0,36),BackgroundColor3=C(20,20,22),LayoutOrder=ord()},s) T({Text="MINECRAFT",Position=u(0,14,0,0),Size=u(0,160,1,0),TextSize=16,Font=FB,TextColor3=C(110,190,70),TextXAlignment=XL},hd)
+  local h=hero(s,120,C(120,190,255),C(60,120,200))
+  for i=0,5 do local blk=F({Position=u(0,24+i*46,0,66),Size=u(0,42,0,42),BackgroundColor3=C(121,85,58)},h) F({Size=u(1,0,0,12),BackgroundColor3=C(98,160,62)},blk) end
+  T({Text="Build Anything.",Position=u(0,16,0,12),Size=u(0,300,0,30),TextSize=20,Font=FB,TextXAlignment=XL},h)
+  btn(h,"Get Minecraft",C(98,160,62),WH,110,24,function() sim("Downloads aren't available here.") end).Position=u(0,16,0,38)
+  txt(s,"Latest News",13,FB,WH,20)
+  for _,e in ipairs({{"The Wandering Forest Update",C(70,130,70)},{"New Mobs Arrive in the Caves",C(90,90,120)},{"Community Build Contest",C(170,110,50)}}) do
+   local c=F({Size=u(0,390,0,52),BackgroundColor3=WH,LayoutOrder=ord()},s) Cr(8,c) N("UIGradient",{Rotation=0,Color=ColorSequence.new(e[2],C(40,40,46))},c)
+   T({Text=e[1],Position=u(0,12,0,0),Size=u(1,-24,1,0),TextSize=12,Font=FB,TextXAlignment=XL},c)
+  end
+ end
+
+ local HL={{"Player Finds Secret Room Behind Spawn","WORLD"},{"Server Lag Blamed On Too Many Parts","TECH"},{"Local Noob Learns To Jump, Community Celebrates","LIFE"},{"Sunny Skies Expected On Baseplate All Week","WEATHER"}}
+ function pages.news(path)
+  local s=base(WH)
+  local m=F({Size=u(0,414,0,50),BackgroundColor3=WH,LayoutOrder=ord()},s)
+  T({Text="BASEPLATE DAILY",Position=u(0,0,0,4),Size=u(1,0,0,26),TextSize=20,Font=FB,TextColor3=C(20,20,20),TextXAlignment=XC},m)
+  T({Text=os.date("%A, %B %d"),Position=u(0,0,0,30),Size=u(1,0,0,14),TextSize=10,TextColor3=C(110,110,116),TextXAlignment=XC},m)
+  F({Position=u(0,12,1,-2),Size=u(1,-24,0,2),BackgroundColor3=C(20,20,20)},m)
+  local aid=tonumber(path:match("^a(%d+)"))
+  if aid and HL[aid] then
+   txt(s,HL[aid][2],10,FB,C(200,40,40),14) txt(s,HL[aid][1],18,FB,C(20,20,20),48)
+   txt(s,"Witnesses say the story unfolded quickly, with players gathering to see it for themselves.",12,FG,C(50,50,56),40)
+   txt(s,"Officials say more details will follow as the story develops.",12,FG,C(50,50,56),30)
+   btn(s,"Back to front page",C(20,20,20),WH,160,28,function() nav("www.baseplate-news.com",true,false) end)
+  else
+   local h=hero(s,90,C(60,60,70),C(20,20,24)) T({Text=HL[1][2],Position=u(0,12,0,8),Size=u(0,100,0,12),TextSize=9,Font=FB,TextColor3=C(255,90,80),TextXAlignment=XL},h)
+   T({Text=HL[1][1],Position=u(0,12,0,24),Size=u(1,-24,0,56),TextSize=17,Font=FB,TextWrapped=true,TextXAlignment=XL,TextYAlignment=Enum.TextYAlignment.Top},h)
+   local hb=B({Size=u(1,0,1,0),BackgroundTransparency=1},h) hb.MouseButton1Click:Connect(function() nav("www.baseplate-news.com/a1",true,false) end)
+   for i=2,#HL do
+    local r=B({Size=u(0,390,0,44),BackgroundColor3=C(245,245,247),LayoutOrder=ord()},s) Cr(6,r)
+    T({Text=HL[i][2],Position=u(0,10,0,4),Size=u(0,100,0,12),TextSize=8,Font=FB,TextColor3=C(200,40,40),TextXAlignment=XL},r)
+    T({Text=HL[i][1],Position=u(0,10,0,16),Size=u(1,-20,0,24),TextSize=11,Font=FB,TextColor3=C(20,20,20),TextXAlignment=XL,TextWrapped=true,TextYAlignment=Enum.TextYAlignment.Top},r)
+    r.MouseButton1Click:Connect(function() nav("www.baseplate-news.com/a"..i,true,false) end)
+   end
+  end
+ end
+
+ function pages.robux()
+  local s=base(C(255,225,0))
+  local h=F({Size=u(0,390,0,70),BackgroundColor3=C(220,20,20),LayoutOrder=ord()},s) Cr(8,h)
+  T({Text="WINNER!!!",Position=u(0,0,0,4),Size=u(1,0,0,36),TextSize=26,Font=FB},h) T({Text="CLAIM 10,000 FREE ROBUX NOW",Position=u(0,0,0,40),Size=u(1,0,0,22),TextSize=14,Font=FB},h)
+  local cd=txt(s,"Offer ends in 04:59",14,FB,C(180,0,0),20,XC)
+  local my=ptok task.spawn(function() local t=299 while alive and ptok==my and t>0 do cd.Text=string.format("Offer ends in %02d:%02d",t//60,t%60) t-=1 task.wait(1) end end)
+  txt(s,"No password needed!!! 100% REAL!!! 1,284,331 players claimed today!!!",11,FM,C(40,40,40),44,XC)
+  btn(s,"CLAIM NOW",C(40,200,40),WH,200,38,function()
+   alert("Human Verification","Complete 5 surveys to continue.",{{"OK",nil,function()
+    alert("Download Required","Install RobuxBooster.exe to get your Robux.",{{"Cancel"},{"Install",nil,function() alert("Just Kidding!","This was a fake scam page. Nothing was downloaded.",{{"OK"}}) end}}) end}}) end)
+ end
+ function pages.virus()
+  local s=base(C(150,0,0))
+  txt(s,"WARNING!!!",24,FB,WH,32,XC) txt(s,"3 VIRUSES FOUND ON YOUR IPAD",13,FB,C(255,230,0),20,XC)
+  local tr=F({Size=u(0,300,0,10),BackgroundColor3=C(60,0,0),LayoutOrder=ord()},s) Cr(5,tr) local fl=F({Size=u(0,0,1,0),BackgroundColor3=C(255,60,60)},tr) Cr(5,fl)
+  local my=ptok task.spawn(function() local t=0 while alive and ptok==my do t=(t+.02)%1 fl.Size=u(t,0,1,0) task.wait(.05) end end)
+  for _,v in ipairs({"Trojan.Robux.Stealer","Adware.Popup.Spam","Spyware.Keylogger.X"}) do txt(s,"! "..v.."  -  CRITICAL",11,FB,C(255,200,200),16,XC) end
+  btn(s,"REMOVE VIRUSES NOW",C(255,200,0),C(60,0,0),220,36,function() alert("Fake Alert","Your iPad is fine. This was a fake scam page.",{{"OK"}}) end)
+ end
+ function pages.prize()
+  local s=base(C(90,40,170))
+  txt(s,"CONGRATULATIONS!",22,FB,WH,30,XC) txt(s,"You are visitor #1,000,000! You won an iPhone 17!",13,FM,C(255,230,120),40,XC)
+  btn(s,"CLAIM PRIZE",C(255,200,0),C(60,20,100),200,38,function()
+   alert("Almost There","Pay $1 shipping to claim your prize.",{{"Cancel"},{"Continue",nil,function() alert("Just Kidding!","Fake prize page. Never enter card details on sites like this.",{{"OK"}}) end}}) end)
+ end
+ function pages.warn(e)
+  local s=base(C(185,28,28))
+  local ic=F({Size=u(0,50,0,50),BackgroundColor3=WH,LayoutOrder=ord()},s) Cr(25,ic) T({Text="!",Size=u(1,0,1,0),TextSize=30,Font=FB,TextColor3=C(185,28,28)},ic)
+  txt(s,"Deceptive Website Warning",16,FB,WH,22,XC)
+  txt(s,"Safari thinks this site may try to trick you into installing software or sharing personal info.",11,FG,C(255,220,220),44,XC)
+  btn(s,"Go Back",WH,C(185,28,28),180,32,function() if hi>1 then hi-=1 show(hist[hi]) else nav("",true,false) end end)
+  btn(s,"Visit Website Anyway",C(140,15,15),WH,180,32,function() e.ok=true show(e) end)
+ end
+ function pages.nofind()
+  local s=base(C(242,242,247)) txt(s,"Safari Can't Find the Server",16,FB,C(20,20,24),22,XC) txt(s,"Safari can't open the page because the server can't be found.",11,FG,C(100,100,106),30,XC)
+ end
+ function pages.search(q)
+  local s=base(C(242,242,247)) txt(s,'Results for "'..q..'"',13,FB,C(20,20,24),20)
+  for _,r in ipairs({{"Roblox","www.roblox.com","Play millions of experiences.",false},{"YouTube","www.youtube.com","Watch, share and create videos.",false},{"Minecraft","www.minecraft.net","Build and explore worlds.",false},{"Baseplate Daily","www.baseplate-news.com","Today's top stories.",false},{"FREE ROBUX NOW!!!","free-robux-now.biz","Claim your free Robux.",true},{"Your iPad Has a Virus","your-ipad-has-virus.net","Scan your device now.",true},{"You Won a Prize","totally-legit-prizes.xyz","Claim your prize today.",true}}) do
+   local c=B({Size=u(0,390,0,52),BackgroundColor3=WH,LayoutOrder=ord()},s) Cr(8,c)
+   T({Text=r[1],Position=u(0,10,0,4),Size=u(1,-20,0,16),TextSize=12,Font=FB,TextColor3=C(10,90,200),TextXAlignment=XL},c)
+   T({Text=r[2]..(r[4] and "  (Not Secure)" or ""),Position=u(0,10,0,20),Size=u(1,-20,0,12),TextSize=9,TextColor3=r[4] and C(200,40,40) or C(40,140,60),TextXAlignment=XL},c)
+   T({Text=r[3],Position=u(0,10,0,33),Size=u(1,-20,0,14),TextSize=10,TextColor3=C(90,90,96),TextXAlignment=XL},c)
+   c.MouseButton1Click:Connect(function() nav(r[2],true,false) end)
+  end
+ end
+
+ local SUS={robux=true,virus=true,prize=true}
+ local function key(l) if l:find("free%-?robux") then return "robux" elseif l:find("virus") then return "virus" elseif l:find("prize") then return "prize" elseif l:find("roblox") then return "roblox" elseif l:find("youtu") then return "youtube" elseif l:find("minecraft") then return "minecraft" elseif l:find("news") then return "news" end end
+ function show(e)
+  local u2=e.u local l=(u2:lower():gsub("^https?://",""):gsub("^www%.","")) local path=l:match("^[^/]+/(.*)$") or ""
+  local k=key(l) local bad=k~=nil and SUS[k]==true
+  tb.Text=u2 lk.Visible=(u2~="") and not bad sec.Text=bad and "Not Secure" or ""
+  if u2=="" then pages.start() elseif bad and not e.ok then pages.warn(e) elseif k then pages[k](path)
+  elseif l:find("%.") and not l:find("%s") then pages.nofind() else pages.search(u2) end
+ end
+ function nav(u2,push,ok) for i=#hist,hi+1,-1 do table.remove(hist,i) end table.insert(hist,{u=u2,ok=ok}) hi=#hist show(hist[hi]) end
+ bk.MouseButton1Click:Connect(function() if hi>1 then hi-=1 show(hist[hi]) end end)
+ fw.MouseButton1Click:Connect(function() if hi<#hist then hi+=1 show(hist[hi]) end end)
+ hm.MouseButton1Click:Connect(function() nav("",true,false) end)
+ tb.FocusLost:Connect(function(enter) if enter and tb.Text~="" then nav(tb.Text,true,false) end end)
+ nav("",true,false)
+ return function() alive=false end
+end
+
+build.messages=function(b,a)
+ local TXS=game:GetService("TextService")
+ local alive,cur,push=true,nil,nil
+ local CONT={
+  {"mom","Mom",C(240,120,140),{"Okay sweetie!","Be home before dark.","Love you! Did you eat?","Don't forget your jacket.","Call me later!"},"Hi sweetie!",{"Are you eating enough?","Text me when you get home."}},
+  {"jake","Jake",C(70,150,220),{"lol fr","wait what","nah bro","bet","ok but have you tried obbies","im lagging so bad rn","ayo","no way"},"yo what's up",{"bro hop on","did you see the new update"}},
+  {"sophie","Sophie",C(170,110,220),{"haha omg","wait really??","stop it lol","I'm so tired today","same!!","send pics","ok ok ok"},"heyyy!",{"omg you won't believe what happened","are you free later?"}},
+  {"pizza","Pizza Palace",C(235,120,60),{"Thanks for your order!","Your pizza is 5 minutes away.","We hope you enjoyed your meal!","Reply STOP to unsubscribe."},"Welcome to Pizza Palace!",{"Two large pizzas for the price of one today!"}},
+  {"coach","Coach",C(60,160,110),{"Good effort today.","See you at practice.","Hydrate!","Be on time.","Nice work."},"Hello. Ready for practice?",{"Practice moved to 4pm.","Don't be late tomorrow."}}}
+ if not S.msgs then
+  S.msgs={mom={{me=false,t="Dinner's at 6, don't be late!",time="9:12 AM"}},jake={{me=false,t="bro did you see the new update",time="8:47 AM"}},sophie={{me=true,t="omg same lol",time="Yesterday"}},pizza={{me=false,t="Your order is on its way!",time="Yesterday"}},coach={{me=false,t="Practice moved to 4pm",time="Mon"}}}
+  S.unread={mom=true,jake=true}
+ end
+ local root=F({Size=u(1,0,1,0),BackgroundTransparency=1},b)
+ local list,chat
+ local function now() return (os.date("%I:%M %p"):gsub("^0","")) end
+ local function clr() for _,c in ipairs(root:GetChildren()) do c:Destroy() end end
+ local function avatar(par,c,x,y,s) local f=F({Position=u(0,x,0,y),Size=u(0,s,0,s),BackgroundColor3=c[3]},par) Cr(s/2,f) T({Text=c[2]:sub(1,1),Size=u(1,0,1,0),TextSize=s*.45,Font=FB},f) return f end
+ local function deliver(c,txt)
+  local m={me=false,t=txt,time=now()} table.insert(S.msgs[c[1]],m)
+  if alive and cur==c[1] and push then push(m) else S.unread[c[1]]=true notify(c[2],txt,c[3]) if alive and cur==nil then list() end end
+ end
+ function list()
+  clr() cur=nil push=nil
+  hdr(root,"Messages",C(0,0,0))
+  local sf=N("ScrollingFrame",{Position=u(0,0,0,72),Size=u(1,0,1,-76),BackgroundTransparency=1,BorderSizePixel=0,ScrollBarThickness=3,AutomaticCanvasSize=Enum.AutomaticSize.Y,CanvasSize=u(0,0,0,0)},root)
+  N("UIListLayout",{SortOrder=Enum.SortOrder.LayoutOrder},sf)
+  for i,c in ipairs(CONT) do
+   local ms=S.msgs[c[1]] local last=ms[#ms]
+   local r=B({Size=u(0,414,0,56),BackgroundColor3=WH,LayoutOrder=i},sf)
+   if S.unread[c[1]] then local d=F({Position=u(0,6,0,24),Size=u(0,8,0,8),BackgroundColor3=C(10,132,255)},r) Cr(4,d) end
+   avatar(r,c,20,8,40)
+   T({Text=c[2],Position=u(0,68,0,8),Size=u(0,240,0,16),TextSize=13,Font=FB,TextColor3=C(0,0,0),TextXAlignment=XL},r)
+   T({Text=(last.me and "You: " or "")..last.t,Position=u(0,68,0,26),Size=u(0,260,0,16),TextSize=11,Font=FG,TextColor3=C(142,142,147),TextXAlignment=XL,TextTruncate=Enum.TextTruncate.AtEnd},r)
+   T({Text=last.time,Position=u(0,330,0,8),Size=u(0,72,0,16),TextSize=10,Font=FG,TextColor3=C(142,142,147),TextXAlignment=XR},r)
+   F({Position=u(0,68,1,-1),Size=u(1,-68,0,1),BackgroundColor3=C(218,218,222)},r)
+   r.MouseButton1Click:Connect(function() chat(c) end)
+  end
+ end
+ function chat(c)
+  clr() cur=c[1] S.unread[c[1]]=false
+  local top=F({Position=u(0,0,0,20),Size=u(0,414,0,40),BackgroundColor3=C(246,246,248),ZIndex=3},root) F({Position=u(0,0,1,-1),Size=u(1,0,0,1),BackgroundColor3=C(210,210,214)},top)
+  local bk=B({Position=u(0,8,0,0),Size=u(0,90,0,40),BackgroundTransparency=1,Text="< Messages",TextSize=12,TextColor3=C(10,132,255),Font=FM,TextXAlignment=XL},top) bk.MouseButton1Click:Connect(function() list() end)
+  avatar(top,c,152,9,22) T({Text=c[2],Position=u(0,180,0,0),Size=u(0,150,1,0),TextSize=12,Font=FB,TextColor3=C(0,0,0),TextXAlignment=XL},top)
+  local sf=N("ScrollingFrame",{Position=u(0,0,0,60),Size=u(1,0,0,200),BackgroundColor3=WH,BorderSizePixel=0,ScrollBarThickness=2,CanvasSize=u(0,0,0,0)},root)
+  local y=8
+  local function fit() sf.CanvasSize=u(0,0,0,y+4) sf.CanvasPosition=V2(0,math.max(0,y+4-200)) end
+  local function bubble(m)
+   local sz=TXS:GetTextSize(m.t,12,FM,V2(230,10000)) local w,h=sz.X+22,sz.Y+14
+   local row=F({Position=u(0,0,0,y),Size=u(0,414,0,h),BackgroundTransparency=1},sf)
+   local bb=F({Position=m.me and u(0,414-12-w,0,0) or u(0,12,0,0),Size=u(0,w,0,h),BackgroundColor3=m.me and C(10,132,255) or C(229,229,234)},row) Cr(14,bb)
+   T({Text=m.t,Position=u(0,11,0,0),Size=u(1,-22,1,0),TextSize=12,Font=FM,TextColor3=m.me and WH or C(0,0,0),TextWrapped=true,TextXAlignment=XL},bb)
+   y+=h+6 fit()
+  end
+  local function typing()
+   local row=F({Position=u(0,0,0,y),Size=u(0,414,0,28),BackgroundTransparency=1},sf)
+   local bb=F({Position=u(0,12,0,0),Size=u(0,54,0,28),BackgroundColor3=C(229,229,234)},row) Cr(14,bb)
+   local ds={} for i=1,3 do ds[i]=F({Position=u(0,12+(i-1)*12,0,11),Size=u(0,7,0,7),BackgroundColor3=C(150,150,156)},bb) Cr(4,ds[i]) end
+   y+=34 fit() local on2=true
+   task.spawn(function() local k=0 while on2 and row.Parent do k=k%3+1 for i,d in ipairs(ds) do d.BackgroundTransparency=(i==k) and 0 or .55 end task.wait(.25) end end)
+   return function() on2=false row:Destroy() y-=34 fit() end
+  end
+  for _,m in ipairs(S.msgs[c[1]]) do bubble(m) end
+  push=bubble
+  local inp=F({Position=u(0,0,0,262),Size=u(0,414,0,38),BackgroundColor3=C(246,246,248),ZIndex=3},root)
+  local tb=N("TextBox",{Position=u(0,12,0,4),Size=u(0,346,0,30),BackgroundColor3=WH,Text="",PlaceholderText="iMessage",PlaceholderColor3=C(150,150,156),TextColor3=C(0,0,0),Font=FM,TextSize=12,ClearTextOnFocus=false,TextXAlignment=XL,BorderSizePixel=0},inp) Cr(15,tb) N("UIPadding",{PaddingLeft=UDim.new(0,12),PaddingRight=UDim.new(0,8)},tb)
+  local sn=B({Position=u(0,366,0,4),Size=u(0,30,0,30),BackgroundColor3=C(10,132,255),Text="^",TextSize=16},inp) Cr(15,sn)
+  local function send()
+   local t=(tb.Text:gsub("^%s+",""):gsub("%s+$","")) if t=="" then return end tb.Text=""
+   local m={me=true,t=t,time=now()} table.insert(S.msgs[c[1]],m) bubble(m)
+   task.spawn(function()
+    task.wait(.6) local rm if alive and cur==c[1] then rm=typing() end
+    task.wait(1.2+math.random()*1.6) if rm and rm then pcall(rm) end
+    local l=t:lower() local out
+    if l:match("^hi") or l:match("^hey") or l:match("^hello") then out=c[5]
+    elseif l:find("%?") and math.random()<.5 then local q={"hmm good question lol","idk honestly","let me think...","maybe?"} out=q[math.random(#q)]
+    else out=c[4][math.random(#c[4])] end
+    deliver(c,out)
+   end)
+  end
+  sn.MouseButton1Click:Connect(send) tb.FocusLost:Connect(function(enter) if enter then send() end end)
+ end
+ task.spawn(function() while alive do task.wait(20+math.random()*20) if alive then local c=CONT[math.random(#CONT)] deliver(c,c[6][math.random(#c[6])]) end end end)
+ list()
+ return function() alive=false end
+end
+
 local st0
 local function ptr(i) return i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch end
 UIS.InputBegan:Connect(function(i) if ptr(i) and G.Enabled and not S.isSleep then
@@ -836,12 +1181,12 @@ local function showPad(v)
 end
 local function mkPad()
  local tool=N("Tool",{Name="iPad",RequiresHandle=true,CanBeDropped=false,ToolTip="iPad"})
- local h=N("Part",{Name="Handle",Size=Vector3.new(1.6,.09,1.15),Color=C(28,28,32),Material=Enum.Material.SmoothPlastic,CanCollide=false},tool)
- local sg=N("SurfaceGui",{Face=Enum.NormalId.Top,CanvasSize=V2(500,354)},h)
- local sbz=F({Size=u(1,0,1,0),BackgroundColor3=C(8,8,10)},sg) Cr(24,sbz)
- local ssc=F({Position=u(0,43,0,22),Size=u(0,414,0,310),BackgroundColor3=WH},sg) wall(ssc)
+ local h=N("Part",{Name="Handle",Size=Vector3.new(1.55,.09,1.18),Color=C(66,66,72),Material=Enum.Material.Metal,CanCollide=false},tool)
+ local sg=N("SurfaceGui",{Face=Enum.NormalId.Top,CanvasSize=V2(442,338)},h)
+ local sbz=F({Size=u(1,0,1,0),BackgroundColor3=C(8,8,10)},sg) Cr(26,sbz)
+ local ssc=F({Position=u(0,14,0,14),Size=u(0,414,0,310),BackgroundColor3=WH},sg) wall(ssc) local m2=F({Position=u(0,14,0,14),Size=u(0,414,0,310),BackgroundTransparency=1,ZIndex=3},sg) Cr(12,m2) N("UIStroke",{Color=C(8,8,10),Thickness=11},m2)
  T({Text="iPadOS",Size=u(1,0,1,0),TextSize=40,Font=FB},ssc)
- local sh2=F({Position=u(0,473,0,164),Size=u(0,24,0,24),BackgroundColor3=C(0,0,0)},sg) Cr(12,sh2) N("UIStroke",{Color=C(100,100,106),Thickness=2},sh2)
+ local sc2=F({Position=u(.5,-3,0,5),Size=u(0,6,0,6),BackgroundColor3=C(10,10,14)},sg) Cr(3,sc2)
  tool.Equipped:Connect(function() showPad(true) end)
  tool.Unequipped:Connect(function() showPad(false) end)
  return tool
