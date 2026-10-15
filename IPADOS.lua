@@ -278,7 +278,6 @@ local function setSlider(sl, frac)
 end
 
 ---------------------------------------------------------------- icon + glyph library (drawn from shapes, no emoji)
--- every coordinate is a fraction of the icon size `s` (pass s = 1 to use pixels)
 local function shape(parent, s, cx, cy, w, h, color, rot, round, tr)
 	local f = Instance.new("Frame")
 	f.BorderSizePixel = 0
@@ -303,7 +302,6 @@ local function ringShape(parent, s, cx, cy, d, thick, color, tr)
 	return f
 end
 
--- triangle (height h, width h/2). dir "r" = points right, "l" = points left. x,y = top-left
 local function triShape(parent, s, dir, x, y, h, color)
 	local hh, ww = h * s, h * s / 2
 	local clip = Instance.new("Frame")
@@ -345,7 +343,6 @@ local function drawGear(h, s, c, bg)
 	shape(h, s, 0.5, 0.5, 0.34, 0.34, bg, 0, 0.5)
 end
 
--- small white glyphs (used in Settings + Control Center)
 local GLYPH = {}
 
 GLYPH.airplane = function(h, s, c)
@@ -459,7 +456,6 @@ local function glyph(parent, name, cx, cy, size, color, bg)
 	return h
 end
 
--- app icons
 local ICONS = {}
 
 ICONS.appstore = {
@@ -587,7 +583,6 @@ local function drawIcon(parent, id, x, y, size)
 	return ic
 end
 
--- live clock registry
 local clocks = {}
 local function clockLabel(lbl, kind)
 	table.insert(clocks, { lbl, kind })
@@ -616,7 +611,7 @@ local function refreshClocks()
 end
 
 ---------------------------------------------------------------- state
-local state = "lock"            -- "lock" | "home" | "app"
+local state = "lock"
 local curId = nil
 local screenOff = false
 local siriOpen, pwOpen = false, false
@@ -625,10 +620,9 @@ local wifiOn, connected, connecting, connectToken = false, nil, nil, nil
 local airplane, btOn = false, false
 local siriOn, siriHold, siriVoice = true, true, 1
 local brightness = 1
-local vol = 8                    -- 0..16
+local vol = 8
 local wifiIcons = {}
 
--- forward declarations (defined further down)
 local openApp, closeApp, lockNow, unlock, openSiri, closeSiri, openPw
 local setWifi, connectTo, onNetChanged, changeVolume, applyBrightness, layoutHome, getApp, showApp
 local ccRender, openCC, closeCC
@@ -663,7 +657,7 @@ local function status(parent, withLeft)
 		clockLabel(label(parent, "", 30, 8, 420, 28, 22, WHITE, Enum.Font.GothamBold, Enum.TextXAlignment.Left), "status")
 	end
 	local icon = { bars = {} }
-	for i = 1, 3 do -- wifi bars
+	for i = 1, 3 do
 		local h = 4 + i * 4
 		icon.bars[i] = frame(parent, 818 + (i - 1) * 9, 32 - h, 6, h, WHITE, 0.65, px(2))
 	end
@@ -785,7 +779,7 @@ chromeF.ZIndex = 4
 status(chromeF, true)
 frame(chromeF, 440, 6, 120, 30, Color3.new(0, 0, 0), 0.6, px(15))
 label(chromeF, "Home", 440, 6, 120, 30, 18, WHITE, Enum.Font.GothamBold)
-homeBar(chromeF)
+homeBar(appF)
 
 local apps = {}
 local pageFrames = {}
@@ -815,7 +809,7 @@ local function newPage()
 	return p
 end
 
-local kbApp = makeKeyboard(appF, 162, 330, 162, 330) -- shared by Notes + Reminders
+local kbApp = makeKeyboard(appF, 162, 330, 162, 330)
 
 ---------------------------------------------------------------- LOCK
 local lockF = frame(root, 0, 0, CW, CH, Color3.new(0, 0, 0), 1)
@@ -1156,7 +1150,7 @@ function S.render()
 				label(f, st, 810, y, 150, 56, 17, Color3.fromRGB(110, 170, 255), Enum.Font.GothamBold, Enum.TextXAlignment.Right)
 				p.region(340, y, 630, 56, function()
 					if connected == n.name then
-						connected = nil -- tap the connected network to disconnect
+						connected = nil
 						onNetChanged()
 					elseif connecting ~= n.name then
 						if n.pass then openPw(n) else connectTo(n) end
@@ -1253,15 +1247,7 @@ function S.render()
 	end
 end
 
-function S.onPress(x, y)
-	if (S.sel == "display" or S.sel == "sounds") and inRect(x, y, 350, 170, 620, 60) then
-		S.drag = (S.sel == "display") and "bright" or "vol"
-		S.onDrag(x, y)
-		return true
-	end
-	return false
-end
-
+-- Define S.onDrag BEFORE S.onPress so it is never nil
 function S.onDrag(x, y)
 	if not S.drag then return end
 	local frac = math.clamp((x - 370) / 570, 0, 1)
@@ -1274,6 +1260,15 @@ function S.onDrag(x, y)
 		if S.volLbl then S.volLbl.Text = math.floor(frac * 100 + 0.5) .. "%" end
 	end
 	setSlider(S.slider, frac)
+end
+
+function S.onPress(x, y)
+	if (S.sel == "display" or S.sel == "sounds") and inRect(x, y, 350, 170, 620, 60) then
+		S.drag = (S.sel == "display") and "bright" or "vol"
+		S.onDrag(x, y)
+		return true
+	end
+	return false
 end
 
 function S.onRelease()
@@ -1350,7 +1345,7 @@ function AS.render()
 end
 AS.tap = AS.page.tap
 
----------------------------------------------------------------- APP: Demo (apps installed from the App Store)
+---------------------------------------------------------------- APP: Demo
 local demoApp = { page = newPage(), def = nil }
 function demoApp.render()
 	local p = demoApp.page
@@ -1364,7 +1359,7 @@ function demoApp.render()
 end
 demoApp.tap = demoApp.page.tap
 
----------------------------------------------------------------- APP: Notes (works)
+---------------------------------------------------------------- APP: Notes
 local N = {
 	page = newPage(),
 	notes = { { body = "Welcome to Notes\nTap + to write a new note." } },
@@ -1493,7 +1488,7 @@ function N.tap(x, y)
 	N.page.tap(x, y)
 end
 
----------------------------------------------------------------- APP: Reminders (works)
+---------------------------------------------------------------- APP: Reminders
 local Rm = {
 	page = newPage(),
 	items = { { text = "Buy milk", done = false }, { text = "Charge iPad", done = false } },
@@ -1597,7 +1592,7 @@ function Rm.tap(x, y)
 	Rm.page.tap(x, y)
 end
 
----------------------------------------------------------------- APP: Podcasts (demo)
+---------------------------------------------------------------- APP: Podcasts
 local SHOWS = {
 	{ "Morning Brew Chat", "Daily news & banter", "", Color3.fromRGB(255, 149, 0) },
 	{ "True Crime Tuesdays", "Mysteries unfolded", "", Color3.fromRGB(175, 82, 222) },
@@ -1655,7 +1650,7 @@ function Pod.render()
 end
 Pod.tap = Pod.page.tap
 
----------------------------------------------------------------- CONTROL CENTER (swipe down from the top-right / Wi-Fi icon)
+---------------------------------------------------------------- CONTROL CENTER
 local ccF = frame(root, 0, 0, CW, CH, Color3.new(0, 0, 0), 1)
 ccF.ZIndex = 9
 ccF.Visible = false
@@ -1692,7 +1687,6 @@ ccRender = function()
 		ccShowToast(name .. ": " .. (ccState[key] and "On" or "Off"))
 	end
 
-	-- connectivity block (airplane / airdrop / wifi / bluetooth)
 	local x0, y0 = cell(0, 0)
 	frame(ccPanel, x0, y0, 124, 124, CC_DARK, 0.08, px(30))
 	local conn = {
@@ -1726,7 +1720,6 @@ ccRender = function()
 		reg(cx - 30, cy - 30, 60, 60, b[6])
 	end
 
-	-- music block
 	local mx, my = cell(2, 0)
 	frame(ccPanel, mx, my, 124, 124, CC_DARK, 0.08, px(30))
 	label(ccPanel, "Music", mx, my + 12, 124, 24, 16, WHITE, Enum.Font.GothamBold)
@@ -1750,7 +1743,6 @@ ccRender = function()
 	end)
 	reg(mx + 86, py - 24, 36, 48, function() ccShowToast("Next track (demo)") end)
 
-	-- brightness + volume sliders
 	local bx, by = cell(2, 2)
 	for i = 1, 2 do
 		local sx = bx + (i - 1) * 66
@@ -1763,7 +1755,6 @@ ccRender = function()
 		cc.sliders[i] = { x = sx, y = by, w = 58, h = 124, fill = fill, id = (i == 1) and "bright" or "vol" }
 	end
 
-	-- small tiles
 	local function small(col, row, name, on, onColor, glyphOn, fn)
 		local x, y = cell(col, row)
 		local bg = on and onColor or CC_TILE
@@ -1774,7 +1765,6 @@ ccRender = function()
 	small(0, 2, "rotlock", ccState.rotlock, Color3.fromRGB(255, 69, 58), WHITE, function() toggle("rotlock", "Orientation Lock") end)
 	small(1, 2, "moon", ccState.dnd, Color3.fromRGB(94, 92, 230), WHITE, function() toggle("dnd", "Do Not Disturb") end)
 
-	-- screen mirroring (wide)
 	local sx0, sy0 = cell(0, 3)
 	frame(ccPanel, sx0, sy0, 124, 58, CC_DARK, 0.08, px(18))
 	glyph(ccPanel, "mirror", sx0 + 28, sy0 + 29, 30, WHITE, CC_DARK)
@@ -1821,7 +1811,7 @@ local function ccRelease()
 	cc.grab = nil
 end
 
-local function ccFollow(p) -- finger is dragging the panel down
+local function ccFollow(p)
 	if not ccF.Visible then
 		ccRender()
 		ccF.Visible = true
@@ -1973,7 +1963,6 @@ lockNow = function(instant)
 	end
 end
 
--- power button: screen off / on (black screen)
 local function sleepScreen()
 	if screenOff then return end
 	screenOff = true
@@ -1995,16 +1984,16 @@ local function wakeScreen()
 	end)
 end
 
----------------------------------------------------------------- spring (tap force)
+---------------------------------------------------------------- spring
 local sp = { x = 0, y = 0, z = 0, rx = 0, ry = 0, xv = 0, yv = 0, zv = 0, rxv = 0, ryv = 0 }
 
 local function bounce(u, v)
-	sp.zv = sp.zv - 1.1                  -- pushed back a little
-	sp.rxv = sp.rxv + (v - 0.5) * 1.5    -- tilts away from where you tapped
+	sp.zv = sp.zv - 1.1
+	sp.rxv = sp.rxv + (v - 0.5) * 1.5
 	sp.ryv = sp.ryv + (u - 0.5) * 1.5
 end
 
----------------------------------------------------------------- taps on the screen
+---------------------------------------------------------------- taps
 local function openSettingsWifi()
 	S.sel = "wifi"
 	if state == "app" and curId == "settings" then
@@ -2064,7 +2053,7 @@ local function handleTap(u, v)
 	end
 end
 
----------------------------------------------------------------- side buttons (3D)
+---------------------------------------------------------------- side buttons
 local function rayBox(o, d, bmin, bmax)
 	local tmin, tmax = 0, math.huge
 	for _, ax in ipairs({ "X", "Y", "Z" }) do
@@ -2082,7 +2071,7 @@ local function rayBox(o, d, bmin, bmax)
 	return tmin
 end
 
-local PAD = Vector3.new(0.13, 0.13, 0.2) -- forgiving finger hitbox
+local PAD = Vector3.new(0.13, 0.13, 0.2)
 local function hitSide(pos)
 	local ray = camera:ScreenPointToRay(pos.X, pos.Y)
 	local cf = model.PrimaryPart.CFrame
@@ -2120,11 +2109,11 @@ local function sideAction(name)
 	end
 end
 
----------------------------------------------------------------- input (ray -> screen)
+---------------------------------------------------------------- input
 local function screenUV(pos)
 	local ray = camera:ScreenPointToRay(pos.X, pos.Y)
 	local cf = screen.CFrame
-	local n = -cf.LookVector -- back-face normal (towards you)
+	local n = -cf.LookVector
 	local denom = ray.Direction:Dot(n)
 	if denom > -1e-4 then return nil end
 	local p0 = cf:PointToWorldSpace(Vector3.new(0, 0, 0.003))
@@ -2284,7 +2273,7 @@ CAS:BindActionAtPriority(
 	Enum.UserInputType.Touch, Enum.UserInputType.MouseButton1, Enum.UserInputType.MouseMovement
 )
 
----------------------------------------------------------------- per-frame update
+---------------------------------------------------------------- render step
 local ARM_NAMES = {
 	"LeftUpperArm", "LeftLowerArm", "LeftHand", "RightUpperArm", "RightLowerArm", "RightHand",
 	"Left Arm", "Right Arm",
@@ -2310,14 +2299,12 @@ RunService:BindToRenderStep("DeltaIPad", Enum.RenderPriority.Camera.Value + 2, f
 	end
 	dt = math.min(dt, 1 / 30)
 
-	-- little inertia when you turn the camera
 	local rel = prevCam:ToObjectSpace(camera.CFrame)
 	local rx, ry = rel:ToEulerAnglesYXZ()
 	prevCam = camera.CFrame
 	sp.x = math.clamp(sp.x + ry * 0.9, -0.2, 0.2)
 	sp.y = math.clamp(sp.y - rx * 0.9, -0.2, 0.2)
 
-	-- springs (this is the tap bounce)
 	for _, k in ipairs({ "x", "y", "z", "rx", "ry" }) do
 		local kv = k .. "v"
 		sp[kv] = sp[kv] + (-K * sp[k] - C * sp[kv]) * dt
@@ -2331,7 +2318,6 @@ RunService:BindToRenderStep("DeltaIPad", Enum.RenderPriority.Camera.Value + 2, f
 		* CFrame.Angles(sp.rx, sp.ry, 0)
 	)
 
-	-- hide the default first-person arms (we have our own hands)
 	local ch = player.Character
 	if ch then
 		for _, n in ipairs(ARM_NAMES) do
@@ -2340,7 +2326,6 @@ RunService:BindToRenderStep("DeltaIPad", Enum.RenderPriority.Camera.Value + 2, f
 		end
 	end
 
-	-- PC: hold Left Ctrl to free the mouse
 	if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then
 		UIS.MouseBehavior = Enum.MouseBehavior.Default
 		UIS.MouseIconEnabled = true
@@ -2360,21 +2345,18 @@ table.insert(conns, RunService.Heartbeat:Connect(function(dt)
 		hint.TextTransparency = 0.15 + 0.4 * (0.5 + 0.5 * math.sin(os.clock() * 2.4))
 	end
 
-	-- Siri orb animation
 	if siriOpen then
 		orbG.Rotation = (os.clock() * 140) % 360
 		local s = 120 + 8 * math.sin(os.clock() * 4)
 		orb.Size = UDim2.fromOffset(s, s)
 	end
 
-	-- hold the home bar = Siri
 	if drag.active and drag.mode == "bottom" and not drag.moved and not drag.siriDone
 		and siriOn and siriHold and (os.clock() - drag.t0) > 0.6 then
 		drag.siriDone = true
 		openSiri()
 	end
 
-	-- podcasts progress (demo)
 	if Pod.playing and Pod.sel then
 		Pod.prog = math.min(1, Pod.prog + dt / 240)
 		if Pod.fill and state == "app" and curId == "podcasts" then
@@ -2382,10 +2364,9 @@ table.insert(conns, RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 
-	-- App Store downloads
 	if not connected then
 		if next(downloading) then
-			table.clear(downloading)
+			for k in pairs(downloading) do downloading[k] = nil end
 			if state == "app" and curId == "appstore" then AS.render() end
 		end
 	else
@@ -2405,14 +2386,14 @@ table.insert(conns, RunService.Heartbeat:Connect(function(dt)
 		if any then
 			dlTimer = dlTimer + dt
 			if dlTimer > 0.1 or not next(downloading) then
-				dlTimer = 0
+				dlTimer = dlTimer = 0
 				if state == "app" and curId == "appstore" then AS.render() end
 			end
 		end
 	end
 end))
 
----------------------------------------------------------------- "pull it out" button
+---------------------------------------------------------------- toggle button
 local sg = Instance.new("ScreenGui")
 sg.Name = "DeltaIPadToggle"
 sg.ResetOnSpawn = false
@@ -2436,7 +2417,7 @@ table.insert(conns, tb.Activated:Connect(function()
 end))
 sg.Parent = player:WaitForChild("PlayerGui")
 
----------------------------------------------------------------- go
+---------------------------------------------------------------- init
 layoutHome()
 refreshClocks()
 applyBrightness()
