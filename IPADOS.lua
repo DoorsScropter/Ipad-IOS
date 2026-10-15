@@ -1,1253 +1,2455 @@
-local P,TS,RS,UIS,GS=game:GetService("Players"),game:GetService("TweenService"),game:GetService("RunService"),game:GetService("UserInputService"),game:GetService("GuiService")
-local LP=P.LocalPlayer local PG=LP:WaitForChild("PlayerGui")
-for _,n in ipairs({"iPadOS_UI","iPadOS_Toggle"}) do local o=PG:FindFirstChild(n) if o then o:Destroy() end end
-for _,c in ipairs({LP:FindFirstChild("Backpack"),LP.Character}) do if c then local o=c:FindFirstChild("iPad") if o then o:Destroy() end end end
-local u,C,V2=UDim2.new,Color3.fromRGB,Vector2.new
-local XL,XR,XC=Enum.TextXAlignment.Left,Enum.TextXAlignment.Right,Enum.TextXAlignment.Center
-local FG,FB,FM=Enum.Font.Gotham,Enum.Font.GothamBold,Enum.Font.GothamMedium
-local WH=C(255,255,255)
-local function N(c,p,par) local o=Instance.new(c) for k,v in pairs(p or {}) do o[k]=v end o.Parent=par return o end
-local function F(p,par) p.BorderSizePixel=0 return N("Frame",p,par) end
-local function Cr(r,par) return N("UICorner",{CornerRadius=UDim.new(0,r)},par) end
-local function T(p,par) p.BackgroundTransparency=1 p.Font=p.Font or FM p.TextColor3=p.TextColor3 or WH p.TextSize=p.TextSize or 12 return N("TextLabel",p,par) end
-local function B(p,par) p.AutoButtonColor=false p.BorderSizePixel=0 p.Text=p.Text or "" p.Font=p.Font or FB p.TextColor3=p.TextColor3 or WH return N("TextButton",p,par) end
-local function tw(o,t,pr,es,dir) local x=TS:Create(o,TweenInfo.new(t,es or Enum.EasingStyle.Quint,dir or Enum.EasingDirection.Out),pr) x:Play() return x end
-local function rc(p,x,y,w,h,c,r,rot,tr)
- local f=N("Frame",{AnchorPoint=V2(.5,.5),Position=u(x,0,y,0),Size=u(w,0,h,0),BackgroundColor3=c,BorderSizePixel=0,Rotation=rot or 0,BackgroundTransparency=tr or 0},p)
- if r and r>0 then N("UICorner",{CornerRadius=UDim.new(r,0)},f) end return f
-end
-local function gt(p,txt,x,y,w,h,c) return N("TextLabel",{AnchorPoint=V2(.5,.5),Position=u(x,0,y,0),Size=u(w,0,h,0),BackgroundTransparency=1,Text=txt,TextScaled=true,Font=FB,TextColor3=c or WH},p) end
-local function tri(p,x,y,D,dir,c)
- local cl=F({Position=u(0,x,0,y),Size=u(0,D/2,0,D),BackgroundTransparency=1,ClipsDescendants=true},p) local a=D/math.sqrt(2)
- N("Frame",{AnchorPoint=V2(.5,.5),Position=u(0,dir>0 and 0 or D/2,0,D/2),Size=u(0,a,0,a),Rotation=45,BackgroundColor3=c,BorderSizePixel=0},cl) return cl
+--[[
+	iPad (first person) - Roblox Delta LocalScript  (v4)
+	- Real 3D iPad in workspace (rounded corners, bezel, camera, side buttons), both hands hold it
+	- Swipe up to unlock
+	- Apps: App Store, Settings, Notes (works), Podcasts (demo), Reminders (works)
+	- Settings: Airplane Mode, Wi-Fi (off by default, some networks need a password), Bluetooth,
+	  Siri (on/off, hold-home-bar, voice, "Try Siri"), Display & Brightness, Sounds (volume), General
+	- App Store needs Wi-Fi. GET installs demo apps onto the home screen
+	- Tap the Wi-Fi icon in the status bar = jump to Settings > Wi-Fi
+	- SWIPE DOWN from the top-right (start on the Wi-Fi / battery icons) = Control Center
+	  (airplane, AirDrop, Wi-Fi, Bluetooth, music, brightness + volume sliders, silent, torch ...)
+	  The flashlight tile is a REAL light: a beam in front of you + a soft glow (only you see it)
+	- Swipe up from the bottom (or tap "Home" at the top) to leave an app
+	- Hold the bottom home bar ~0.6s = Siri (if Siri + "Hold Home Bar" are on in Settings)
+	- Side buttons (right edge): upper = volume up, lower = volume down
+	- Top button = screen off / on (black screen like a real power button)
+	- Small "iPad" button (top right) = put the iPad away / pull it out
+	PC: hold Left Ctrl to free the mouse and click.
+
+	WI-FI PASSWORDS:  Home_5G = 12345678 | NeighborNet = password123 | Library_WiFi = readbooks
+	(CoffeeShop_Free and Roblox_Guest are open)
+]]
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local CAS = game:GetService("ContextActionService")
+local UIS = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local Debris = game:GetService("Debris")
+
+local player = Players.LocalPlayer
+local camera = workspace.CurrentCamera
+
+-- remove an older copy if you execute twice
+local env = (getgenv and getgenv()) or _G
+if env.__DeltaIPadCleanup then pcall(env.__DeltaIPadCleanup) end
+
+---------------------------------------------------------------- constants
+local WHITE = Color3.new(1, 1, 1)
+local BG = Color3.fromRGB(26, 26, 34)
+local CARD = Color3.fromRGB(46, 46, 58)
+local GRAY = Color3.fromRGB(150, 150, 165)
+local BLUE = Color3.fromRGB(10, 132, 255)
+local GREEN = Color3.fromRGB(52, 199, 89)
+local FULL = UDim.new(1, 0)
+
+local SW, SH, M = 2.66, 1.862, 0.17          -- screen size + bezel margin (studs)
+local W, H, T, R = SW + 2 * M, SH + 2 * M, 0.11, 0.26
+local CW, CH = 1000, 700                     -- screen canvas (pixels)
+local HOLD = CFrame.new(0, -0.15, -2.3) * CFrame.Angles(math.rad(-12), 0, 0)
+local K, C = 220, 11                         -- spring stiffness / damping (bounce feel)
+local SP = Enum.Material.SmoothPlastic
+local CYL, BALL = Enum.PartType.Cylinder, Enum.PartType.Ball
+
+local conns = {}
+local shown = true
+
+---------------------------------------------------------------- 3D model
+local model = Instance.new("Model")
+model.Name = "DeltaIPad"
+
+local function mk(size, cf, color, mat, shape)
+	local p = Instance.new("Part")
+	p.Anchored = true
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.CastShadow = false
+	p.Size = size
+	p.CFrame = cf
+	p.Color = color
+	p.Material = mat or SP
+	if shape then p.Shape = shape end
+	p.Parent = model
+	return p
 end
 
-local S={isSleep=false,currentVolume=75,activeAppId=nil,installedApps={},locked=true,wifi=false,net=nil,joining=nil,bt=false,btdev=false,dnd=false,eye=false,bright=1,playing=false,track=1,prog=0,battery=87,photos={},note="",best=0,page=0}
-local subs={}
-local function on(k,f) subs[k]=subs[k] or {} table.insert(subs[k],f) end
-local function set(k,v) S[k]=v for _,f in ipairs(subs[k] or {}) do pcall(f,v) end end
-local function setKey(k,v) if k=="wifi" and not v then S.joining=nil set("net",nil) end set(k,v) end
-local TR={{"Sunset Drive","Baseplate Beats"},{"Neon Studs","Roblox Radio"},{"Lo-Fi Spawn","Chill Parts"}}
-
-local function A(id,n,col,cat,light,sub,sys) return {id=id,name=n,col=col,cat=cat,light=light,sub=sub,sys=sys} end
-local ALL={A("camera","Camera",C(110,110,118),"Creativity",false,nil,true),A("maps","Maps",C(96,200,110),"Utilities",false,nil,true),A("store","App Store",C(21,126,251),"Utilities",true,nil,true),A("settings","Settings",C(120,120,128),"Utilities",true,nil,true),
-A("photos","Photos",C(248,248,250),"Creativity",true,nil,true),A("notes","Notes",C(252,252,250),"Productivity",true,nil,true),A("music","Music",C(252,60,90),"Entertainment",false,nil,true),A("clock","Clock",C(22,22,24),"Utilities",false,nil,true),A("facetime","FaceTime",C(52,199,89),"Utilities",false,nil,true),A("safari","Safari",C(10,132,255),"Productivity",true,nil,true),A("messages","Messages",C(52,199,89),"Productivity",true,nil,true),
-A("flappy","Flappy Bird",C(112,197,206),"Entertainment",false,"Tap to flap. Don't crash."),A("calc","Calculator",C(40,40,44),"Productivity",false,"Fast, simple maths"),A("stopwatch","Stopwatch",C(30,30,32),"Utilities",false,"Time anything"),A("weather","Weather",C(62,150,240),"Utilities",false,"Live forecast"),A("amazon","Amazon",C(35,47,62),"Utilities",true,"Shop everything you need")}
-local byId={} for _,a in ipairs(ALL) do byId[a.id]=a if a.sys then table.insert(S.installedApps,a) end end
-local function hasApp(id) for _,a in ipairs(S.installedApps) do if a.id==id then return true end end return false end
-local DOCK={camera=true,maps=true,store=true,settings=true}
-local refs={[0]={},[1]={}}
-local launch,closeApp,setPage,renderHome,renderLib,notify,alert,ctxMenu,go,unlock,lockNow,openCC,closeCC,showVol,setBar,geom,placeOrder
-local ccOpen,busy,Win,WC,WS=false,false,nil,nil,nil
-local build={}
-
-local GL={
-camera=function(p) rc(p,.5,.58,.66,.44,WH,.2) rc(p,.5,.34,.28,.1,WH,.35) rc(p,.5,.58,.34,.34,C(52,52,58),.5) rc(p,.5,.58,.22,.22,C(30,48,92),.5) rc(p,.46,.54,.07,.07,C(140,170,255),.5) rc(p,.78,.44,.06,.06,C(255,190,40),.5) end,
-maps=function(p) rc(p,.5,.5,.9,.12,WH,0,-32) rc(p,.3,.76,.5,.08,C(255,225,120),0,18) rc(p,.5,.6,.13,.13,C(255,59,48),0,45) rc(p,.5,.44,.3,.3,C(255,59,48),.5) rc(p,.5,.44,.12,.12,WH,.5) end,
-store=function(p) rc(p,.41,.5,.09,.56,WH,.5,-20) rc(p,.59,.5,.09,.56,WH,.5,20) rc(p,.5,.6,.3,.07,WH,.3) end,
-settings=function(p) for _,r in ipairs({0,45,90,135}) do rc(p,.5,.5,.74,.14,C(228,228,235),.3,r) end rc(p,.5,.5,.52,.52,C(210,210,218),.5) rc(p,.5,.5,.24,.24,C(110,110,120),.5) end,
-photos=function(p) local cs={C(255,59,48),C(255,149,0),C(255,204,0),C(52,199,89),C(90,200,250),C(10,132,255),C(175,82,222),C(255,45,85)} for i,c in ipairs(cs) do local a=math.rad((i-1)*45) rc(p,.5+.2*math.cos(a),.5+.2*math.sin(a),.34,.34,c,.5,0,.35) end end,
-notes=function(p) rc(p,.5,.22,.72,.1,C(255,204,0),.5) for i=0,3 do rc(p,.5,.42+i*.14,.7,.04,C(205,205,210),.5) end end,
-music=function(p) rc(p,.5,.42,.05,.4,WH,0) rc(p,.38,.64,.22,.17,WH,.5,-20) rc(p,.6,.26,.2,.07,WH,.5,25) end,
-clock=function(p) rc(p,.5,.5,.76,.76,WH,.5) rc(p,.5,.34,.04,.32,C(20,20,20),.5) rc(p,.64,.5,.28,.05,C(20,20,20),.5) rc(p,.5,.5,.07,.07,C(255,149,0),.5) end,
-flappy=function(p) rc(p,.5,.9,.9,.1,C(222,216,149)) rc(p,.45,.52,.46,.38,C(250,213,60),.5) rc(p,.56,.46,.15,.15,WH,.5) rc(p,.58,.46,.06,.06,C(0,0,0),.5) rc(p,.72,.58,.2,.1,C(240,100,40),.5) rc(p,.38,.58,.2,.14,C(255,240,150),.5) end,
-calc=function(p) rc(p,.5,.22,.72,.2,C(80,80,86),.2) for r=0,2 do for c=0,2 do rc(p,.26+c*.24,.46+r*.19,.18,.14,c==2 and C(255,159,10) or C(110,110,116),.3) end end end,
-stopwatch=function(p) local r=rc(p,.5,.56,.64,.64,C(30,30,32),.5) N("UIStroke",{Color=WH,Thickness=2},r) rc(p,.5,.46,.04,.22,C(255,159,10),.5) rc(p,.5,.16,.14,.08,WH,.3) end,
-weather=function(p) rc(p,.38,.4,.3,.3,C(255,214,10),.5) rc(p,.55,.64,.5,.22,WH,.5) rc(p,.45,.56,.26,.26,WH,.5) rc(p,.64,.58,.22,.22,WH,.5) end,
-facetime=function(p) rc(p,.4,.5,.5,.36,WH,.2) rc(p,.74,.5,.2,.2,WH,.15,45) end,
-messages=function(p) rc(p,.5,.46,.68,.5,WH,.4) rc(p,.32,.76,.16,.16,WH,0,45) end,
-safari=function(p) rc(p,.5,.5,.78,.78,WH,.5) rc(p,.5,.5,.68,.68,C(40,150,255),.5) rc(p,.56,.44,.12,.3,C(255,69,58),.5,45) rc(p,.44,.56,.12,.3,WH,.5,45) end,
-amazon=function(p) gt(p,"a",.5,.42,.5,.6,WH) rc(p,.5,.72,.52,.08,C(255,153,0),.5) rc(p,.76,.68,.1,.1,C(255,153,0),.2,0,0) end}
-local function tile(a,par,x,y,sz,isb)
- local t=N(isb and "TextButton" or "Frame",{Position=u(0,x,0,y),Size=u(0,sz,0,sz),BackgroundColor3=a.col,BorderSizePixel=0},par)
- if isb then t.AutoButtonColor=false t.Text="" end
- Cr(sz*.225,t) N("UIGradient",{Rotation=90,Color=ColorSequence.new(a.col:Lerp(WH,.22),a.col:Lerp(C(0,0,0),.12))},t)
- N("UIStroke",{Color=WH,Transparency=.84,Thickness=1},t)
- if GL[a.id] then GL[a.id](t) end return t
+-- rounded rectangle slab (smooth corners made from cylinders)
+local function roundedBox(w, h, d, r, center, color, mat)
+	mk(Vector3.new(w - 2 * r, h, d), CFrame.new(center), color, mat)
+	mk(Vector3.new(w, h - 2 * r, d - 0.002), CFrame.new(center), color, mat)
+	for _, sx in ipairs({ -1, 1 }) do
+		for _, sy in ipairs({ -1, 1 }) do
+			mk(
+				Vector3.new(d - 0.004, 2 * r, 2 * r),
+				CFrame.new(center + Vector3.new(sx * (w / 2 - r), sy * (h / 2 - r), 0)) * CFrame.Angles(0, math.pi / 2, 0),
+				color, mat, CYL
+			)
+		end
+	end
 end
 
-local G=N("ScreenGui",{Name="iPadOS_UI",ResetOnSpawn=false,IgnoreGuiInset=true,DisplayOrder=50,ZIndexBehavior=Enum.ZIndexBehavior.Sibling},PG)
-G.Enabled=false
-local R=F({Name="iPad",Size=u(0,500,0,354),AnchorPoint=V2(.5,.5),Position=u(.5,0,1.7,0),BackgroundTransparency=1},G)
-local sc=N("UIScale",{Scale=.8},R)
-local av=N("NumberValue",{Value=0}) local base=1
-local function apply() local v=av.Value R.Position=u(.5,0,.5+(1-v)*1.2,0) sc.Scale=math.max(base*(.8+.2*v),.01) end
-local function fit() local cm=workspace.CurrentCamera if not cm then return end local v=cm.ViewportSize base=math.min(v.X*.94/510,v.Y*.86/372,1.6) apply() end fit()
-if workspace.CurrentCamera then workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(fit) end
-av.Changed:Connect(apply)
-local sd=F({Size=u(1,0,1,0),Position=u(0,0,0,12),BackgroundColor3=C(0,0,0),BackgroundTransparency=.65},R) Cr(28,sd)
-local O=F({Size=u(1,0,1,0),BackgroundColor3=C(70,70,75)},R) Cr(26,O)
-N("UIGradient",{Rotation=90,Color=ColorSequence.new(C(140,140,146),C(48,48,52))},O)
-N("UIStroke",{Color=C(200,200,208),Thickness=1.2,Transparency=.55},O)
-local Bz=F({Size=u(1,-6,1,-6),Position=u(0,3,0,3),BackgroundColor3=C(8,8,10)},O) Cr(23,Bz)
-N("UIGradient",{Rotation=90,Color=ColorSequence.new(C(18,18,22),C(4,4,6))},Bz) N("UIStroke",{Color=C(28,28,32),Thickness=1.5},Bz)
-local Sc=F({Name="Screen",Size=u(0,414,0,310),Position=u(0,43,0,22),BackgroundColor3=C(0,0,0),ClipsDescendants=true},R) Cr(4,Sc) N("UIStroke",{Color=C(0,0,0),Thickness=2},Sc)
-local cam=F({Size=u(0,7,0,7),Position=u(0,20,0,176),BackgroundColor3=C(28,28,34)},R) Cr(4,cam) N("UIStroke",{Color=C(70,70,78),Thickness=1},cam) local sn=F({Size=u(0,3,0,3),Position=u(0,22,0,160),BackgroundColor3=C(22,22,28)},R) Cr(2,sn)
-F({Size=u(0,2,0,2),Position=u(0,2,0,2),BackgroundColor3=C(60,90,160)},cam)
-local HB=B({Position=u(0,473,0,164),Size=u(0,24,0,24),BackgroundColor3=C(0,0,0)},R) Cr(12,HB) N("UIStroke",{Color=C(100,100,106),Thickness=2},HB) local hq=F({AnchorPoint=V2(.5,.5),Position=u(.5,0,.5,0),Size=u(0,9,0,9),BackgroundTransparency=1},HB) Cr(2,hq) N("UIStroke",{Color=C(90,90,96),Thickness=1},hq)
-local function press(b) local p=b.Position tw(b,.07,{Position=p+u(0,0,0,2)}).Completed:Connect(function() tw(b,.12,{Position=p}) end) end
-local function HW(x,w,cb) local b=B({Position=u(0,x,0,-6),Size=u(0,w,0,10),BackgroundColor3=C(105,105,112)},R) Cr(3,b) N("UIStroke",{Color=C(40,40,44),Thickness=1},b) b.MouseButton1Click:Connect(function() press(b) cb() end) return b end
+local silver = Color3.fromRGB(196, 198, 204)
+roundedBox(W, H, T, R, Vector3.zero, silver, Enum.Material.Metal)               -- aluminium body (first part = pivot)
+model.PrimaryPart = model:FindFirstChildWhichIsA("BasePart")
+roundedBox(W - 0.05, H - 0.05, 0.012, R - 0.03, Vector3.new(0, 0, T / 2 + 0.004), Color3.fromRGB(8, 8, 10), SP) -- black bezel
 
-function geom(b) local k=sc.Scale return (b.AbsolutePosition-Sc.AbsolutePosition)/k,b.AbsoluteSize/k end
-local function wall(par)
- local w=F({Size=u(1,0,1,0),BackgroundColor3=WH,ClipsDescendants=true},par)
- N("UIGradient",{Rotation=120,Color=ColorSequence.new({ColorSequenceKeypoint.new(0,C(20,28,90)),ColorSequenceKeypoint.new(.55,C(96,60,170)),ColorSequenceKeypoint.new(1,C(230,110,150))})},w)
- for _,bl in ipairs({{60,60,280,C(255,110,170),.7},{330,250,320,C(70,170,255),.72},{260,30,200,C(255,200,90),.82}}) do local f=F({AnchorPoint=V2(.5,.5),Position=u(0,bl[1],0,bl[2]),Size=u(0,bl[3],0,bl[3]),BackgroundColor3=bl[4],BackgroundTransparency=bl[5]},w) Cr(bl[3]/2,f) end
- return w
-end
-wall(Sc).ZIndex=0
-local PC=F({Size=u(0,828,0,310),BackgroundTransparency=1,ZIndex=1},Sc)
-local P1=F({Size=u(0,414,0,310),BackgroundTransparency=1},PC)
-local P2=F({Size=u(0,414,0,310),Position=u(0,414,0,0),BackgroundTransparency=1},PC)
-local GridC=F({Position=u(0,0,0,30),Size=u(0,414,0,200),BackgroundTransparency=1},P1)
-local LibC=F({Position=u(0,0,0,60),Size=u(0,414,0,250),BackgroundTransparency=1},P2)
+local screen = mk(Vector3.new(SW, SH, 0.006), CFrame.new(0, 0, T / 2 + 0.0135), Color3.new(0, 0, 0), SP)
+screen.Name = "Screen"
 
-local function icon(a,par,x,y,sz,pg,lab,shadow)
- if shadow then local sh=F({Position=u(0,x,0,y+3),Size=u(0,sz,0,sz),BackgroundColor3=C(0,0,0),BackgroundTransparency=.75},par) Cr(sz*.225,sh) end
- local b=tile(a,par,x,y,sz,true) b.Name=a.id
- if lab then T({Text=a.name,Position=u(0,x-8,0,y+sz+3),Size=u(0,sz+16,0,12),TextSize=9,Font=FM,TextStrokeTransparency=.8,TextTruncate=Enum.TextTruncate.AtEnd},par) end
- refs[pg][a.id]=b local down,long=false,false
- b.MouseButton1Down:Connect(function() down=true long=false if not a.sys then task.delay(.55,function() if down then long=true down=false ctxMenu(a,b) end end) end end)
- b.MouseButton1Up:Connect(function() down=false end) b.MouseLeave:Connect(function() down=false end)
- b.MouseButton1Click:Connect(function() if long then long=false return end launch(a.id,b) end)
- return b
-end
-local DK=F({Position=u(0,42,0,240),Size=u(0,330,0,58),BackgroundColor3=WH,BackgroundTransparency=.78},P1) Cr(18,DK) N("UIStroke",{Color=WH,Transparency=.7,Thickness=1},DK)
-for i,id in ipairs({"camera","maps","store","settings"}) do icon(byId[id],DK,(i-1)*66+11,7,44,0,false,false) end
-local LB=B({Position=u(0,4*66+11,0,7),Size=u(0,44,0,44),BackgroundColor3=C(70,70,86)},DK) Cr(10,LB)
-for r=0,1 do for c=0,1 do rc(LB,.3+c*.4,.3+r*.4,.28,.28,C(235,235,245),.25) end end
-LB.MouseButton1Click:Connect(function() setPage(1) end)
-local d1=F({Position=u(0,198,0,230),Size=u(0,6,0,6),BackgroundColor3=WH,ZIndex=5},Sc) Cr(3,d1)
-local d2=F({Position=u(0,210,0,230),Size=u(0,6,0,6),BackgroundColor3=WH,BackgroundTransparency=.6,ZIndex=5},Sc) Cr(3,d2)
-B({Position=u(0,192,0,224),Size=u(0,14,0,18),BackgroundTransparency=1,ZIndex=6},Sc).MouseButton1Click:Connect(function() setPage(0) end)
-B({Position=u(0,208,0,224),Size=u(0,14,0,18),BackgroundTransparency=1,ZIndex=6},Sc).MouseButton1Click:Connect(function() setPage(1) end)
-function setPage(n) if S.activeAppId then return end S.page=n tw(PC,.4,{Position=u(0,-414*n,0,0)}) d1.BackgroundTransparency=n==0 and 0 or .6 d2.BackgroundTransparency=n==1 and 0 or .6 end
-local SBx=N("TextBox",{Position=u(0,20,0,26),Size=u(0,374,0,26),BackgroundColor3=WH,BackgroundTransparency=.25,Text="",PlaceholderText="Search",PlaceholderColor3=C(100,100,108),TextColor3=C(0,0,0),Font=FM,TextSize=12,ClearTextOnFocus=false,BorderSizePixel=0},P2) Cr(13,SBx)
-function renderHome()
- for _,c in ipairs(GridC:GetChildren()) do c:Destroy() end
- local i=0 for _,a in ipairs(S.installedApps) do if not DOCK[a.id] and i<18 then icon(a,GridC,29+(i%6)*62,8+math.floor(i/6)*64,46,0,true,true) i+=1 end end
-end
-function renderLib()
- for _,c in ipairs(LibC:GetChildren()) do c:Destroy() end
- local q=SBx.Text:lower()
- if q~="" then
-  local i=0 for _,a in ipairs(S.installedApps) do if a.name:lower():find(q,1,true) then icon(a,LibC,29+(i%6)*62,8+math.floor(i/6)*64,46,1,true,false) i+=1 end end
-  if i==0 then T({Text="No Results",Position=u(0,0,0,40),Size=u(0,414,0,20),TextSize=14,Font=FB,TextXAlignment=XC},LibC) end return
- end
- for k,cn in ipairs({"Utilities","Creativity","Entertainment","Productivity"}) do
-  local f=F({Position=u(0,16+((k-1)%2)*198,0,4+math.floor((k-1)/2)*122),Size=u(0,184,0,112),BackgroundColor3=WH,BackgroundTransparency=.8},LibC) Cr(18,f)
-  T({Text=cn,Position=u(0,12,0,5),Size=u(0,160,0,16),TextSize=10,Font=FB,TextXAlignment=XL},f)
-  local j=0 for _,a in ipairs(S.installedApps) do if a.cat==cn and j<8 then icon(a,f,10+(j%4)*43,24+math.floor(j/4)*43,36,1,false,false) j+=1 end end
- end
-end
-SBx:GetPropertyChangedSignal("Text"):Connect(renderLib)
+-- front camera
+mk(Vector3.new(0.004, 0.045, 0.045), CFrame.new(0, H / 2 - M / 2, T / 2 + 0.0125) * CFrame.Angles(0, math.pi / 2, 0), Color3.fromRGB(25, 28, 40), Enum.Material.Glass, CYL)
 
-local SBar=F({Size=u(0,414,0,20),BackgroundTransparency=1,ZIndex=80},Sc)
-local BI={} local function bi(o) table.insert(BI,o) return o end
-local tm=bi(T({Position=u(0,16,0,0),Size=u(0,56,0,20),TextSize=11,Font=FB,TextXAlignment=XL},SBar))
-local dtl=bi(T({Position=u(0,70,0,0),Size=u(0,70,0,20),TextSize=10,TextXAlignment=XL},SBar))
-local dndT=bi(T({Position=u(0,142,0,0),Size=u(0,30,0,20),Text="DND",TextSize=9,Font=FB,Visible=false,TextXAlignment=XL},SBar))
-local wf={} for i,h in ipairs({4,7,10}) do local w=bi(F({Position=u(0,316+(i-1)*5,0,14-h),Size=u(0,3,0,h),BackgroundColor3=WH,Visible=false},SBar)) Cr(1,w) wf[i]=w end
-local pct=bi(T({Position=u(0,338,0,0),Size=u(0,34,0,20),TextSize=10,TextXAlignment=XR},SBar))
-local bat=F({Position=u(0,376,0,5),Size=u(0,22,0,10),BackgroundTransparency=1},SBar) Cr(3,bat)
-bi(N("UIStroke",{Color=WH,Thickness=1,Transparency=.4},bat))
-local bf=F({Position=u(0,2,0,2),Size=u(1,-4,1,-4),BackgroundColor3=C(52,199,89)},bat) Cr(2,bf)
-bi(F({Position=u(0,399,0,8),Size=u(0,2,0,4),BackgroundColor3=WH},SBar))
-local function updBat() pct.Text=S.battery.."%" bf.Size=u(S.battery/100,-4,1,-4) bf.BackgroundColor3=S.battery<=20 and C(255,69,58) or C(52,199,89) end updBat()
-local SBb=B({Position=u(0,306,0,0),Size=u(0,108,0,22),BackgroundTransparency=1,ZIndex=2},SBar)
-local HI=bi(F({Position=u(0,152,0,302),Size=u(0,110,0,4),BackgroundColor3=WH,ZIndex=90},Sc)) Cr(2,HI)
-local HIB=B({Position=u(0,127,0,288),Size=u(0,160,0,22),BackgroundTransparency=1,ZIndex=91},Sc)
-function setBar(light) local c=light and C(10,10,10) or WH for _,o in ipairs(BI) do if o:IsA("TextLabel") then o.TextColor3=c elseif o:IsA("UIStroke") then o.Color=c else o.BackgroundColor3=c end end end
-on("net",function(v) for _,w in ipairs(wf) do w.Visible=v~=nil end end)
-on("dnd",function(v) dndT.Visible=v end)
+-- clickable side buttons
+local btnCol = Color3.fromRGB(214, 216, 222)
+local powerPart = mk(Vector3.new(0.3, 0.06, 0.06), CFrame.new(W / 2 - 0.55, H / 2 + 0.012, 0), btnCol, Enum.Material.Metal)
+local volUpPart = mk(Vector3.new(0.06, 0.2, 0.06), CFrame.new(W / 2 + 0.012, H / 2 - 0.55, 0), btnCol, Enum.Material.Metal)
+local volDownPart = mk(Vector3.new(0.06, 0.2, 0.06), CFrame.new(W / 2 + 0.012, H / 2 - 0.85, 0), btnCol, Enum.Material.Metal)
 
-local LS=F({Size=u(1,0,1,0),ZIndex=75,Active=true,BackgroundColor3=WH,ClipsDescendants=true},Sc) wall(LS)
-local lsD=T({Position=u(0,0,0,56),Size=u(0,414,0,20),TextSize=15,Font=FM,TextXAlignment=XC},LS)
-local lsT=T({Position=u(0,0,0,72),Size=u(0,414,0,86),TextSize=82,Font=FG,TextXAlignment=XC},LS)
-local lk=F({Position=u(0,201,0,36),Size=u(0,12,0,9),BackgroundColor3=WH},LS) Cr(2,lk)
-local lkr=F({Position=u(0,203,0,29),Size=u(0,8,0,10),BackgroundTransparency=1},LS) Cr(4,lkr) N("UIStroke",{Color=WH,Thickness=1.5},lkr)
-T({Text="Swipe up to unlock",Position=u(0,0,0,266),Size=u(0,414,0,16),TextSize=11,TextTransparency=.25,TextXAlignment=XC},LS)
-for i,x in ipairs({22,358}) do local cb=F({Position=u(0,x,0,248),Size=u(0,34,0,34),BackgroundColor3=C(10,10,14),BackgroundTransparency=.45},LS) Cr(17,cb) if i==2 then GL.camera(cb) else rc(cb,.5,.36,.3,.18,WH,.2) rc(cb,.5,.62,.2,.38,WH,.2) end end
-F({Position=u(0,152,0,302),Size=u(0,110,0,4),BackgroundColor3=WH},LS)
+local SIDE_BTNS = {
+	{ name = "power", center = Vector3.new(W / 2 - 0.55, H / 2 + 0.012, 0), size = Vector3.new(0.3, 0.06, 0.06) },
+	{ name = "volup", center = Vector3.new(W / 2 + 0.012, H / 2 - 0.55, 0), size = Vector3.new(0.06, 0.2, 0.06) },
+	{ name = "voldown", center = Vector3.new(W / 2 + 0.012, H / 2 - 0.85, 0), size = Vector3.new(0.06, 0.2, 0.06) },
+}
 
-local SL=F({Size=u(1,0,1,0),BackgroundColor3=C(0,0,0),BackgroundTransparency=1,Visible=false,ZIndex=160,Active=true},Sc)
-local BR=F({Size=u(1,0,1,0),BackgroundColor3=C(0,0,0),BackgroundTransparency=1,ZIndex=176},Sc)
-local EY=F({Size=u(1,0,1,0),BackgroundColor3=C(255,150,40),BackgroundTransparency=1,ZIndex=177},Sc)
-local GLS=F({Size=u(1,0,1,0),BackgroundColor3=WH,ZIndex=180},Sc) N("UIGradient",{Rotation=125,Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,.9),NumberSequenceKeypoint.new(.4,.96),NumberSequenceKeypoint.new(.5,1),NumberSequenceKeypoint.new(1,1)})},GLS)
-on("bright",function(v) tw(BR,.1,{BackgroundTransparency=1-(1-v)*.8}) end)
-on("eye",function(v) tw(EY,.5,{BackgroundTransparency=v and .84 or 1}) end)
+---------------------------------------------------------------- hands
+local skin = Color3.fromRGB(234, 184, 146)
+pcall(function()
+	local hd = player.Character and player.Character:FindFirstChild("Head")
+	if hd and hd:IsA("BasePart") then skin = hd.Color end
+end)
+local sleeve = Color3.fromRGB(44, 48, 62)
 
-local BN=N("CanvasGroup",{Position=u(0,57,0,-60),Size=u(0,300,0,46),BackgroundColor3=C(236,236,240),BorderSizePixel=0,ZIndex=85},Sc) Cr(14,BN)
-local bnI=F({Position=u(0,10,0,11),Size=u(0,24,0,24),BackgroundColor3=C(21,126,251)},BN) Cr(6,bnI)
-local bnT=T({Position=u(0,44,0,6),Size=u(0,244,0,16),TextSize=11,Font=FB,TextColor3=C(0,0,0),TextXAlignment=XL},BN)
-local bnM=T({Position=u(0,44,0,22),Size=u(0,244,0,16),TextSize=10,Font=FG,TextColor3=C(70,70,76),TextXAlignment=XL,TextTruncate=Enum.TextTruncate.AtEnd},BN)
-local btok=0
-function notify(ti,ms,col)
- if S.dnd or S.isSleep then return end
- bnT.Text=ti bnM.Text=ms bnI.BackgroundColor3=col or C(21,126,251) BN.Position=u(0,57,0,-60)
- tw(BN,.5,{Position=u(0,57,0,28)},Enum.EasingStyle.Back) btok+=1 local t=btok
- task.delay(3,function() if t==btok then tw(BN,.4,{Position=u(0,57,0,-60)}) end end)
-end
-function alert(ti,ms,bt)
- local o=F({Size=u(1,0,1,0),BackgroundColor3=C(0,0,0),BackgroundTransparency=1,ZIndex=140,Active=true},Sc) tw(o,.2,{BackgroundTransparency=.5})
- local c=N("CanvasGroup",{AnchorPoint=V2(.5,.5),Position=u(.5,0,.5,0),Size=u(0,250,0,118),BackgroundColor3=C(246,246,248),BorderSizePixel=0,GroupTransparency=1},o) Cr(14,c)
- local us=N("UIScale",{Scale=1.1},c) tw(c,.2,{GroupTransparency=0}) tw(us,.2,{Scale=1})
- T({Text=ti,Position=u(0,10,0,12),Size=u(1,-20,0,18),TextSize=13,Font=FB,TextColor3=C(0,0,0)},c)
- T({Text=ms,Position=u(0,14,0,32),Size=u(1,-28,0,44),TextSize=11,Font=FG,TextColor3=C(60,60,67),TextWrapped=true,TextYAlignment=Enum.TextYAlignment.Top},c)
- F({Position=u(0,0,0,81),Size=u(1,0,0,1),BackgroundColor3=C(200,200,205)},c)
- local w=250/#bt
- for i,b in ipairs(bt) do
-  local k=B({Position=u(0,(i-1)*w,0,82),Size=u(0,w,0,36),BackgroundTransparency=1,Text=b[1],TextSize=13,TextColor3=b[2] or C(10,132,255),Font=i==#bt and FB or FG},c)
-  if i>1 then F({Position=u(0,(i-1)*w,0,82),Size=u(0,1,0,36),BackgroundColor3=C(200,200,205)},c) end
-  k.MouseButton1Click:Connect(function() o:Destroy() if b[3] then b[3]() end end)
- end
-end
-local function sw(par,x,y,k)
- local tr=B({Position=u(0,x,0,y),Size=u(0,44,0,26),BackgroundColor3=C(120,120,128)},par) Cr(13,tr)
- local kn=F({Position=u(0,2,0,2),Size=u(0,22,0,22),BackgroundColor3=WH},tr) Cr(11,kn)
- local function ap(v,an) local p,c=v and u(0,20,0,2) or u(0,2,0,2),v and C(52,199,89) or C(120,120,128) if an then tw(kn,.2,{Position=p}) tw(tr,.2,{BackgroundColor3=c}) else kn.Position=p tr.BackgroundColor3=c end end
- ap(S[k]) on(k,function(v) ap(v,true) end) tr.MouseButton1Click:Connect(function() setKey(k,not S[k]) end)
-end
-local function check(par,x,y,col) local f=F({Position=u(0,x,0,y),Size=u(0,16,0,16),BackgroundTransparency=1},par) rc(f,.3,.64,.36,.16,col,0,45) rc(f,.58,.46,.78,.16,col,0,-50) end
-local function lockI(par,x,y) F({Position=u(0,x,0,y+5),Size=u(0,10,0,7),BackgroundColor3=C(142,142,147)},par) local s=F({Position=u(0,x+2,0,y),Size=u(0,6,0,8),BackgroundTransparency=1},par) Cr(3,s) N("UIStroke",{Color=C(142,142,147),Thickness=1.3},s) end
-local function bars(par,x,y,col) for i,h in ipairs({4,7,10}) do F({Position=u(0,x+(i-1)*5,0,y+10-h),Size=u(0,3,0,h),BackgroundColor3=col},par) end end
-
-local VH=N("CanvasGroup",{Position=u(0,-44,0,85),Size=u(0,34,0,140),BackgroundColor3=C(44,44,48),BorderSizePixel=0,GroupTransparency=1,ZIndex=170},Sc) Cr(12,VH)
-local VT=F({Position=u(0,12,0,10),Size=u(0,10,0,92),BackgroundColor3=C(95,95,100)},VH) Cr(5,VT)
-local VF=F({AnchorPoint=V2(0,1),Position=u(0,0,1,0),Size=u(1,0,.75,0),BackgroundColor3=WH},VT) Cr(5,VF)
-F({Position=u(0,9,0,113),Size=u(0,5,0,8),BackgroundColor3=WH},VH) tri(VH,13,111,12,-1,WH)
-local vtok=0
-on("currentVolume",function(v) VF.Size=u(1,0,v/100,0) end)
-function showVol() tw(VH,.25,{Position=u(0,10,0,85),GroupTransparency=0}) vtok+=1 local t=vtok task.delay(2,function() if t==vtok then tw(VH,.4,{Position=u(0,-44,0,85),GroupTransparency=1}) end end) end
-local function vol(d) set("currentVolume",math.clamp(S.currentVolume+d,0,100)) showVol() end
-local function setSleep(v)
- S.isSleep=v
- if v then closeCC() lockNow() SL.Visible=true tw(SL,.35,{BackgroundTransparency=0}) else tw(SL,.3,{BackgroundTransparency=1}).Completed:Connect(function() if not S.isSleep then SL.Visible=false end end) end
-end
-function lockNow() S.locked=true LS.Position=u(0,0,0,0) LS.Visible=true setBar(false) end
-function unlock() if not S.locked then return end S.locked=false tw(LS,.5,{Position=u(0,0,-1,0)}).Completed:Connect(function() if not S.locked then LS.Visible=false end end) end
-HW(40,34,function() setSleep(not S.isSleep) end) HW(392,30,function() vol(6.25) end) HW(430,30,function() vol(-6.25) end)
-for i,tx in ipairs({"+","-"}) do T({Text=tx,Position=u(0,i==1 and 392 or 430,0,-6),Size=u(0,30,0,10),TextSize=9,Font=FB,ZIndex=2},R) end
-
-local function slider(par,x,y,w,h,lab,get,put,key)
- local tr=B({Position=u(0,x,0,y),Size=u(0,w,0,h),BackgroundColor3=WH,BackgroundTransparency=.82,ClipsDescendants=true},par) Cr(14,tr)
- local fl=F({Size=u(get(),0,1,0),BackgroundColor3=WH},tr)
- T({Text=lab,Position=u(0,12,0,0),Size=u(1,-12,1,0),TextSize=10,Font=FB,TextColor3=C(130,130,138),TextXAlignment=XL},tr)
- local dr=false
- local function up(i) put(math.clamp((i.Position.X-tr.AbsolutePosition.X)/tr.AbsoluteSize.X,0,1)) end
- tr.InputBegan:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then dr=true up(i) end end)
- UIS.InputChanged:Connect(function(i) if dr and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then up(i) end end)
- UIS.InputEnded:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then dr=false end end)
- on(key,function() fl.Size=u(get(),0,1,0) end)
-end
-local function musicUI(par,x,y,w,sz,tc,sc2)
- local ti=T({Position=u(0,x,0,y),Size=u(0,w,0,sz+4),TextSize=sz,Font=FB,TextColor3=tc,TextXAlignment=XL,TextTruncate=Enum.TextTruncate.AtEnd},par)
- local ar=T({Position=u(0,x,0,y+sz+4),Size=u(0,w,0,sz),TextSize=sz-2,Font=FG,TextColor3=sc2,TextXAlignment=XL},par)
- local ty=y+2*sz+10
- local tr=F({Position=u(0,x,0,ty),Size=u(0,w,0,3),BackgroundColor3=sc2,BackgroundTransparency=.55},par) Cr(2,tr)
- local fl=F({Size=u(S.prog/180,0,1,0),BackgroundColor3=tc},tr) Cr(2,fl)
- local cs,cy=sz+3,ty+10
- local pv=B({Position=u(0,x+w/2-cs*3.6,0,cy),Size=u(0,cs*2,0,cs+4),BackgroundTransparency=1},par) tri(pv,cs*.2,2,cs,-1,tc) tri(pv,cs*.7,2,cs,-1,tc)
- local pp=B({Position=u(0,x+w/2-cs,0,cy),Size=u(0,cs*2,0,cs+4),BackgroundTransparency=1},par)
- local nx=B({Position=u(0,x+w/2+cs*1.6,0,cy),Size=u(0,cs*2,0,cs+4),BackgroundTransparency=1},par) tri(nx,cs*.2,2,cs,1,tc) tri(nx,cs*.7,2,cs,1,tc)
- local function dpp(v) for _,c in ipairs(pp:GetChildren()) do c:Destroy() end if v then F({Position=u(0,cs*.55,0,2),Size=u(0,cs*.28,0,cs),BackgroundColor3=tc},pp) F({Position=u(0,cs*1.05,0,2),Size=u(0,cs*.28,0,cs),BackgroundColor3=tc},pp) else tri(pp,cs*.6,2,cs,1,tc) end end
- dpp(S.playing) on("playing",dpp)
- local function tt() ti.Text=TR[S.track][1] ar.Text=TR[S.track][2] end tt() on("track",tt)
- on("prog",function(v) fl.Size=u(v/180,0,1,0) end)
- pp.MouseButton1Click:Connect(function() set("playing",not S.playing) end)
- pv.MouseButton1Click:Connect(function() set("prog",0) set("track",(S.track-2)%#TR+1) end)
- nx.MouseButton1Click:Connect(function() set("prog",0) set("track",S.track%#TR+1) end)
-end
-local CCb=B({Size=u(1,0,1,0),BackgroundColor3=C(0,0,0),BackgroundTransparency=1,Visible=false,ZIndex=120},Sc)
-local CCp=N("CanvasGroup",{Position=u(0,26,0,-200),Size=u(0,362,0,184),BackgroundColor3=C(34,34,38),BorderSizePixel=0,GroupTransparency=1,ZIndex=121,Active=true},Sc) Cr(26,CCp) N("UIStroke",{Color=WH,Transparency=.85,Thickness=1},CCp)
-local function ctile(x,y,k,lab,col,gl,lf)
- local t=B({Position=u(0,x,0,y),Size=u(0,72,0,72),BackgroundColor3=WH,BackgroundTransparency=.82},CCp) Cr(18,t)
- local g=F({Position=u(.5,-13,0,11),Size=u(0,26,0,26),BackgroundTransparency=1},t)
- local lb=T({Text=lab,Position=u(0,2,1,-24),Size=u(1,-4,0,18),TextSize=8,Font=FB,TextTruncate=Enum.TextTruncate.AtEnd},t)
- local cut=gl(g)
- local function ap(v) tw(t,.2,{BackgroundColor3=v and col or WH,BackgroundTransparency=v and 0 or .82}) if cut then cut.BackgroundColor3=v and col or C(82,82,86) end if lf then lb.Text=lf() end end
- ap(S[k]) on(k,ap) if lf then on("net",function() lb.Text=lf() end) end
- t.MouseButton1Click:Connect(function() setKey(k,not S[k]) end)
-end
-ctile(12,12,"wifi","Wi-Fi Off",C(10,132,255),function(g) rc(g,.2,.85,.2,.3,WH,.3) rc(g,.5,.72,.2,.56,WH,.3) rc(g,.8,.58,.2,.84,WH,.3) end,function() return S.net or (S.wifi and "Not Connected" or "Wi-Fi Off") end)
-ctile(96,12,"bt","Bluetooth",C(10,132,255),function(g) gt(g,"B",.5,.5,.9,1,WH) end)
-ctile(12,96,"dnd","Do Not Disturb",C(94,92,230),function(g) rc(g,.5,.5,.9,.9,WH,.5) return rc(g,.72,.36,.78,.78,C(82,82,86),.5) end)
-ctile(96,96,"eye","Eye Protection",C(255,149,0),function(g) rc(g,.5,.5,1,.5,WH,.5) rc(g,.5,.5,.42,.42,C(40,40,44),.5) rc(g,.5,.5,.16,.16,WH,.5) end)
-local mcd=F({Position=u(0,180,0,12),Size=u(0,170,0,70),BackgroundColor3=WH,BackgroundTransparency=.82},CCp) Cr(18,mcd) musicUI(mcd,12,8,146,11,WH,C(190,190,198))
-slider(CCp,180,90,170,36,"Brightness",function() return (S.bright-.15)/.85 end,function(v) set("bright",.15+.85*v) end,"bright")
-slider(CCp,180,134,170,34,"Volume",function() return S.currentVolume/100 end,function(v) set("currentVolume",math.floor(v*100+.5)) end,"currentVolume")
-function openCC() if ccOpen or S.isSleep then return end ccOpen=true CCb.Visible=true tw(CCb,.3,{BackgroundTransparency=.45}) CCp.Position=u(0,26,0,-200) tw(CCp,.45,{Position=u(0,26,0,26),GroupTransparency=0}) end
-function closeCC() if not ccOpen then return end ccOpen=false tw(CCb,.3,{BackgroundTransparency=1}) tw(CCp,.35,{Position=u(0,26,0,-200),GroupTransparency=1}).Completed:Connect(function() if not ccOpen then CCb.Visible=false end end) end
-CCb.MouseButton1Click:Connect(closeCC)
-SBb.MouseButton1Click:Connect(function() if ccOpen then closeCC() else openCC() end end)
-
-local function hdr(b,txt,col) T({Text=txt,Position=u(0,20,0,34),Size=u(0,300,0,34),TextSize=26,Font=FB,TextColor3=col,TextXAlignment=XL},b) end
-function launch(id,btn)
- if busy or S.activeAppId or S.isSleep or S.locked or not G.Enabled then return end
- local a=byId[id] busy=true S.activeAppId=id closeCC()
- local bp,bsz=V2(184,132),V2(46,46) if btn and btn.Parent then bp,bsz=geom(btn) end
- Win=N("CanvasGroup",{Size=u(0,bsz.X,0,bsz.Y),Position=u(0,bp.X,0,bp.Y),BackgroundColor3=a.light and C(242,242,247) or C(18,18,20),BorderSizePixel=0,GroupTransparency=.5,ZIndex=20},Sc)
- WC=Cr(12,Win) local body=F({Size=u(0,414,0,310),BackgroundTransparency=1},Win)
- WS=N("UIScale",{Scale=math.max(bsz.X/414,.05)},body)
- S.cl=(build[id] or build.generic)(body,a) setBar(a.light)
- tw(Win,.5,{Size=u(1,0,1,0),Position=u(0,0,0,0),GroupTransparency=0}) tw(WC,.5,{CornerRadius=UDim.new(0,0)}) tw(WS,.5,{Scale=1}).Completed:Connect(function() busy=false end)
-end
-function closeApp()
- if busy or not S.activeAppId then return end busy=true
- local id=S.activeAppId local b=refs[S.page][id] or refs[0][id] or refs[1][id]
- local pos,sz=V2(184,132),V2(46,46) if b and b.Parent then pos,sz=geom(b) end
- if S.cl then pcall(S.cl) S.cl=nil end setBar(false) local w=Win
- tw(w,.45,{Size=u(0,sz.X,0,sz.Y),Position=u(0,pos.X,0,pos.Y),GroupTransparency=.6}) tw(WC,.45,{CornerRadius=UDim.new(0,12)})
- tw(WS,.45,{Scale=sz.X/414}).Completed:Connect(function() w:Destroy() S.activeAppId=nil busy=false end)
-end
-function go(id) closeApp() task.delay(.6,function() launch(id,refs[S.page][id] or refs[0][id]) end) end
-local function deleteApp(a) for i,x in ipairs(S.installedApps) do if x.id==a.id then table.remove(S.installedApps,i) break end end refs[0][a.id]=nil refs[1][a.id]=nil renderHome() renderLib() notify("App Removed",a.name.." was deleted",C(255,59,48)) end
-local ctx
-function ctxMenu(a,btn)
- if ctx then ctx:Destroy() end local bp,bsz=geom(btn)
- ctx=B({Size=u(1,0,1,0),BackgroundTransparency=1,ZIndex=130},Sc)
- local m=F({Position=u(0,math.clamp(bp.X+bsz.X/2-70,8,266),0,math.clamp(bp.Y+bsz.Y+8,24,250)),Size=u(0,140,0,40),BackgroundColor3=C(236,236,240)},ctx) Cr(12,m)
- local d=B({Size=u(1,0,1,0),BackgroundTransparency=1,Text="Delete App",TextSize=13,TextColor3=C(255,59,48),Font=FM},m)
- local c=ctx ctx.MouseButton1Click:Connect(function() c:Destroy() ctx=nil end)
- d.MouseButton1Click:Connect(function() c:Destroy() ctx=nil alert('Delete "'..a.name..'"?',"Deleting this app will also delete its data.",{{"Cancel"},{"Delete",C(255,59,48),function() deleteApp(a) end}}) end)
-end
-local function homeBtn() if S.isSleep then setSleep(false) elseif S.locked then unlock() elseif ccOpen then closeCC() elseif S.activeAppId then closeApp() else setPage(0) end end
-HB.MouseButton1Click:Connect(homeBtn)
-HIB.MouseButton1Click:Connect(function() if S.locked then unlock() elseif ccOpen then closeCC() elseif S.activeAppId then closeApp() elseif S.page==1 then setPage(0) end end)
-
-build.camera=function(b,a)
- local vp=N("ViewportFrame",{Size=u(1,0,1,0),BackgroundColor3=C(135,175,215),Ambient=C(170,170,170),LightColor=WH},b)
- local cm=N("Camera",{FieldOfView=70},vp) vp.CurrentCamera=cm
- pcall(function()
-  local ch=LP.Character local hrp=ch and ch:FindFirstChild("HumanoidRootPart") if not hrp then return end
-  ch.Archivable=true local cc=ch:Clone() if cc then for _,d in ipairs(cc:GetDescendants()) do if d:IsA("LuaSourceContainer") then d:Destroy() end end cc.Parent=vp end
-  local n=0
-  for _,p in ipairs(workspace:GetDescendants()) do
-   if n>350 then break end
-   if p:IsA("BasePart") and p~=workspace.Terrain and not p:IsDescendantOf(ch) and p.Size.Magnitude>1 and (p.Position-hrp.Position).Magnitude<150 then
-    local ok,cl=pcall(function() return p:Clone() end)
-    if ok and cl then for _,d in ipairs(cl:GetChildren()) do if d:IsA("LuaSourceContainer") or d:IsA("Sound") or d:IsA("ParticleEmitter") then d:Destroy() end end cl.Anchored=true cl.Parent=vp n+=1 end
-   end
-  end
- end)
- local mode,pool="pic",{}
- local lay=F({Size=u(1,0,1,0),BackgroundTransparency=1,ZIndex=2},b)
- local function proj(pos)
-  local rel=cm.CFrame:PointToObjectSpace(pos) if rel.Z>=-.1 then return nil end
-  local hh=math.tan(math.rad(cm.FieldOfView)/2)
-  return (rel.X/(-rel.Z)/(hh*(414/310))*.5+.5)*414,(.5-rel.Y/(-rel.Z)/hh*.5)*310
- end
- local function boxes()
-  local out={} local me=LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
-  for _,pl in ipairs(P:GetPlayers()) do if pl~=LP then
-   local hr=pl.Character and pl.Character:FindFirstChild("HumanoidRootPart")
-   if hr then
-    local x1,y1=proj(hr.Position+Vector3.new(0,3,0)) local x2,y2=proj(hr.Position-Vector3.new(0,3,0))
-    if x1 and x2 then local h2=math.abs(y2-y1) local w2=h2*.5
-     table.insert(out,{x=(x1+x2)/2-w2/2,y=math.min(y1,y2),w=w2,h=h2,name=pl.DisplayName,dist=me and math.floor((hr.Position-me.Position).Magnitude) or 0}) end
-   end
-  end end
-  return out
- end
- local function mk(i)
-  local bx=F({BackgroundTransparency=1,Visible=false},lay) N("UIStroke",{Color=C(255,59,48),Thickness=1.5},bx)
-  local lb=T({AnchorPoint=V2(0,1),Position=u(0,0,0,-2),Size=u(0,150,0,12),TextSize=9,Font=FB,TextColor3=C(255,90,80),TextStrokeTransparency=.2,TextXAlignment=XL},bx)
-  pool[i]={bx=bx,lb=lb} return pool[i]
- end
- local cn=RS.RenderStepped:Connect(function()
-  local wc=workspace.CurrentCamera if wc then cm.CFrame=wc.CFrame cm.FieldOfView=wc.FieldOfView end
-  local l=mode=="esp" and boxes() or {}
-  for i,e in ipairs(l) do local p=pool[i] or mk(i) p.bx.Visible=true p.bx.Position=u(0,e.x,0,e.y) p.bx.Size=u(0,e.w,0,e.h) p.lb.Text=e.name.." "..e.dist.." studs" end
-  for i=#l+1,#pool do pool[i].bx.Visible=false end
- end)
- F({Position=u(0,0,0,232),Size=u(0,414,0,78),BackgroundColor3=C(0,0,0),BackgroundTransparency=.4,ZIndex=3},b)
- local mb={}
- local function setMode(m) mode=m for k,bt in pairs(mb) do bt.TextColor3=(k==m) and C(255,214,10) or C(205,205,210) end end
- for _,d in ipairs({{"pic","Picture",126,70},{"esp","ESP Picture",204,96}}) do
-  local bt=B({Position=u(0,d[3],0,236),Size=u(0,d[4],0,16),BackgroundTransparency=1,Text=d[2],TextSize=10,ZIndex=4},b) mb[d[1]]=bt bt.MouseButton1Click:Connect(function() setMode(d[1]) end)
- end
- setMode("pic")
- local th=F({Position=u(0,22,0,252),Size=u(0,44,0,44),BackgroundColor3=C(30,30,32),ClipsDescendants=true,ZIndex=4},b) Cr(8,th) N("UIStroke",{Color=WH,Thickness=1.5},th)
- local ring=B({Position=u(0,179,0,254),Size=u(0,56,0,56),BackgroundTransparency=1,ZIndex=4},b) Cr(28,ring) N("UIStroke",{Color=WH,Thickness=3},ring)
- local inn=F({Position=u(0,6,0,6),Size=u(0,44,0,44),BackgroundColor3=WH,Active=false},ring) Cr(22,inn)
- local fl=F({Size=u(1,0,1,0),BackgroundColor3=WH,BackgroundTransparency=1,ZIndex=30,Active=false},b)
- ring.MouseButton1Click:Connect(function()
-  fl.BackgroundTransparency=0 tw(fl,.4,{BackgroundTransparency=1}) inn.Size=u(0,36,0,36) inn.Position=u(0,10,0,10) tw(inn,.25,{Size=u(0,44,0,44),Position=u(0,6,0,6)})
-  for _,c in ipairs(th:GetChildren()) do if c:IsA("ViewportFrame") then c:Destroy() end end
-  local cp=vp:Clone() cp.Size=u(0,59,0,44) cp.Position=u(0,-7,0,0) cp.Parent=th cp.CurrentCamera=cp:FindFirstChildOfClass("Camera")
-  table.insert(S.photos,{vp=cp:Clone(),mode=mode,esp=mode=="esp" and boxes() or nil,t=os.date("%b %d, %I:%M %p")})
-  if #S.photos>12 then table.remove(S.photos,1).vp:Destroy() end
- end)
- return function() cn:Disconnect() end
-end
-build.photos=function(b,a)
- local root=F({Size=u(1,0,1,0),BackgroundTransparency=1},b) local list,view
- local function clr() for _,c in ipairs(root:GetChildren()) do c:Destroy() end end
- local function put(par,ph,w,h) local c=ph.vp:Clone() c.Size=u(0,w,0,h) c.Position=u(0,0,0,0) c.Parent=par c.CurrentCamera=c:FindFirstChildOfClass("Camera") return c end
- local function esp(par,ph,w,th,names)
-  if not ph.esp then return end local k=w/414
-  for _,e in ipairs(ph.esp) do
-   local bx=F({Position=u(0,e.x*k,0,e.y*k),Size=u(0,e.w*k,0,e.h*k),BackgroundTransparency=1,ZIndex=3},par) N("UIStroke",{Color=C(255,59,48),Thickness=th},bx)
-   if names then T({AnchorPoint=V2(0,1),Position=u(0,0,0,-2),Size=u(0,150,0,12),Text=e.name.." "..e.dist.." studs",TextSize=9,Font=FB,TextColor3=C(255,90,80),TextStrokeTransparency=.2,TextXAlignment=XL},bx) end
-  end
- end
- function list()
-  clr() hdr(root,"Photos",C(0,0,0))
-  T({Text=#S.photos==0 and "No photos yet. Take some with Camera." or #S.photos.." photo"..(#S.photos==1 and "" or "s"),Position=u(0,20,0,68),Size=u(0,374,0,14),TextSize=10,TextColor3=C(142,142,147),TextXAlignment=XL},root)
-  local sf=N("ScrollingFrame",{Position=u(0,0,0,86),Size=u(1,0,1,-90),BackgroundTransparency=1,BorderSizePixel=0,ScrollBarThickness=3,AutomaticCanvasSize=Enum.AutomaticSize.Y,CanvasSize=u(0,0,0,0)},root)
-  N("UIPadding",{PaddingLeft=UDim.new(0,20),PaddingTop=UDim.new(0,4),PaddingBottom=UDim.new(0,16)},sf)
-  local g=F({Size=u(0,374,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1},sf) N("UIGridLayout",{CellSize=u(0,86,0,64),CellPadding=u(0,6,0,6),SortOrder=Enum.SortOrder.LayoutOrder},g)
-  for i=#S.photos,1,-1 do
-   local ph=S.photos[i] local cell=B({BackgroundColor3=C(30,30,32),ClipsDescendants=true,LayoutOrder=#S.photos-i},g) Cr(6,cell) put(cell,ph,86,64) esp(cell,ph,86,1,false)
-   if ph.mode=="esp" then local tg=F({Position=u(0,3,1,-14),Size=u(0,26,0,11),BackgroundColor3=C(255,59,48),ZIndex=5},cell) Cr(4,tg) T({Text="ESP",Size=u(1,0,1,0),TextSize=7,Font=FB},tg) end
-   cell.MouseButton1Click:Connect(function() view(i) end)
-  end
- end
- function view(i)
-  local ph=S.photos[i] if not ph then return list() end
-  clr() F({Size=u(1,0,1,0),BackgroundColor3=C(0,0,0)},root)
-  local v=put(root,ph,414,310) esp(root,ph,414,1.5,true)
-  local tp=F({Position=u(0,0,0,20),Size=u(0,414,0,40),BackgroundColor3=C(0,0,0),BackgroundTransparency=.45,ZIndex=6},root)
-  local bk=B({Position=u(0,12,0,0),Size=u(0,90,0,40),BackgroundTransparency=1,Text="< Photos",TextSize=12,TextColor3=C(10,132,255),Font=FM,TextXAlignment=XL},tp) bk.MouseButton1Click:Connect(list)
-  T({Text=ph.t..(ph.mode=="esp" and "  (ESP)" or ""),Size=u(1,0,1,0),TextSize=12,Font=FB,TextXAlignment=XC},tp)
-  local bt=F({Position=u(0,0,0,258),Size=u(0,414,0,44),BackgroundColor3=C(0,0,0),BackgroundTransparency=.45,ZIndex=6},root)
-  T({Text=(#S.photos-i+1).." of "..#S.photos,Size=u(1,0,1,0),TextSize=11,Font=FM,TextTransparency=.2,TextXAlignment=XC},bt)
-  local tr=B({Position=u(0,364,0,4),Size=u(0,36,0,36),BackgroundTransparency=1},bt) rc(tr,.5,.3,.6,.1,C(255,69,58),.3) rc(tr,.5,.62,.46,.5,C(255,69,58),.12) rc(tr,.5,.2,.22,.08,C(255,69,58),.3)
-  tr.MouseButton1Click:Connect(function() alert("Delete Photo?","This photo will be deleted.",{{"Cancel"},{"Delete",C(255,59,48),function() local x=table.remove(S.photos,i) if x then x.vp:Destroy() end list() end}}) end)
- end
- list() return function() end
-end
-build.notes=function(b,a) hdr(b,"Notes",C(0,0,0))
- local tb=N("TextBox",{Position=u(0,20,0,76),Size=u(0,374,0,200),BackgroundColor3=C(255,252,235),Text=S.note,PlaceholderText="Tap to write...",MultiLine=true,ClearTextOnFocus=false,TextWrapped=true,TextXAlignment=XL,TextYAlignment=Enum.TextYAlignment.Top,Font=FM,TextSize=13,TextColor3=C(0,0,0),BorderSizePixel=0},b) Cr(10,tb) N("UIPadding",{PaddingLeft=UDim.new(0,10),PaddingTop=UDim.new(0,8)},tb)
- tb:GetPropertyChangedSignal("Text"):Connect(function() S.note=tb.Text end) return function() end
-end
-build.music=function(b,a)
- local bg=F({Size=u(1,0,1,0),BackgroundColor3=C(60,20,40)},b) N("UIGradient",{Rotation=90,Color=ColorSequence.new(C(120,30,60),C(20,10,20))},bg)
- local ar=tile(a,b,30,70,130,false)
- musicUI(b,182,86,200,15,WH,C(190,170,178)) return function() end
-end
-build.clock=function(b,a) local alive=true
- local cx,cy=207,140 local face=F({AnchorPoint=V2(.5,.5),Position=u(0,cx,0,cy),Size=u(0,196,0,196),BackgroundColor3=C(30,30,33)},b) Cr(98,face) N("UIStroke",{Color=C(70,70,76),Thickness=3},face)
- for i=0,11 do local an=math.rad(i*30) F({AnchorPoint=V2(.5,.5),Position=u(0,98+math.sin(an)*88,0,98-math.cos(an)*88),Size=u(0,i%3==0 and 3 or 2,0,i%3==0 and 10 or 6),Rotation=i*30,BackgroundColor3=WH},face)
-  if i%3==0 then T({Text=tostring(i==0 and 12 or i),Position=u(0,98+math.sin(an)*68-10,0,98-math.cos(an)*68-8),Size=u(0,20,0,16),TextSize=13,Font=FB},face) end end
- local function hand(len,w,col) local h=F({AnchorPoint=V2(.5,.5),Size=u(0,w,0,len),BackgroundColor3=col},face) Cr(w/2,h) return h end
- local hh,mh,sh=hand(46,4,WH),hand(70,3,WH),hand(78,1.5,C(255,149,10))
- F({AnchorPoint=V2(.5,.5),Position=u(.5,0,.5,0),Size=u(0,8,0,8),BackgroundColor3=C(255,149,10),ZIndex=5},face).ZIndex=5
- local function pl(h,len,deg) local a2=math.rad(deg) h.Position=u(0,98+math.sin(a2)*len/2,0,98-math.cos(a2)*len/2) h.Rotation=deg end
- local dg=T({Position=u(0,0,0,252),Size=u(0,414,0,30),TextSize=22,Font=FB,TextXAlignment=XC},b)
- task.spawn(function() while alive do local t=os.date("*t") pl(hh,46,(t.hour%12+t.min/60)*30) pl(mh,70,(t.min+t.sec/60)*6) pl(sh,78,t.sec*6) dg.Text=os.date("%H:%M:%S") task.wait(.25) end end)
- return function() alive=false end
-end
-build.stopwatch=function(b,a) local alive,run,el,t0=true,false,0,0
- local d=T({Position=u(0,0,0,70),Size=u(0,414,0,70),TextSize=54,Font=FG,TextXAlignment=XC,Text="00:00.00"},b)
- local function mk(x,txt,col) local k=B({Position=u(0,x,0,190),Size=u(0,72,0,72),BackgroundColor3=col,Text=txt,TextSize=13},b) Cr(36,k) return k end
- local rs,st=mk(90,"Reset",C(60,60,64)),mk(252,"Start",C(48,209,88))
- rs.MouseButton1Click:Connect(function() if not run then el=0 d.Text="00:00.00" end end)
- st.MouseButton1Click:Connect(function() run=not run if run then t0=tick()-el st.Text="Stop" st.BackgroundColor3=C(255,69,58) else st.Text="Start" st.BackgroundColor3=C(48,209,88) end end)
- task.spawn(function() while alive do if run then el=tick()-t0 d.Text=string.format("%02d:%05.2f",math.floor(el/60),el%60) end task.wait(.03) end end)
- return function() alive=false end
-end
-build.weather=function(b,a)
- local bg=F({Size=u(1,0,1,0),BackgroundColor3=C(60,140,230)},b) N("UIGradient",{Rotation=90,Color=ColorSequence.new(C(40,110,220),C(150,200,250))},bg)
- T({Text="Baseplate",Position=u(0,0,0,50),Size=u(0,414,0,30),TextSize=24,Font=FB,TextXAlignment=XC},b)
- T({Text="72°",Position=u(0,0,0,86),Size=u(0,414,0,90),TextSize=76,Font=FG,TextXAlignment=XC},b)
- T({Text="Sunny  H:76°  L:61°",Position=u(0,0,0,180),Size=u(0,414,0,20),TextSize=13,TextXAlignment=XC},b) return function() end
-end
-build.calc=function(b,a)
- local ds=T({Position=u(0,20,0,28),Size=u(0,374,0,64),TextScaled=true,Font=FG,TextXAlignment=XR,Text="0"},b) N("UITextSizeConstraint",{MaxTextSize=46},ds)
- local cur,acc,op,fresh="0",nil,nil,true
- local function fmt(n) if n~=n or math.abs(n)==math.huge then return "Error" end return string.format("%.9g",n) end
- local function cal(x,y,o) if o=="+" then return x+y elseif o=="-" then return x-y elseif o=="x" then return x*y else return y~=0 and x/y or 0/0 end end
- local function pr(k)
-  if cur=="Error" then cur="0" acc=nil op=nil fresh=true end
-  if tonumber(k) then if fresh then cur=k fresh=false else cur=(cur=="0") and k or cur..k end
-  elseif k=="." then if fresh then cur="0." fresh=false elseif not cur:find("%.") then cur=cur.."." end
-  elseif k=="C" then cur="0" acc=nil op=nil fresh=true
-  elseif k=="+/-" then cur=fmt(-(tonumber(cur) or 0))
-  elseif k=="%" then cur=fmt((tonumber(cur) or 0)/100)
-  elseif k=="=" then if op and acc then cur=fmt(cal(acc,tonumber(cur) or 0,op)) acc=nil op=nil fresh=true end
-  else if op and acc and not fresh then acc=cal(acc,tonumber(cur) or 0,op) cur=fmt(acc) elseif not acc or fresh then acc=tonumber(cur) end op=k fresh=true end
-  ds.Text=cur
- end
- local rows={{"C","+/-","%","/"},{"7","8","9","x"},{"4","5","6","-"},{"1","2","3","+"},{"0",".","="}}
- for r,row in ipairs(rows) do local x=14 for _,k in ipairs(row) do
-  local w=k=="0" and 184 or 90 local top=(k=="C" or k=="+/-" or k=="%") local opk=(k=="/" or k=="x" or k=="-" or k=="+" or k=="=")
-  local bt=B({Position=u(0,x,0,98+(r-1)*40),Size=u(0,w,0,34),BackgroundColor3=top and C(165,165,170) or opk and C(255,159,10) or C(58,58,62),Text=k,TextSize=15,TextColor3=top and C(0,0,0) or WH},b) Cr(17,bt)
-  bt.MouseButton1Click:Connect(function() pr(k) end) x+=w+8 end end
- return function() end
-end
-build.generic=function(b,a) return function() end end
-
-build.flappy=function(b,a)
- local W,H,GY,PW,GAP,SPD,GRV,FLAP=414,310,268,54,92,125,950,-300
- local sky=F({Size=u(1,0,1,0),BackgroundColor3=C(112,197,206),ClipsDescendants=true},b) N("UIGradient",{Rotation=90,Color=ColorSequence.new(C(78,192,202),C(195,236,214))},sky)
- for i,cx in ipairs({50,190,320}) do local cl=F({Position=u(0,cx,0,36+i*20),Size=u(0,70,0,22),BackgroundColor3=WH,BackgroundTransparency=.4},sky) Cr(11,cl) end
- local pc=F({Size=u(1,0,1,0),BackgroundTransparency=1},sky)
- local gr=F({Position=u(0,0,0,GY),Size=u(1,0,0,H-GY),BackgroundColor3=C(222,216,149),ZIndex=5},sky) F({Size=u(1,0,0,8),BackgroundColor3=C(115,191,46),ZIndex=6},gr)
- local stripes={} for i=1,12 do local f=F({Size=u(0,14,0,6),Position=u(0,(i-1)*40,0,18),BackgroundColor3=C(196,186,118),ZIndex=6},gr) stripes[i]={f=f,x=(i-1)*40} end
- local bd=F({AnchorPoint=V2(.5,.5),Size=u(0,28,0,22),BackgroundColor3=C(250,213,60),ZIndex=8},sky) Cr(11,bd) N("UIStroke",{Color=C(90,65,20),Thickness=1.5},bd)
- rc(bd,.7,.35,.3,.38,WH,.5) rc(bd,.76,.37,.14,.18,C(0,0,0),.5) rc(bd,.97,.62,.36,.3,C(240,100,40),.4) rc(bd,.32,.62,.42,.32,C(255,240,150),.5)
- local sT=T({Text="0",Position=u(0,0,0,34),Size=u(0,414,0,44),TextSize=36,Font=FB,TextStrokeTransparency=0,TextXAlignment=XC,ZIndex=9},sky)
- local ms=T({Text="Tap to Start",Position=u(0,0,0,130),Size=u(0,414,0,70),TextSize=18,Font=FB,TextStrokeTransparency=0,TextXAlignment=XC,ZIndex=9},sky)
- local fl=F({Size=u(1,0,1,0),BackgroundColor3=WH,BackgroundTransparency=1,ZIndex=12},sky)
- local st,by,vy,score,pipes,sp,d0="ready",150,0,0,{},0,0
- local function reset() for _,p in ipairs(pipes) do p.t:Destroy() p.b:Destroy() end pipes={} st="ready" by=150 vy=0 score=0 sp=0 sT.Text="0" ms.Text="Tap to Start" ms.Visible=true bd.Rotation=0 end
- local function die() if st=="dead" then return end st="dead" d0=tick() S.best=math.max(S.best,score) ms.Text="Game Over\nScore "..score.."   Best "..S.best.."\nTap to retry" ms.Visible=true fl.BackgroundTransparency=.2 tw(fl,.4,{BackgroundTransparency=1}) end
- local function flap() if st=="dead" then if tick()-d0>.5 then reset() end return end if st=="ready" then st="play" ms.Visible=false end vy=FLAP end
- local function pipe(par,x,y,h,cap) local p=F({Position=u(0,x,0,y),Size=u(0,PW,0,h),BackgroundColor3=C(115,191,46)},par) N("UIStroke",{Color=C(70,120,30),Thickness=2},p) local c=F({Position=u(0,-3,cap and 0 or 1,cap and 0 or -14),Size=u(0,PW+6,0,14),BackgroundColor3=C(130,210,56)},p) N("UIStroke",{Color=C(70,120,30),Thickness=2},c) return p end
- local cn=RS.RenderStepped:Connect(function(dt)
-  dt=math.min(dt,.05)
-  if st~="dead" then for _,s in ipairs(stripes) do s.x-=SPD*dt if s.x<-20 then s.x+=W+40 end s.f.Position=u(0,s.x,0,18) end end
-  if st=="ready" then by=150+math.sin(tick()*5)*5 bd.Position=u(0,100,0,by) return end
-  vy+=GRV*dt by+=vy*dt
-  if st=="play" then
-   sp-=dt if sp<=0 then sp=1.55 local gy=math.random(50,GY-GAP-40) table.insert(pipes,{x=W+10,gy=gy,c=false,t=pipe(pc,W+10,0,gy,false),b=pipe(pc,W+10,gy+GAP,GY-gy-GAP,true)}) end
-   for i=#pipes,1,-1 do local p=pipes[i] p.x-=SPD*dt p.t.Position=u(0,p.x,0,0) p.b.Position=u(0,p.x,0,p.gy+GAP)
-    if not p.c and p.x+PW<89 then p.c=true score+=1 sT.Text=tostring(score) end
-    if p.x<-PW-10 then p.t:Destroy() p.b:Destroy() table.remove(pipes,i)
-    elseif 111>p.x and 89<p.x+PW and (by-10<p.gy or by+10>p.gy+GAP) then die() end
-   end
-   if by+10>=GY then by=GY-10 die() end if by<10 then by=10 vy=0 end
-  elseif by+10>=GY then by=GY-10 vy=0 end
-  bd.Position=u(0,100,0,by) bd.Rotation=math.clamp(vy*.12,-25,80)
- end)
- local kc=UIS.InputBegan:Connect(function(i) if i.KeyCode==Enum.KeyCode.Space then flap() end end)
- B({Size=u(1,0,1,0),BackgroundTransparency=1,ZIndex=15},sky).MouseButton1Down:Connect(flap)
- return function() cn:Disconnect() kc:Disconnect() end
+local function limb(a, b, th, color, mat, caps)
+	local mid = (a + b) / 2
+	local len = (b - a).Magnitude
+	mk(Vector3.new(len, th, th), CFrame.lookAt(mid, b) * CFrame.Angles(0, math.pi / 2, 0), color, mat, CYL)
+	if caps then
+		mk(Vector3.new(th, th, th), CFrame.new(a), color, mat, BALL)
+		mk(Vector3.new(th, th, th), CFrame.new(b), color, mat, BALL)
+	end
 end
 
-build.maps=function(b,a)
- local mf=F({Size=u(1,0,1,0),BackgroundColor3=C(228,226,220),ClipsDescendants=true},b)
- local z,trk,alive=.8,nil,true
- local vl,hl={},{} for i=1,25 do vl[i]=F({Size=u(0,1,1,0),BackgroundColor3=C(206,204,197),ZIndex=1},mf) end for i=1,19 do hl[i]=F({Size=u(1,0,0,1),BackgroundColor3=C(206,204,197),ZIndex=1},mf) end
- local fps={}
- pcall(function()
-  local ch=LP.Character local hrp=ch and ch:FindFirstChild("HumanoidRootPart")
-  for _,p in ipairs(workspace:GetDescendants()) do
-   if #fps>=200 then break end
-   if p:IsA("BasePart") and p~=workspace.Terrain and p.Transparency<.9 and p.Size.X*p.Size.Z>24 then
-    local m=p:FindFirstAncestorOfClass("Model")
-    if not (m and m:FindFirstChildOfClass("Humanoid")) and (not hrp or (p.Position-hrp.Position).Magnitude<900) then
-     local _,yy=p.CFrame:ToOrientation() local big=p.Size.X*p.Size.Z>20000
-     local f=F({AnchorPoint=V2(.5,.5),BackgroundColor3=p.Color:Lerp(WH,big and .55 or .3),BackgroundTransparency=big and 0 or .1,ZIndex=big and 2 or 3},mf) Cr(2,f)
-     table.insert(fps,{f=f,p=p.Position,sx=p.Size.X,sz=p.Size.Z,r=-math.deg(yy)})
-    end
-   end
-  end
- end)
- local mk={}
- local function marker(pl)
-  if mk[pl] then return mk[pl] end local me=pl==LP
-  local d=F({AnchorPoint=V2(.5,.5),Size=u(0,me and 16 or 14,0,me and 16 or 14),BackgroundColor3=me and C(10,132,255) or C(255,59,48),ZIndex=10},mf) Cr(8,d) N("UIStroke",{Color=WH,Thickness=2},d)
-  T({AnchorPoint=V2(.5,1),Position=u(.5,0,0,-3),Size=u(0,80,0,12),Text=me and "You" or pl.DisplayName,TextSize=9,Font=FB,TextColor3=C(30,30,34),TextStrokeColor3=WH,TextStrokeTransparency=.2},d)
-  mk[pl]=d return d
- end
- local function cpos(pl) local c=pl and pl.Character local h=c and c:FindFirstChild("HumanoidRootPart") return h and h.Position end
- local function upd()
-  local c=cpos(trk or LP) or Vector3.new()
-  local sp=50*z if sp<18 then sp*=4 end
-  local x0,y0=(207-c.X*z)%sp,(155-c.Z*z)%sp
-  for i,l in ipairs(vl) do local x=x0+(i-1)*sp l.Visible=x<414 l.Position=u(0,x,0,0) end
-  for i,l in ipairs(hl) do local y=y0+(i-1)*sp l.Visible=y<310 l.Position=u(0,0,0,y) end
-  for _,p in ipairs(fps) do
-   local px,py,w,h=207+(p.p.X-c.X)*z,155+(p.p.Z-c.Z)*z,p.sx*z,p.sz*z local r=math.max(w,h)*.75
-   local vis=math.abs(px-207)-r<230 and math.abs(py-155)-r<175 p.f.Visible=vis
-   if vis then p.f.Position=u(0,px,0,py) p.f.Size=u(0,w,0,h) p.f.Rotation=p.r end
-  end
-  for pl,m in pairs(mk) do if not pl.Parent then m:Destroy() mk[pl]=nil end end
-  for _,pl in ipairs(P:GetPlayers()) do
-   local m=marker(pl) local pos=cpos(pl)
-   if pos then local sx,sy=207+(pos.X-c.X)*z,155+(pos.Z-c.Z)*z local cx2,cy2=math.clamp(sx,12,402),math.clamp(sy,40,298) m.Position=u(0,cx2,0,cy2) m.BackgroundTransparency=(cx2~=sx or cy2~=sy) and .4 or 0 m.Visible=true else m.Visible=false end
-  end
- end
- local pill=F({Position=u(0,14,0,26),Size=u(0,180,0,26),BackgroundColor3=C(250,250,252),BackgroundTransparency=.08,ZIndex=20},b) Cr(13,pill)
- local pt=T({Position=u(0,12,0,0),Size=u(1,-12,1,0),TextSize=11,Font=FB,TextColor3=C(30,30,34),TextXAlignment=XL,ZIndex=21},pill)
- local function zb(y,txt,cb) local x=B({Position=u(0,372,0,y),Size=u(0,30,0,30),BackgroundColor3=C(250,250,252),Text=txt,TextSize=18,TextColor3=C(40,40,46),ZIndex=20},b) Cr(8,x) x.MouseButton1Click:Connect(cb) return x end
- zb(60,"+",function() z=math.clamp(z*1.35,.12,3) upd() end) zb(94,"-",function() z=math.clamp(z/1.35,.12,3) upd() end)
- local lc=zb(128,"",function() trk=nil z=.8 upd() end) local rg=F({AnchorPoint=V2(.5,.5),Position=u(.5,0,.5,0),Size=u(0,14,0,14),BackgroundTransparency=1,ZIndex=21},lc) Cr(7,rg) N("UIStroke",{Color=C(10,132,255),Thickness=2},rg) rc(rg,.5,.5,.4,.4,C(10,132,255),.5)
- local sh=F({Position=u(0,10,0,198),Size=u(0,394,0,104),BackgroundColor3=C(250,250,252),BackgroundTransparency=.06,ZIndex=20},b) Cr(16,sh)
- T({Text="Players",Position=u(0,14,0,6),Size=u(0,100,0,16),TextSize=12,Font=FB,TextColor3=C(30,30,34),TextXAlignment=XL,ZIndex=21},sh)
- local sf=N("ScrollingFrame",{Position=u(0,8,0,26),Size=u(1,-16,1,-32),BackgroundTransparency=1,BorderSizePixel=0,ScrollBarThickness=2,AutomaticCanvasSize=Enum.AutomaticSize.Y,CanvasSize=u(0,0,0,0),ZIndex=21},sh)
- N("UIListLayout",{Padding=UDim.new(0,4)},sf)
- local dl={}
- local function dist() local mp=cpos(LP) for pl,l in pairs(dl) do local pp=cpos(pl) l.Text=(mp and pp) and (math.floor((pp-mp).Magnitude).." studs") or "--" end end
- local function rows()
-  if not alive then return end
-  for _,c in ipairs(sf:GetChildren()) do if c:IsA("Frame") then c:Destroy() end end dl={}
-  pt.Text="Tracking: "..(trk and trk.DisplayName or "You")
-  for _,pl in ipairs(P:GetPlayers()) do
-   local r=F({Size=u(1,-4,0,24),BackgroundTransparency=1,ZIndex=22},sf)
-   local dt=F({Position=u(0,4,0,7),Size=u(0,10,0,10),BackgroundColor3=pl==LP and C(10,132,255) or C(255,59,48),ZIndex=23},r) Cr(5,dt)
-   T({Text=pl==LP and pl.DisplayName.." (You)" or pl.DisplayName,Position=u(0,22,0,0),Size=u(0,170,1,0),TextSize=11,Font=FM,TextColor3=C(30,30,34),TextXAlignment=XL,TextTruncate=Enum.TextTruncate.AtEnd,ZIndex=23},r)
-   dl[pl]=T({Position=u(0,200,0,0),Size=u(0,100,1,0),TextSize=10,Font=FG,TextColor3=C(110,110,118),TextXAlignment=XR,ZIndex=23},r)
-   local tb=B({Position=u(0,306,0,3),Size=u(0,66,0,18),BackgroundColor3=(trk==pl) and C(52,199,89) or C(10,132,255),Text=(trk==pl) and "Tracking" or "Track",TextSize=10,ZIndex=23},r) Cr(9,tb)
-   tb.MouseButton1Click:Connect(function() if pl==LP then trk=nil else trk=(trk==pl) and nil or pl end rows() upd() end)
-  end
-  dist()
- end
- rows() upd()
- task.spawn(function() local n=0 while alive do upd() n+=1 if n%5==0 then dist() end task.wait(.12) end end)
- local c1=P.PlayerAdded:Connect(function() task.delay(.2,rows) end) local c2=P.PlayerRemoving:Connect(function() task.delay(.3,rows) end)
- return function() alive=false c1:Disconnect() c2:Disconnect() end
+local function buildHand(s) -- s = -1 left, +1 right
+	local x = W / 2
+	-- thumb wraps over the front bezel
+	local A = Vector3.new(s * (x + 0.05), -0.62, 0.15)
+	local B = Vector3.new(s * (x - 0.17), -0.5, T / 2 + 0.12)
+	local Cc = Vector3.new(s * (x - 0.6), -0.43, T / 2 + 0.125)
+	limb(A, B, 0.2, skin, SP, true)
+	limb(B, Cc, 0.19, skin, SP, true)
+	mk(Vector3.new(0.13, 0.1, 0.012), CFrame.new(Cc.X - s * 0.02, Cc.Y, Cc.Z + 0.098), Color3.fromRGB(245, 225, 215), SP)
+	-- palm gripping the back edge
+	mk(Vector3.new(0.95, 0.52, 0.52), CFrame.new(s * (x + 0.29), -0.12, -0.18) * CFrame.Angles(0, 0, math.pi / 2), skin, SP, CYL)
+	-- forearm + sleeve going down out of view
+	local p0 = Vector3.new(s * (x + 0.32), -0.55, -0.15)
+	local p1 = Vector3.new(s * (x + 0.9), -2.1, 0.95)
+	mk(Vector3.new(0.46, 0.46, 0.46), CFrame.new(p0), skin, SP, BALL)
+	limb(p0, p1, 0.44, skin, SP, false)
+	limb(p0:Lerp(p1, 0.42), p1 + (p1 - p0) * 0.2, 0.58, sleeve, Enum.Material.Fabric, false)
+end
+buildHand(-1)
+buildHand(1)
+
+---------------------------------------------------------------- flashlight (real light aimed where you look)
+local torchPart = Instance.new("Part")
+torchPart.Name = "DeltaIPadTorch"
+torchPart.Anchored = true
+torchPart.CanCollide = false
+torchPart.CanQuery = false
+torchPart.CanTouch = false
+torchPart.CastShadow = false
+torchPart.Transparency = 1
+torchPart.Size = Vector3.new(0.2, 0.2, 0.2)
+torchPart.Parent = workspace
+
+local torchBeam = Instance.new("SpotLight")
+torchBeam.Face = Enum.NormalId.Front          -- front = the way the camera looks
+torchBeam.Brightness = 4
+torchBeam.Range = 70
+torchBeam.Angle = 65
+torchBeam.Shadows = true
+torchBeam.Color = Color3.fromRGB(255, 244, 225)
+torchBeam.Enabled = false
+torchBeam.Parent = torchPart
+
+local torchGlow = Instance.new("PointLight")   -- soft glow right around you
+torchGlow.Brightness = 0.8
+torchGlow.Range = 14
+torchGlow.Color = Color3.fromRGB(255, 244, 225)
+torchGlow.Enabled = false
+torchGlow.Parent = torchPart
+
+local function setTorch(on)
+	torchBeam.Enabled = on
+	torchGlow.Enabled = on
 end
 
-local function getBtn(par,a,x,y,w,h,bg,fg)
- local g=B({Position=u(0,x,0,y),Size=u(0,w,0,h),BackgroundColor3=bg,TextSize=11,TextColor3=fg},par) Cr(h/2,g)
- local function lab() g.Text=hasApp(a.id) and "OPEN" or "GET" end lab() local dl=false
- g.MouseButton1Click:Connect(function()
-  if dl then return end
-  if hasApp(a.id) then go(a.id) return end
-  if not S.net then alert("Cannot Connect to App Store","Connect to a Wi-Fi network in Settings to download apps.",{{"OK"},{"Settings",nil,function() go("settings") end}}) return end
-  dl=true g.Text=""
-  local sp=F({Size=u(0,14,0,14),Position=u(.5,-7,.5,-7),BackgroundTransparency=1},g) Cr(7,sp)
-  local st=N("UIStroke",{Color=fg,Thickness=2},sp)
-  local gr=N("UIGradient",{Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,0),NumberSequenceKeypoint.new(.6,0),NumberSequenceKeypoint.new(.61,1),NumberSequenceKeypoint.new(1,1)})},st)
-  task.spawn(function()
-   local t,d=0,1.8+math.random()*1.6
-   while t<d do t+=RS.RenderStepped:Wait() gr.Rotation=(gr.Rotation+14)%360 end
-   sp:Destroy() dl=false
-   if not S.net then alert("Download Failed","The Wi-Fi connection was lost.",{{"OK"}}) lab() return end
-   if not hasApp(a.id) then table.insert(S.installedApps,a) end renderHome() renderLib() lab() notify(a.name,"Downloaded and installed",a.col)
-  end)
- end)
-end
-build.store=function(b,a)
- T({Text=os.date("%A %d %B"):upper(),Position=u(0,20,0,22),Size=u(0,300,0,12),TextSize=9,TextColor3=C(142,142,147),Font=FB,TextXAlignment=XL},b) hdr(b,"Today",C(0,0,0))
- local av=F({Position=u(0,372,0,38),Size=u(0,26,0,26),BackgroundColor3=C(10,132,255)},b) Cr(13,av) rc(av,.5,.38,.34,.34,WH,.5) rc(av,.5,.82,.6,.4,WH,.5)
- local sf=N("ScrollingFrame",{Position=u(0,0,0,76),Size=u(1,0,1,-76),BackgroundTransparency=1,BorderSizePixel=0,ScrollBarThickness=3,AutomaticCanvasSize=Enum.AutomaticSize.Y,CanvasSize=u(0,0,0,0)},b)
- N("UIListLayout",{Padding=UDim.new(0,10),HorizontalAlignment=Enum.HorizontalAlignment.Center,SortOrder=Enum.SortOrder.LayoutOrder},sf) N("UIPadding",{PaddingBottom=UDim.new(0,30)},sf)
- local fa=byId.flappy
- local fc=F({Size=u(0,374,0,150),BackgroundColor3=C(60,180,190),LayoutOrder=1,ClipsDescendants=true},sf) Cr(16,fc) N("UIGradient",{Rotation=45,Color=ColorSequence.new(C(90,205,215),C(30,140,160))},fc)
- T({Text="GAME OF THE DAY",Position=u(0,16,0,14),Size=u(0,200,0,12),TextSize=9,Font=FB,TextTransparency=.25,TextXAlignment=XL},fc)
- T({Text=fa.name,Position=u(0,16,0,28),Size=u(0,220,0,28),TextSize=22,Font=FB,TextXAlignment=XL},fc)
- T({Text=fa.sub,Position=u(0,16,0,58),Size=u(0,200,0,30),TextSize=11,Font=FG,TextWrapped=true,TextXAlignment=XL},fc)
- tile(fa,fc,262,28,90,false) getBtn(fc,fa,16,108,60,26,WH,C(30,140,160))
- T({Text="Top Apps",Size=u(0,374,0,22),TextSize=16,Font=FB,TextColor3=C(0,0,0),TextXAlignment=XL,LayoutOrder=2},sf)
- local gr=F({Size=u(0,374,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,LayoutOrder=3},sf) N("UIGridLayout",{CellSize=u(0,183,0,70),CellPadding=u(0,8,0,8)},gr)
- for _,s in ipairs(ALL) do if not s.sys and s.id~="flappy" then
-  local cd=F({BackgroundColor3=WH},gr) Cr(12,cd) tile(s,cd,8,12,46,false)
-  T({Text=s.name,Position=u(0,62,0,10),Size=u(0,114,0,14),TextSize=11,Font=FB,TextColor3=C(0,0,0),TextXAlignment=XL,TextTruncate=Enum.TextTruncate.AtEnd},cd)
-  T({Text=s.sub,Position=u(0,62,0,24),Size=u(0,114,0,12),TextSize=9,Font=FG,TextColor3=C(142,142,147),TextXAlignment=XL,TextTruncate=Enum.TextTruncate.AtEnd},cd)
-  getBtn(cd,s,62,42,50,20,C(235,235,240),C(10,132,255))
- end end
- return function() end
+---------------------------------------------------------------- screen UI helpers
+local gui = Instance.new("SurfaceGui")
+gui.Face = Enum.NormalId.Back
+gui.SizingMode = Enum.SurfaceGuiSizingMode.FixedSize
+gui.CanvasSize = Vector2.new(CW, CH)
+gui.LightInfluence = 0
+gui.Brightness = 1.15
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+gui.Parent = screen
+
+local function px(n) return UDim.new(0, n) end
+
+local function frame(parent, x, y, w, h, color, tr, corner)
+	local f = Instance.new("Frame")
+	f.BorderSizePixel = 0
+	f.Position = UDim2.fromOffset(x, y)
+	f.Size = UDim2.fromOffset(w, h)
+	f.BackgroundColor3 = color or WHITE
+	f.BackgroundTransparency = tr or 0
+	if corner then
+		local c = Instance.new("UICorner")
+		c.CornerRadius = corner
+		c.Parent = f
+	end
+	f.Parent = parent
+	return f
 end
 
-local function rel(d,root) local t={} while d and d~=root do table.insert(t,1,d.Name) d=d.Parent end return table.concat(t,"/") end
-local function clean(cl) for _,d in ipairs(cl:GetDescendants()) do if d:IsA("LuaSourceContainer") or d:IsA("Sound") or d:IsA("ParticleEmitter") then d:Destroy() end end end
-local function feed(par,pl,rad,maxp,dist)
- local vp=N("ViewportFrame",{Size=u(1,0,1,0),BackgroundColor3=C(135,175,215),Ambient=C(175,175,175),LightColor=WH},par)
- local cm=N("Camera",{FieldOfView=60},vp) vp.CurrentCamera=cm
- local ch=pl.Character local hrp=ch and ch:FindFirstChild("HumanoidRootPart") local prs={}
- if hrp then pcall(function()
-  ch.Archivable=true local cc=ch:Clone()
-  if cc then clean(cc) cc.Parent=vp local mp={}
-   for _,d in ipairs(cc:GetDescendants()) do if d:IsA("BasePart") then d.Anchored=true mp[rel(d,cc)]=d end end
-   for _,d in ipairs(ch:GetDescendants()) do if d:IsA("BasePart") then local c2=mp[rel(d,ch)] if c2 then table.insert(prs,{d,c2}) end end end end
-  local n=0
-  for _,p in ipairs(workspace:GetDescendants()) do
-   if n>maxp then break end
-   if p:IsA("BasePart") and p~=workspace.Terrain and p.Size.Magnitude>1 and (p.Position-hrp.Position).Magnitude<rad and not p:IsDescendantOf(ch) then
-    local m=p:FindFirstAncestorOfClass("Model")
-    if not (m and m:FindFirstChildOfClass("Humanoid")) then local ok,cl=pcall(function() return p:Clone() end) if ok and cl then clean(cl) cl.Anchored=true cl.Parent=vp n+=1 end end
-   end
-  end
- end) end
- local cn=RS.RenderStepped:Connect(function()
-  if not (hrp and hrp.Parent) then return end
-  for _,pr in ipairs(prs) do pr[2].CFrame=pr[1].CFrame end
-  local hd=ch:FindFirstChild("Head") local tg=hd and hd.Position or hrp.Position+Vector3.new(0,1.5,0)
-  cm.CFrame=CFrame.lookAt(tg+hrp.CFrame.LookVector*dist+Vector3.new(0,.3,0),tg)
- end)
- return hrp~=nil,function() cn:Disconnect() end
+local function label(parent, text, x, y, w, h, size, color, font, align)
+	local l = Instance.new("TextLabel")
+	l.BackgroundTransparency = 1
+	l.Position = UDim2.fromOffset(x, y)
+	l.Size = UDim2.fromOffset(w, h)
+	l.Text = text
+	l.TextSize = size
+	l.TextColor3 = color or WHITE
+	l.Font = font or Enum.Font.GothamMedium
+	l.TextXAlignment = align or Enum.TextXAlignment.Center
+	l.TextYAlignment = Enum.TextYAlignment.Center
+	l.TextTruncate = Enum.TextTruncate.AtEnd
+	l.Parent = parent
+	return l
 end
 
-build.facetime=function(b,a)
- local alive,mode,cleanup,tok=true,"list",nil,0
- local root=F({Size=u(1,0,1,0),BackgroundTransparency=1},b)
- local list,calling,incall
- local function clr() if cleanup then pcall(cleanup) cleanup=nil end for _,c in ipairs(root:GetChildren()) do c:Destroy() end end
- local function avatar(par,pl,x,y,s) local f=F({Position=u(0,x,0,y),Size=u(0,s,0,s),BackgroundColor3=Color3.fromHSV((#pl.Name*.13)%1,.45,.75)},par) Cr(s/2,f) T({Text=pl.DisplayName:sub(1,1):upper(),Size=u(1,0,1,0),TextSize=s*.45,Font=FB},f) return f end
- local function rbtn(par,x,y,s,col,z) local k=B({Position=u(0,x,0,y),Size=u(0,s,0,s),BackgroundColor3=col,ZIndex=z or 1},par) Cr(s/2,k) return k end
- function list()
-  clr() mode="list"
-  T({Text="FaceTime",Position=u(0,20,0,34),Size=u(0,300,0,34),TextSize=26,Font=FB,TextXAlignment=XL},root)
-  T({Text="Tap someone to start a video call",Position=u(0,20,0,68),Size=u(0,300,0,14),TextSize=10,Font=FG,TextColor3=C(150,150,158),TextXAlignment=XL},root)
-  local sf=N("ScrollingFrame",{Position=u(0,0,0,90),Size=u(1,0,1,-96),BackgroundTransparency=1,BorderSizePixel=0,ScrollBarThickness=3,AutomaticCanvasSize=Enum.AutomaticSize.Y,CanvasSize=u(0,0,0,0)},root)
-  N("UIListLayout",{Padding=UDim.new(0,8),HorizontalAlignment=Enum.HorizontalAlignment.Center},sf)
-  local n=0
-  for _,pl in ipairs(P:GetPlayers()) do if pl~=LP then n+=1
-   local r=B({Size=u(0,374,0,48),BackgroundColor3=C(40,40,44)},sf) Cr(12,r) avatar(r,pl,8,6,36)
-   T({Text=pl.DisplayName,Position=u(0,54,0,6),Size=u(0,220,0,18),TextSize=13,Font=FB,TextXAlignment=XL},r)
-   T({Text="@"..pl.Name,Position=u(0,54,0,24),Size=u(0,220,0,14),TextSize=10,Font=FG,TextColor3=C(150,150,158),TextXAlignment=XL},r)
-   local cb=F({Position=u(0,328,0,9),Size=u(0,34,0,30),BackgroundColor3=C(52,199,89)},r) Cr(15,cb) GL.camera(cb)
-   r.MouseButton1Click:Connect(function() calling(pl) end)
-  end end
-  if n==0 then T({Text="No one else is in this server yet.",Position=u(0,0,0,110),Size=u(0,414,0,20),TextSize=13,Font=FG,TextColor3=C(150,150,158),TextXAlignment=XC},root) end
- end
- function calling(pl)
-  clr() mode="calling" tok+=1 local my=tok
-  local bg=F({Size=u(1,0,1,0),BackgroundColor3=C(30,30,34)},root) N("UIGradient",{Rotation=90,Color=ColorSequence.new(C(64,64,74),C(14,14,18))},bg)
-  avatar(root,pl,162,64,90)
-  T({Text=pl.DisplayName,Position=u(0,0,0,164),Size=u(0,414,0,26),TextSize=20,Font=FB,TextXAlignment=XC},root)
-  local st=T({Text="FaceTime Video",Position=u(0,0,0,192),Size=u(0,414,0,16),TextSize=12,Font=FG,TextColor3=C(190,190,198),TextXAlignment=XC},root)
-  local en=rbtn(root,186,236,42,C(255,59,48)) rc(en,.5,.5,.58,.16,WH,.5) en.MouseButton1Click:Connect(function() list() end)
-  task.spawn(function()
-   local t,w,i=0,2.5+math.random()*3,0
-   while alive and mode=="calling" and tok==my and t<w do i=i%3+1 st.Text="FaceTime Video"..string.rep(".",i) task.wait(.45) t+=.45 end
-   if alive and mode=="calling" and tok==my then if pl.Parent then incall(pl) else list() end end
-  end)
- end
- function incall(pl)
-  clr() mode="call" tok+=1 local my=tok
-  local ok1,c1=feed(root,pl,150,300,6)
-  if not ok1 then local nc=F({Size=u(1,0,1,0),BackgroundColor3=C(30,30,34)},root) T({Text="Camera unavailable",Size=u(1,0,1,0),TextSize=14},nc) end
-  local pip=F({Position=u(0,306,0,28),Size=u(0,96,0,128),BackgroundColor3=C(20,20,24),ClipsDescendants=true,ZIndex=5},root) Cr(10,pip) N("UIStroke",{Color=WH,Thickness=1.5,Transparency=.3},pip)
-  local ok2,c2=feed(pip,LP,80,150,4)
-  local off=F({Size=u(1,0,1,0),BackgroundColor3=C(28,28,32),Visible=false,ZIndex=6},pip) T({Text="Camera Off",Position=u(0,0,.5,-8),Size=u(1,0,0,16),TextSize=10,Font=FB,ZIndex=7},off)
-  cleanup=function() c1() c2() end
-  T({Text=pl.DisplayName,Position=u(0,16,0,28),Size=u(0,220,0,20),TextSize=16,Font=FB,TextXAlignment=XL,TextStrokeTransparency=.5,ZIndex=8},root)
-  local tl=T({Text="0:00",Position=u(0,16,0,48),Size=u(0,100,0,14),TextSize=11,Font=FM,TextXAlignment=XL,TextStrokeTransparency=.5,ZIndex=8},root)
-  local mt=F({Position=u(0,16,0,68),Size=u(0,64,0,18),BackgroundColor3=C(255,59,48),Visible=false,ZIndex=8},root) Cr(9,mt) T({Text="Mic Off",Size=u(1,0,1,0),TextSize=10,Font=FB},mt)
-  local bar=F({Position=u(0,92,0,242),Size=u(0,230,0,56),BackgroundColor3=C(20,20,24),BackgroundTransparency=.3,ZIndex=7},root) Cr(28,bar)
-  local mu=rbtn(bar,14,7,42,C(70,70,76),8) rc(mu,.5,.4,.22,.4,WH,.5) rc(mu,.5,.72,.04,.14,WH,0) rc(mu,.5,.82,.28,.05,WH,.5)
-  local ms=rc(mu,.5,.5,.9,.07,C(255,59,48),0,45) ms.Visible=false
-  local cm2=rbtn(bar,94,7,42,C(70,70,76),8) GL.camera(cm2)
-  local cs=rc(cm2,.5,.5,.9,.07,C(255,59,48),0,45) cs.Visible=false
-  local en=rbtn(bar,174,7,42,C(255,59,48),8) rc(en,.5,.5,.6,.16,WH,.5)
-  local muted,camOff=false,false
-  mu.MouseButton1Click:Connect(function() muted=not muted ms.Visible=muted mt.Visible=muted end)
-  cm2.MouseButton1Click:Connect(function() camOff=not camOff cs.Visible=camOff off.Visible=camOff end)
-  en.MouseButton1Click:Connect(function() list() end)
-  task.spawn(function() local t=0 while alive and mode=="call" and tok==my do t+=1 tl.Text=string.format("%d:%02d",t//60,t%60) if not pl.Parent then list() break end task.wait(1) end end)
- end
- local c1=P.PlayerAdded:Connect(function() task.delay(.3,function() if alive and mode=="list" then list() end end) end)
- local c2=P.PlayerRemoving:Connect(function() task.delay(.3,function() if alive and mode=="list" then list() end end) end)
- list()
- return function() alive=false c1:Disconnect() c2:Disconnect() clr() end
+local function stroke(parent, color, thickness, tr)
+	local s = Instance.new("UIStroke")
+	s.Color = color
+	s.Thickness = thickness
+	s.Transparency = tr or 0
+	s.Parent = parent
+	return s
 end
 
-build.settings=function(b,a)
- local alive,pg,ord=true,"main",0
- local top=F({Size=u(1,0,0,68),BackgroundTransparency=1,ZIndex=2},b)
- local sf=N("ScrollingFrame",{Position=u(0,0,0,68),Size=u(1,0,1,-68),BackgroundTransparency=1,BorderSizePixel=0,ScrollBarThickness=3,AutomaticCanvasSize=Enum.AutomaticSize.Y,CanvasSize=u(0,0,0,0)},b)
- N("UIListLayout",{Padding=UDim.new(0,10),HorizontalAlignment=Enum.HorizontalAlignment.Center,SortOrder=Enum.SortOrder.LayoutOrder},sf) N("UIPadding",{PaddingTop=UDim.new(0,4),PaddingBottom=UDim.new(0,24)},sf)
- local show
- local function nxo() ord+=1 return ord end
- local function title(t,back)
-  if back then
-   local bb=B({Position=u(0,14,0,34),Size=u(0,90,0,22),BackgroundTransparency=1,Text="< Settings",TextSize=12,TextColor3=C(10,132,255),Font=FM,TextXAlignment=XL},top) bb.MouseButton1Click:Connect(function() show("main") end)
-   T({Text=t,Position=u(0,0,0,34),Size=u(0,414,0,22),TextSize=14,Font=FB,TextColor3=C(0,0,0),TextXAlignment=XC},top)
-  else T({Text=t,Position=u(0,20,0,28),Size=u(0,300,0,34),TextSize=26,Font=FB,TextColor3=C(0,0,0),TextXAlignment=XL},top) end
- end
- local function group(items)
-  local g=F({Size=u(0,374,0,#items*36),BackgroundColor3=WH,LayoutOrder=nxo()},sf) Cr(10,g)
-  for i,it in ipairs(items) do
-   local r=B({Position=u(0,0,0,(i-1)*36),Size=u(1,0,0,36),BackgroundTransparency=1},g)
-   local x=it.app and 44 or (it.nx or 14)
-   if it.app then tile(it.app,r,12,6,24,false) end
-   T({Text=it.t,Position=u(0,x,0,0),Size=u(0,200,1,0),TextSize=13,Font=FG,TextColor3=it.col or C(0,0,0),TextXAlignment=XL},r)
-   if it.k then if S[it.k]==nil then S[it.k]=true end sw(r,374-14-44,5,it.k)
-   elseif it.v then local rt=T({Text=it.v(),Position=u(0,160,0,0),Size=u(0,it.chev and 176 or 190,1,0),TextSize=12,Font=FG,TextColor3=C(142,142,147),TextXAlignment=XR},r) for _,k in ipairs(it.vk or {}) do on(k,function() rt.Text=it.v() end) end end
-   if it.chev then local c=F({Position=u(0,350,0,12),Size=u(0,10,0,12),BackgroundTransparency=1},r) rc(c,.3,.3,.7,.14,C(190,190,195),0,45) rc(c,.3,.7,.7,.14,C(190,190,195),0,-45) end
-   if i<#items then F({Position=u(0,x,1,-1),Size=u(1,-x,0,1),BackgroundColor3=C(215,215,220)},r) end
-   if it.ex then it.ex(r) end if it.cb then r.MouseButton1Click:Connect(it.cb) end
-  end
- end
- local function lbl(t) T({Text=t,Size=u(0,350,0,14),TextSize=9,Font=FM,TextColor3=C(142,142,147),TextXAlignment=XL,LayoutOrder=nxo()},sf) end
- local function srow(lab,get,put,key) local c=F({Size=u(0,374,0,44),BackgroundColor3=C(34,34,38),LayoutOrder=nxo()},sf) Cr(12,c) slider(c,10,6,354,32,lab,get,put,key) end
- local function vol() return math.floor(S.currentVolume+.5).."%" end
- local function join(nm) if S.joining or S.net==nm then return end S.joining=nm show("wifi")
-  task.delay(1.8,function() S.joining=nil if S.wifi then set("net",nm) notify("Wi-Fi","Connected to "..nm,C(10,132,255)) end if alive and pg=="wifi" then show("wifi") end end) end
- function show(p)
-  pg=p ord=0
-  for _,c in ipairs(sf:GetChildren()) do if c:IsA("GuiObject") then c:Destroy() end end top:ClearAllChildren() sf.CanvasPosition=V2(0,0)
-  if p=="main" then title("Settings")
-   group({{t="Wi-Fi",v=function() return S.net or (S.wifi and "Not Connected" or "Off") end,vk={"net","wifi"},chev=true,cb=function() show("wifi") end},{t="Bluetooth",v=function() return S.bt and "On" or "Off" end,vk={"bt"},chev=true,cb=function() show("bt") end}})
-   group({{t="Do Not Disturb",k="dnd"},{t="Eye Protection",k="eye"}})
-   group({{t="Display & Brightness",chev=true,cb=function() show("display") end},{t="Sounds",v=vol,vk={"currentVolume"},chev=true,cb=function() show("sounds") end},{t="Battery",v=function() return S.battery.."%" end,chev=true,cb=function() show("battery") end}})
-   group({{t="About",chev=true,cb=function() show("about") end}})
-   lbl("APPS") local its={}
-   for _,x in ipairs(S.installedApps) do table.insert(its,{t=x.name,app=x,chev=true,cb=function() show("app:"..x.id) end}) end group(its)
-  elseif p=="wifi" then title("Wi-Fi",true) group({{t="Wi-Fi",k="wifi"}})
-   if S.wifi then lbl("NETWORKS") local its={}
-    for _,n in ipairs({{"Baseplate_5G",false},{"NETGEAR_42",true},{"Roblox_Guest",true},{"xfinitywifi",true}}) do
-     table.insert(its,{t=n[1],nx=36,ex=function(r)
-       if S.net==n[1] then check(r,12,10,C(10,132,255)) end
-       if S.joining==n[1] then T({Text="Joining...",Position=u(0,190,0,0),Size=u(0,170,1,0),TextSize=11,Font=FG,TextColor3=C(142,142,147),TextXAlignment=XR},r) else if n[2] then lockI(r,374-62,13) end bars(r,374-34,13,C(30,30,34)) end end,
-       cb=function() if n[2] then alert("Unable to Join Network",'The password for "'..n[1]..'" is incorrect.',{{"OK"}}) else join(n[1]) end end})
-    end
-    group(its)
-   end
-  elseif p=="bt" then title("Bluetooth",true) group({{t="Bluetooth",k="bt"}})
-   if S.bt then lbl("MY DEVICES") group({{t="Baseplate Buds",v=function() return S.btdev and "Connected" or "Not Connected" end,vk={"btdev"},cb=function() set("btdev",not S.btdev) end}}) end
-  elseif p=="display" then title("Display & Brightness",true)
-   srow("Brightness",function() return (S.bright-.15)/.85 end,function(v) set("bright",.15+.85*v) end,"bright") group({{t="Eye Protection",k="eye"}})
-  elseif p=="sounds" then title("Sounds",true) srow("Volume",function() return S.currentVolume/100 end,function(v) set("currentVolume",math.floor(v*100+.5)) end,"currentVolume")
-  elseif p=="battery" then title("Battery",true) group({{t="Battery Level",v=function() return S.battery.."%" end,vk={}},{t="Power Source",v=function() return "Battery" end}})
-  elseif p=="about" then title("About",true)
-   group({{t="Name",v=function() return "iPad" end},{t="Software Version",v=function() return "iPadOS 17.4" end},{t="Apps",v=function() return tostring(#S.installedApps) end}})
-  else
-   local x=byId[p:sub(5)] title(x.name,true)
-   local hd=F({Size=u(0,374,0,70),BackgroundTransparency=1,LayoutOrder=nxo()},sf) tile(x,hd,0,6,58,false)
-   T({Text=x.name,Position=u(0,72,0,14),Size=u(0,280,0,20),TextSize=16,Font=FB,TextColor3=C(0,0,0),TextXAlignment=XL},hd)
-   T({Text=x.cat,Position=u(0,72,0,36),Size=u(0,280,0,14),TextSize=11,Font=FG,TextColor3=C(142,142,147),TextXAlignment=XL},hd)
-   group({{t="Notifications",k="na_"..x.id},{t="Background App Refresh",k="br_"..x.id}})
-   group({{t="Storage",v=function() return ((#x.name*37+11)%90+12).." MB" end},{t="Version",v=function() return "1.0" end}})
-   if not x.sys then group({{t="Delete App",col=C(255,59,48),cb=function() alert('Delete "'..x.name..'"?',"Deleting this app will also delete its data.",{{"Cancel"},{"Delete",C(255,59,48),function() deleteApp(x) show("main") end}}) end}}) end
-  end
- end
- on("wifi",function() if alive and pg=="wifi" then show("wifi") end end) on("net",function() if alive and pg=="wifi" then show("wifi") end end) on("bt",function() if alive and pg=="bt" then show("bt") end end)
- show("main") return function() alive=false end
+local function gradient(parent, c1, c2, rot)
+	local g = Instance.new("UIGradient")
+	g.Color = ColorSequence.new(c1, c2)
+	g.Rotation = rot or 90
+	g.Parent = parent
+	return g
 end
 
-local PHC=C(104,84,66)
-local function phoneArt(par,x,y,w,h,rot,back)
- local bd=rc(par,x,y,w,h,PHC,.14,rot) N("UIStroke",{Color=PHC:Lerp(C(0,0,0),.35),Thickness=1},bd)
- if back then rc(bd,.5,.19,.76,.27,PHC:Lerp(WH,.18),.18) for _,l in ipairs({{.3,.14},{.7,.14},{.5,.25}}) do rc(bd,l[1],l[2],.27,.115,C(20,20,24),.5) rc(bd,l[1],l[2],.14,.06,C(50,70,120),.5) end
- else rc(bd,.5,.5,.9,.95,C(0,0,0),.12) end
-end
-local function art(par,k,c)
- local d=c:Lerp(C(0,0,0),.3)
- if k=="shoe" then rc(par,.5,.7,.72,.14,C(40,40,44),.5) rc(par,.42,.52,.46,.36,c,.3) rc(par,.7,.62,.3,.2,c,.5)
- elseif k=="pj" then rc(par,.5,.52,.4,.56,c,.15) rc(par,.28,.4,.16,.34,c,.3,18) rc(par,.72,.4,.16,.34,c,.3,-18) rc(par,.5,.52,.4,.05,WH,0,0,.4)
- elseif k=="vac" then rc(par,.4,.64,.3,.34,c,.3) rc(par,.6,.42,.05,.62,d,.5,24) rc(par,.76,.82,.3,.1,d,.3)
- elseif k=="cof" then rc(par,.45,.58,.34,.46,c,.2) rc(par,.7,.58,.12,.22,c,.5) rc(par,.45,.22,.04,.16,WH,.5,0,.3)
- elseif k=="hp" then rc(par,.5,.38,.5,.06,d,.5) rc(par,.27,.58,.18,.36,c,.4) rc(par,.73,.58,.18,.36,c,.4)
- elseif k=="bag" then rc(par,.5,.56,.42,.6,c,.25) rc(par,.5,.7,.3,.24,d,.2) rc(par,.5,.24,.18,.12,d,.5)
- elseif k=="lamp" then rc(par,.5,.84,.3,.06,d,.3) rc(par,.5,.58,.04,.48,d,.5) rc(par,.58,.28,.32,.22,c,.3,-18)
- else rc(par,.5,.52,.62,.3,c,.5,-8) rc(par,.2,.54,.14,.3,d,.5) end
-end
-local function dots(par,x,y,rate) for i=1,5 do local d=F({Position=u(0,x+(i-1)*10,0,y),Size=u(0,7,0,7),BackgroundColor3=i<=math.floor(rate+.5) and C(255,153,0) or C(210,210,214)},par) Cr(4,d) end end
-local ITEMS={{name="iPhone 17 Pro Max",price="$1,199.00",rate=4.8,phone=true},
-{name="Running Shoes",price="$64.99",rate=4.4,kind="shoe",col=C(235,90,70)},{name="Cozy Pajama Set",price="$29.99",rate=4.6,kind="pj",col=C(90,130,220)},
-{name="Cordless Vacuum",price="$149.00",rate=4.3,kind="vac",col=C(130,90,200)},{name="Coffee Maker",price="$79.95",rate=4.5,kind="cof",col=C(120,80,50)},
-{name="Wireless Headphones",price="$59.99",rate=4.2,kind="hp",col=C(60,60,70)},{name="Travel Backpack",price="$39.50",rate=4.7,kind="bag",col=C(60,160,120)},
-{name="Desk Lamp",price="$24.99",rate=4.1,kind="lamp",col=C(230,180,40)},{name="Yoga Mat",price="$19.99",rate=4.5,kind="yoga",col=C(220,90,150)}}
-local function thumb(im,it,s,big)
- if it.phone then if big then phoneArt(im,.42,.5,.12,.9,-7,false) phoneArt(im,.58,.5,.12,.9,7,true) else phoneArt(im,.5,.5,.28,.9,0,true) end
- else local sq=F({AnchorPoint=V2(.5,.5),Position=u(.5,0,.5,0),Size=u(0,s,0,s),BackgroundTransparency=1},im) art(sq,it.kind,it.col) end
-end
-build.amazon=function(b,a)
- local page,prod,q="home",nil,""
- local nv=F({Position=u(0,0,0,20),Size=u(0,414,0,40),BackgroundColor3=C(35,47,62)},b)
- T({Text="amazon",Position=u(0,12,0,3),Size=u(0,70,0,24),TextSize=17,Font=FB,TextXAlignment=XL},nv) rc(nv,.113,.8,.1,.07,C(255,153,0),.5)
- local sb=N("TextBox",{Position=u(0,96,0,7),Size=u(0,306,0,26),BackgroundColor3=WH,Text="",PlaceholderText="Search Amazon",PlaceholderColor3=C(120,120,128),TextColor3=C(0,0,0),Font=FM,TextSize=12,ClearTextOnFocus=false,BorderSizePixel=0},nv) Cr(6,sb)
- local body=F({Position=u(0,0,0,60),Size=u(0,414,0,238),BackgroundTransparency=1,ClipsDescendants=true},b)
- local render
- local function rt(s,txt,sz,fnt,col,h,ord) return T({Text=txt,Size=u(0,390,0,h),TextSize=sz,Font=fnt,TextColor3=col,TextXAlignment=XL,TextWrapped=true,TextYAlignment=Enum.TextYAlignment.Top,LayoutOrder=ord},s) end
- local function buy(s,ord,it) local k=B({Size=u(0,390,0,34),BackgroundColor3=C(255,216,20),Text="Buy Now",TextSize=12,TextColor3=C(20,20,24),LayoutOrder=ord},s) Cr(17,k) k.MouseButton1Click:Connect(function()
-   if it.phone then alert("Place your order?","iPhone 17 Pro Max for $1,199.00. It will be delivered near you.",{{"Cancel"},{"Order",nil,function() placeOrder() alert("Order Placed","Your iPhone is on the way. Look for the package near you.",{{"OK"}}) end}})
-   else alert("Amazon","This item is a placeholder. Only the iPhone 17 Pro Max can be ordered.",{{"OK"}}) end end) end
- local function open(it) prod=it page="prod" render() end
- function render()
-  for _,c in ipairs(body:GetChildren()) do c:Destroy() end
-  local s=N("ScrollingFrame",{Size=u(1,0,1,0),BackgroundColor3=C(236,238,240),BorderSizePixel=0,ScrollBarThickness=3,AutomaticCanvasSize=Enum.AutomaticSize.Y,CanvasSize=u(0,0,0,0)},body)
-  N("UIListLayout",{Padding=UDim.new(0,8),HorizontalAlignment=Enum.HorizontalAlignment.Center,SortOrder=Enum.SortOrder.LayoutOrder},s) N("UIPadding",{PaddingTop=UDim.new(0,8),PaddingBottom=UDim.new(0,16)},s)
-  local n=0 local function o() n+=1 return n end
-  if page=="prod" then
-   local it=prod
-   local bk=B({Size=u(0,390,0,18),BackgroundTransparency=1,Text="< Back",TextSize=11,Font=FM,TextColor3=C(0,113,133),TextXAlignment=XL,LayoutOrder=o()},s) bk.MouseButton1Click:Connect(function() page="home" prod=nil render() end)
-   local im=F({Size=u(0,390,0,130),BackgroundColor3=it.col and it.col:Lerp(WH,.75) or C(238,238,242),LayoutOrder=o()},s) Cr(10,im) thumb(im,it,130,true)
-   rt(s,it.name,15,FB,C(20,20,24),20,o()) rt(s,it.price,22,FB,C(177,39,4),28,o()) rt(s,"In Stock",11,FM,C(0,128,60),16,o())
-   buy(s,o(),it)
-  else
-   local list={} for _,it in ipairs(ITEMS) do if q=="" or it.name:lower():find(q,1,true) then table.insert(list,it) end end
-   if q=="" then
-    local bn=B({Size=u(0,390,0,100),BackgroundColor3=C(255,170,40),LayoutOrder=o()},s) Cr(10,bn) N("UIGradient",{Rotation=20,Color=ColorSequence.new(C(255,153,0),C(255,210,110))},bn)
-    T({Text="DEAL OF THE DAY",Position=u(0,14,0,10),Size=u(0,200,0,12),TextSize=9,Font=FB,TextColor3=C(35,47,62),TextXAlignment=XL},bn)
-    T({Text="iPhone 17 Pro Max",Position=u(0,14,0,24),Size=u(0,220,0,26),TextSize=17,Font=FB,TextColor3=C(20,20,24),TextXAlignment=XL},bn)
-    T({Text="$1,199.00",Position=u(0,14,0,50),Size=u(0,200,0,20),TextSize=15,Font=FB,TextColor3=C(120,20,0),TextXAlignment=XL},bn)
-    local sd=B({Position=u(0,14,0,74),Size=u(0,84,0,20),BackgroundColor3=C(35,47,62),Text="See deal",TextSize=10},bn) Cr(10,sd)
-    local pa=F({Position=u(0,250,0,0),Size=u(0,140,0,100),BackgroundTransparency=1},bn) phoneArt(pa,.34,.5,.29,.9,-8,false) phoneArt(pa,.66,.5,.29,.9,8,true)
-    bn.MouseButton1Click:Connect(function() open(ITEMS[1]) end) sd.MouseButton1Click:Connect(function() open(ITEMS[1]) end)
-    T({Text="Recommended for you",Size=u(0,390,0,16),TextSize=13,Font=FB,TextColor3=C(20,20,24),TextXAlignment=XL,LayoutOrder=o()},s)
-   end
-   local gd=F({Size=u(0,390,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,LayoutOrder=o()},s) N("UIGridLayout",{CellSize=u(0,124,0,150),CellPadding=u(0,9,0,9)},gd)
-   for _,it in ipairs(list) do
-    local c=B({BackgroundColor3=WH},gd) Cr(8,c)
-    local im=F({Position=u(0,6,0,6),Size=u(0,112,0,84),BackgroundColor3=it.col and it.col:Lerp(WH,.75) or C(238,238,242)},c) Cr(6,im) thumb(im,it,84,false)
-    T({Text=it.name,Position=u(0,8,0,94),Size=u(0,108,0,14),TextSize=10,Font=FM,TextColor3=C(30,30,34),TextXAlignment=XL,TextTruncate=Enum.TextTruncate.AtEnd},c)
-    T({Text=it.price,Position=u(0,8,0,108),Size=u(0,108,0,16),TextSize=12,Font=FB,TextColor3=C(177,39,4),TextXAlignment=XL},c) dots(c,8,129,it.rate)
-    c.MouseButton1Click:Connect(function() open(it) end)
-   end
-   if #list==0 then T({Text="No results",Size=u(0,390,0,20),TextSize=12,Font=FG,TextColor3=C(110,110,118),LayoutOrder=o()},s) end
-  end
- end
- sb:GetPropertyChangedSignal("Text"):Connect(function() q=sb.Text:lower() page="home" prod=nil render() end)
- render() return function() end
+local function tw(obj, t, props, style, dir)
+	TweenService:Create(obj, TweenInfo.new(t, style or Enum.EasingStyle.Quad, dir or Enum.EasingDirection.Out), props):Play()
 end
 
-build.safari=function(b,a)
- local alive,ptok,hist,hi,n=true,0,{},0,0
- local bar=F({Position=u(0,0,0,20),Size=u(0,414,0,40),BackgroundColor3=C(246,246,248)},b) F({Position=u(0,0,1,-1),Size=u(1,0,0,1),BackgroundColor3=C(210,210,214)},bar)
- local function nb(x,t) return B({Position=u(0,x,0,6),Size=u(0,26,0,28),BackgroundTransparency=1,Text=t,TextSize=18,TextColor3=C(10,132,255)},bar) end
- local bk,fw=nb(6,"<"),nb(34,">")
- local tb=N("TextBox",{Position=u(0,66,0,7),Size=u(0,282,0,26),BackgroundColor3=C(228,228,233),Text="",PlaceholderText="Search or enter website name",PlaceholderColor3=C(120,120,128),TextColor3=C(0,0,0),Font=FM,TextSize=11,ClearTextOnFocus=false,TextXAlignment=XL,BorderSizePixel=0},bar) Cr(8,tb) N("UIPadding",{PaddingLeft=UDim.new(0,24),PaddingRight=UDim.new(0,64)},tb)
- local lk=F({Position=u(0,72,0,0),Size=u(0,14,0,40),BackgroundTransparency=1,ZIndex=3},bar) lockI(lk,0,9)
- local sec=T({Position=u(0,284,0,0),Size=u(0,60,0,40),TextSize=9,Font=FB,TextColor3=C(220,40,40),TextXAlignment=XR,ZIndex=3},bar)
- local hm=B({Position=u(0,352,0,6),Size=u(0,56,0,28),BackgroundTransparency=1,Text="Home",TextSize=11,Font=FM,TextColor3=C(10,132,255)},bar)
- local area=F({Position=u(0,0,0,60),Size=u(0,414,0,240),BackgroundTransparency=1,ClipsDescendants=true},b)
- local pages,nav,show={}
- local function ord() n+=1 return n end
- local function base(bg)
-  ptok+=1 n=0 for _,c in ipairs(area:GetChildren()) do c:Destroy() end
-  local s=N("ScrollingFrame",{Size=u(1,0,1,0),BackgroundColor3=bg,BorderSizePixel=0,ScrollBarThickness=3,AutomaticCanvasSize=Enum.AutomaticSize.Y,CanvasSize=u(0,0,0,0)},area)
-  N("UIListLayout",{Padding=UDim.new(0,8),HorizontalAlignment=Enum.HorizontalAlignment.Center,SortOrder=Enum.SortOrder.LayoutOrder},s) N("UIPadding",{PaddingTop=UDim.new(0,8),PaddingBottom=UDim.new(0,16)},s)
-  return s
- end
- local function txt(s,t,sz,fnt,col,h,al) return T({Text=t,Size=u(0,390,0,h or sz+6),TextSize=sz,Font=fnt or FG,TextColor3=col,TextXAlignment=al or XL,TextWrapped=true,TextYAlignment=Enum.TextYAlignment.Top,LayoutOrder=ord()},s) end
- local function btn(s,t,col,fg,w,h,cb) local k=B({Size=u(0,w,0,h),BackgroundColor3=col,Text=t,TextSize=12,TextColor3=fg,LayoutOrder=ord()},s) Cr(math.min(h/2,12),k) k.MouseButton1Click:Connect(cb) return k end
- local function hero(s,h,c1,c2) local f=F({Size=u(0,390,0,h),BackgroundColor3=WH,LayoutOrder=ord()},s) Cr(10,f) N("UIGradient",{Rotation=30,Color=ColorSequence.new(c1,c2)},f) return f end
- local function sim(t) alert("Simulation",t,{{"OK"}}) end
-
- function pages.start()
-  local s=base(C(242,242,247))
-  local function grid(title,list)
-   txt(s,title,15,FB,C(20,20,24),20)
-   local g=F({Size=u(0,390,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,LayoutOrder=ord()},s) N("UIGridLayout",{CellSize=u(0,88,0,82),CellPadding=u(0,10,0,6)},g)
-   for _,f in ipairs(list) do
-    local cell=F({BackgroundTransparency=1},g)
-    local k=B({Position=u(0,16,0,0),Size=u(0,56,0,56),BackgroundColor3=f[3],Text=f[4],TextSize=26},cell) Cr(14,k)
-    T({Text=f[1],Position=u(0,0,0,60),Size=u(1,0,0,14),TextSize=10,TextColor3=C(30,30,34),TextXAlignment=XC},cell)
-    k.MouseButton1Click:Connect(function() nav(f[2],true,false) end)
-   end
-  end
-  grid("Favorites",{{"Roblox","www.roblox.com",C(35,37,39),"R"},{"YouTube","www.youtube.com",C(255,0,0),"Y"},{"Minecraft","www.minecraft.net",C(98,160,62),"M"},{"News","www.baseplate-news.com",C(60,60,66),"N"}})
-  grid("Sus Sites",{{"Free Robux","free-robux-now.biz",C(255,200,0),"$"},{"Virus Check","your-ipad-has-virus.net",C(200,30,30),"!"},{"Prizes","totally-legit-prizes.xyz",C(150,60,200),"?"}})
- end
-
- function pages.roblox()
-  local s=base(C(18,18,20))
-  local hd=F({Size=u(0,414,0,36),BackgroundColor3=C(35,37,39),LayoutOrder=ord()},s)
-  T({Text="ROBLOX",Position=u(0,14,0,0),Size=u(0,100,1,0),TextSize=16,Font=FB,TextXAlignment=XL},hd)
-  for i,l in ipairs({"Discover","Avatar Shop","Create"}) do T({Text=l,Position=u(0,120+(i-1)*76,0,0),Size=u(0,76,1,0),TextSize=10,Font=FM,TextColor3=C(190,192,196)},hd) end
-  local h=hero(s,110,C(0,162,255),C(80,60,220))
-  T({Text="Play. Create. Explore.",Position=u(0,16,0,16),Size=u(0,300,0,30),TextSize=20,Font=FB,TextXAlignment=XL},h)
-  T({Text="Millions of worlds made by players.",Position=u(0,16,0,48),Size=u(0,300,0,16),TextSize=11,Font=FG,TextXAlignment=XL},h)
-  btn(h,"Sign Up",WH,C(0,100,200),90,26,function() sim("Sign up isn't real in this simulation.") end).Position=u(0,16,0,74)
-  txt(s,"Popular Experiences",13,FB,WH,20)
-  local g=F({Size=u(0,390,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,LayoutOrder=ord()},s) N("UIGridLayout",{CellSize=u(0,122,0,96),CellPadding=u(0,8,0,8)},g)
-  for _,e in ipairs({{"Obby Tower",C(235,90,70)},{"Brookside Town",C(70,170,110)},{"Blox Racers",C(240,170,40)},{"Sword Arena",C(110,110,200)},{"Pet Island",C(230,110,170)},{"Tycoon City",C(60,150,200)}}) do
-   local c=B({BackgroundColor3=e[2]},g) Cr(8,c) N("UIGradient",{Rotation=90,Color=ColorSequence.new(WH,C(140,140,140))},c)
-   T({Text=e[1],Position=u(0,6,1,-24),Size=u(1,-12,0,20),TextSize=11,Font=FB,TextXAlignment=XL,TextStrokeTransparency=.5},c)
-   c.MouseButton1Click:Connect(function() sim("Joining games isn't available here.") end)
-  end
- end
-
- local VIDS={{"a1","Top 10 Obby Fails","BloxBuddy","1.2M views",C(235,90,70)},{"b2","I Built a Castle in 24 Hours","PixelPete","3.4M views",C(70,150,220)},{"c3","Server Crash Compilation","LagLord","890K views",C(110,90,200)},{"d4","Funny Cats Being Cats","Whiskers TV","5.1M views",C(240,160,60)},{"e5","Lo-Fi Beats to Relax To","ChillCloud","12M views",C(60,170,140)}}
- function pages.youtube(path)
-  local s=base(C(249,249,249))
-  local hd=F({Size=u(0,414,0,38),BackgroundColor3=WH,LayoutOrder=ord()},s)
-  local lg=F({Position=u(0,12,0,9),Size=u(0,28,0,20),BackgroundColor3=C(255,0,0)},hd) Cr(6,lg) tri(lg,10,4,12,1,WH)
-  T({Text="YouTube",Position=u(0,46,0,0),Size=u(0,100,1,0),TextSize=15,Font=FB,TextColor3=C(20,20,20),TextXAlignment=XL},hd)
-  local sb=F({Position=u(0,170,0,6),Size=u(0,150,0,26),BackgroundColor3=C(238,238,238)},hd) Cr(13,sb) T({Text="Search",Position=u(0,12,0,0),Size=u(1,-12,1,0),TextSize=10,TextColor3=C(120,120,120),TextXAlignment=XL},sb)
-  local function card(v)
-   local c=B({Size=u(0,390,0,148),BackgroundColor3=WH,LayoutOrder=ord()},s) Cr(8,c)
-   local th=F({Size=u(1,0,0,100),BackgroundColor3=WH},c) Cr(8,th) N("UIGradient",{Rotation=35,Color=ColorSequence.new(v[5],C(30,30,40))},th) tri(th,187,34,32,1,WH)
-   T({Text=v[2],Position=u(0,8,0,104),Size=u(1,-16,0,16),TextSize=12,Font=FB,TextColor3=C(20,20,20),TextXAlignment=XL,TextTruncate=Enum.TextTruncate.AtEnd},c)
-   T({Text=v[3].."  -  "..v[4],Position=u(0,8,0,122),Size=u(1,-16,0,14),TextSize=10,TextColor3=C(100,100,100),TextXAlignment=XL},c)
-   c.MouseButton1Click:Connect(function() nav("www.youtube.com/watch?v="..v[1],true,false) end)
-  end
-  local wid=path:match("watch%?v=(%w+)")
-  if wid then
-   local v=VIDS[1] for _,x in ipairs(VIDS) do if x[1]==wid then v=x end end
-   local pl=F({Size=u(0,414,0,200),BackgroundColor3=WH,LayoutOrder=ord()},s) N("UIGradient",{Rotation=45,Color=ColorSequence.new(v[5],C(10,10,14))},pl) tri(pl,191,72,56,1,WH)
-   local tr=F({Position=u(0,12,1,-14),Size=u(0,390,0,4),BackgroundColor3=C(90,90,95)},pl) local fl=F({Size=u(0,0,1,0),BackgroundColor3=C(255,0,0)},tr)
-   local my=ptok task.spawn(function() local t=0 while alive and ptok==my do t=(t+.3)%100 fl.Size=u(t/100,0,1,0) task.wait(.1) end end)
-   txt(s,v[2],14,FB,C(20,20,20),20) txt(s,v[3].."  -  "..v[4],10,FM,C(100,100,100),14)
-   btn(s,"Like",C(235,235,235),C(20,20,20),90,26,function() sim("Likes aren't saved in this simulation.") end)
-   txt(s,"Up next",13,FB,C(20,20,20),20)
-  end
-  for _,v in ipairs(VIDS) do if v[1]~=wid then card(v) end end
- end
-
- function pages.minecraft()
-  local s=base(C(30,30,34))
-  local hd=F({Size=u(0,414,0,36),BackgroundColor3=C(20,20,22),LayoutOrder=ord()},s) T({Text="MINECRAFT",Position=u(0,14,0,0),Size=u(0,160,1,0),TextSize=16,Font=FB,TextColor3=C(110,190,70),TextXAlignment=XL},hd)
-  local h=hero(s,120,C(120,190,255),C(60,120,200))
-  for i=0,5 do local blk=F({Position=u(0,24+i*46,0,66),Size=u(0,42,0,42),BackgroundColor3=C(121,85,58)},h) F({Size=u(1,0,0,12),BackgroundColor3=C(98,160,62)},blk) end
-  T({Text="Build Anything.",Position=u(0,16,0,12),Size=u(0,300,0,30),TextSize=20,Font=FB,TextXAlignment=XL},h)
-  btn(h,"Get Minecraft",C(98,160,62),WH,110,24,function() sim("Downloads aren't available here.") end).Position=u(0,16,0,38)
-  txt(s,"Latest News",13,FB,WH,20)
-  for _,e in ipairs({{"The Wandering Forest Update",C(70,130,70)},{"New Mobs Arrive in the Caves",C(90,90,120)},{"Community Build Contest",C(170,110,50)}}) do
-   local c=F({Size=u(0,390,0,52),BackgroundColor3=WH,LayoutOrder=ord()},s) Cr(8,c) N("UIGradient",{Rotation=0,Color=ColorSequence.new(e[2],C(40,40,46))},c)
-   T({Text=e[1],Position=u(0,12,0,0),Size=u(1,-24,1,0),TextSize=12,Font=FB,TextXAlignment=XL},c)
-  end
- end
-
- local HL={{"Player Finds Secret Room Behind Spawn","WORLD"},{"Server Lag Blamed On Too Many Parts","TECH"},{"Local Noob Learns To Jump, Community Celebrates","LIFE"},{"Sunny Skies Expected On Baseplate All Week","WEATHER"}}
- function pages.news(path)
-  local s=base(WH)
-  local m=F({Size=u(0,414,0,50),BackgroundColor3=WH,LayoutOrder=ord()},s)
-  T({Text="BASEPLATE DAILY",Position=u(0,0,0,4),Size=u(1,0,0,26),TextSize=20,Font=FB,TextColor3=C(20,20,20),TextXAlignment=XC},m)
-  T({Text=os.date("%A, %B %d"),Position=u(0,0,0,30),Size=u(1,0,0,14),TextSize=10,TextColor3=C(110,110,116),TextXAlignment=XC},m)
-  F({Position=u(0,12,1,-2),Size=u(1,-24,0,2),BackgroundColor3=C(20,20,20)},m)
-  local aid=tonumber(path:match("^a(%d+)"))
-  if aid and HL[aid] then
-   txt(s,HL[aid][2],10,FB,C(200,40,40),14) txt(s,HL[aid][1],18,FB,C(20,20,20),48)
-   txt(s,"Witnesses say the story unfolded quickly, with players gathering to see it for themselves.",12,FG,C(50,50,56),40)
-   txt(s,"Officials say more details will follow as the story develops.",12,FG,C(50,50,56),30)
-   btn(s,"Back to front page",C(20,20,20),WH,160,28,function() nav("www.baseplate-news.com",true,false) end)
-  else
-   local h=hero(s,90,C(60,60,70),C(20,20,24)) T({Text=HL[1][2],Position=u(0,12,0,8),Size=u(0,100,0,12),TextSize=9,Font=FB,TextColor3=C(255,90,80),TextXAlignment=XL},h)
-   T({Text=HL[1][1],Position=u(0,12,0,24),Size=u(1,-24,0,56),TextSize=17,Font=FB,TextWrapped=true,TextXAlignment=XL,TextYAlignment=Enum.TextYAlignment.Top},h)
-   local hb=B({Size=u(1,0,1,0),BackgroundTransparency=1},h) hb.MouseButton1Click:Connect(function() nav("www.baseplate-news.com/a1",true,false) end)
-   for i=2,#HL do
-    local r=B({Size=u(0,390,0,44),BackgroundColor3=C(245,245,247),LayoutOrder=ord()},s) Cr(6,r)
-    T({Text=HL[i][2],Position=u(0,10,0,4),Size=u(0,100,0,12),TextSize=8,Font=FB,TextColor3=C(200,40,40),TextXAlignment=XL},r)
-    T({Text=HL[i][1],Position=u(0,10,0,16),Size=u(1,-20,0,24),TextSize=11,Font=FB,TextColor3=C(20,20,20),TextXAlignment=XL,TextWrapped=true,TextYAlignment=Enum.TextYAlignment.Top},r)
-    r.MouseButton1Click:Connect(function() nav("www.baseplate-news.com/a"..i,true,false) end)
-   end
-  end
- end
-
- function pages.robux()
-  local s=base(C(255,225,0))
-  local h=F({Size=u(0,390,0,70),BackgroundColor3=C(220,20,20),LayoutOrder=ord()},s) Cr(8,h)
-  T({Text="WINNER!!!",Position=u(0,0,0,4),Size=u(1,0,0,36),TextSize=26,Font=FB},h) T({Text="CLAIM 10,000 FREE ROBUX NOW",Position=u(0,0,0,40),Size=u(1,0,0,22),TextSize=14,Font=FB},h)
-  local cd=txt(s,"Offer ends in 04:59",14,FB,C(180,0,0),20,XC)
-  local my=ptok task.spawn(function() local t=299 while alive and ptok==my and t>0 do cd.Text=string.format("Offer ends in %02d:%02d",t//60,t%60) t-=1 task.wait(1) end end)
-  txt(s,"No password needed!!! 100% REAL!!! 1,284,331 players claimed today!!!",11,FM,C(40,40,40),44,XC)
-  btn(s,"CLAIM NOW",C(40,200,40),WH,200,38,function()
-   alert("Human Verification","Complete 5 surveys to continue.",{{"OK",nil,function()
-    alert("Download Required","Install RobuxBooster.exe to get your Robux.",{{"Cancel"},{"Install",nil,function() alert("Just Kidding!","This was a fake scam page. Nothing was downloaded.",{{"OK"}}) end}}) end}}) end)
- end
- function pages.virus()
-  local s=base(C(150,0,0))
-  txt(s,"WARNING!!!",24,FB,WH,32,XC) txt(s,"3 VIRUSES FOUND ON YOUR IPAD",13,FB,C(255,230,0),20,XC)
-  local tr=F({Size=u(0,300,0,10),BackgroundColor3=C(60,0,0),LayoutOrder=ord()},s) Cr(5,tr) local fl=F({Size=u(0,0,1,0),BackgroundColor3=C(255,60,60)},tr) Cr(5,fl)
-  local my=ptok task.spawn(function() local t=0 while alive and ptok==my do t=(t+.02)%1 fl.Size=u(t,0,1,0) task.wait(.05) end end)
-  for _,v in ipairs({"Trojan.Robux.Stealer","Adware.Popup.Spam","Spyware.Keylogger.X"}) do txt(s,"! "..v.."  -  CRITICAL",11,FB,C(255,200,200),16,XC) end
-  btn(s,"REMOVE VIRUSES NOW",C(255,200,0),C(60,0,0),220,36,function() alert("Fake Alert","Your iPad is fine. This was a fake scam page.",{{"OK"}}) end)
- end
- function pages.prize()
-  local s=base(C(90,40,170))
-  txt(s,"CONGRATULATIONS!",22,FB,WH,30,XC) txt(s,"You are visitor #1,000,000! You won an iPhone 17!",13,FM,C(255,230,120),40,XC)
-  btn(s,"CLAIM PRIZE",C(255,200,0),C(60,20,100),200,38,function()
-   alert("Almost There","Pay $1 shipping to claim your prize.",{{"Cancel"},{"Continue",nil,function() alert("Just Kidding!","Fake prize page. Never enter card details on sites like this.",{{"OK"}}) end}}) end)
- end
- function pages.warn(e)
-  local s=base(C(185,28,28))
-  local ic=F({Size=u(0,50,0,50),BackgroundColor3=WH,LayoutOrder=ord()},s) Cr(25,ic) T({Text="!",Size=u(1,0,1,0),TextSize=30,Font=FB,TextColor3=C(185,28,28)},ic)
-  txt(s,"Deceptive Website Warning",16,FB,WH,22,XC)
-  txt(s,"Safari thinks this site may try to trick you into installing software or sharing personal info.",11,FG,C(255,220,220),44,XC)
-  btn(s,"Go Back",WH,C(185,28,28),180,32,function() if hi>1 then hi-=1 show(hist[hi]) else nav("",true,false) end end)
-  btn(s,"Visit Website Anyway",C(140,15,15),WH,180,32,function() e.ok=true show(e) end)
- end
- function pages.nofind()
-  local s=base(C(242,242,247)) txt(s,"Safari Can't Find the Server",16,FB,C(20,20,24),22,XC) txt(s,"Safari can't open the page because the server can't be found.",11,FG,C(100,100,106),30,XC)
- end
- function pages.search(q)
-  local s=base(C(242,242,247)) txt(s,'Results for "'..q..'"',13,FB,C(20,20,24),20)
-  for _,r in ipairs({{"Roblox","www.roblox.com","Play millions of experiences.",false},{"YouTube","www.youtube.com","Watch, share and create videos.",false},{"Minecraft","www.minecraft.net","Build and explore worlds.",false},{"Baseplate Daily","www.baseplate-news.com","Today's top stories.",false},{"FREE ROBUX NOW!!!","free-robux-now.biz","Claim your free Robux.",true},{"Your iPad Has a Virus","your-ipad-has-virus.net","Scan your device now.",true},{"You Won a Prize","totally-legit-prizes.xyz","Claim your prize today.",true}}) do
-   local c=B({Size=u(0,390,0,52),BackgroundColor3=WH,LayoutOrder=ord()},s) Cr(8,c)
-   T({Text=r[1],Position=u(0,10,0,4),Size=u(1,-20,0,16),TextSize=12,Font=FB,TextColor3=C(10,90,200),TextXAlignment=XL},c)
-   T({Text=r[2]..(r[4] and "  (Not Secure)" or ""),Position=u(0,10,0,20),Size=u(1,-20,0,12),TextSize=9,TextColor3=r[4] and C(200,40,40) or C(40,140,60),TextXAlignment=XL},c)
-   T({Text=r[3],Position=u(0,10,0,33),Size=u(1,-20,0,14),TextSize=10,TextColor3=C(90,90,96),TextXAlignment=XL},c)
-   c.MouseButton1Click:Connect(function() nav(r[2],true,false) end)
-  end
- end
-
- local SUS={robux=true,virus=true,prize=true}
- local function key(l) if l:find("free%-?robux") then return "robux" elseif l:find("virus") then return "virus" elseif l:find("prize") then return "prize" elseif l:find("roblox") then return "roblox" elseif l:find("youtu") then return "youtube" elseif l:find("minecraft") then return "minecraft" elseif l:find("news") then return "news" end end
- function show(e)
-  local u2=e.u local l=(u2:lower():gsub("^https?://",""):gsub("^www%.","")) local path=l:match("^[^/]+/(.*)$") or ""
-  local k=key(l) local bad=k~=nil and SUS[k]==true
-  tb.Text=u2 lk.Visible=(u2~="") and not bad sec.Text=bad and "Not Secure" or ""
-  if u2=="" then pages.start() elseif bad and not e.ok then pages.warn(e) elseif k then pages[k](path)
-  elseif l:find("%.") and not l:find("%s") then pages.nofind() else pages.search(u2) end
- end
- function nav(u2,push,ok) for i=#hist,hi+1,-1 do table.remove(hist,i) end table.insert(hist,{u=u2,ok=ok}) hi=#hist show(hist[hi]) end
- bk.MouseButton1Click:Connect(function() if hi>1 then hi-=1 show(hist[hi]) end end)
- fw.MouseButton1Click:Connect(function() if hi<#hist then hi+=1 show(hist[hi]) end end)
- hm.MouseButton1Click:Connect(function() nav("",true,false) end)
- tb.FocusLost:Connect(function(enter) if enter and tb.Text~="" then nav(tb.Text,true,false) end end)
- nav("",true,false)
- return function() alive=false end
+local function inRect(x, y, rx, ry, rw, rh)
+	return x >= rx and x <= rx + rw and y >= ry and y <= ry + rh
 end
 
-build.messages=function(b,a)
- local TXS=game:GetService("TextService")
- local alive,cur,push=true,nil,nil
- local CONT={
-  {"mom","Mom",C(240,120,140),{"Okay sweetie!","Be home before dark.","Love you! Did you eat?","Don't forget your jacket.","Call me later!"},"Hi sweetie!",{"Are you eating enough?","Text me when you get home."}},
-  {"jake","Jake",C(70,150,220),{"lol fr","wait what","nah bro","bet","ok but have you tried obbies","im lagging so bad rn","ayo","no way"},"yo what's up",{"bro hop on","did you see the new update"}},
-  {"sophie","Sophie",C(170,110,220),{"haha omg","wait really??","stop it lol","I'm so tired today","same!!","send pics","ok ok ok"},"heyyy!",{"omg you won't believe what happened","are you free later?"}},
-  {"pizza","Pizza Palace",C(235,120,60),{"Thanks for your order!","Your pizza is 5 minutes away.","We hope you enjoyed your meal!","Reply STOP to unsubscribe."},"Welcome to Pizza Palace!",{"Two large pizzas for the price of one today!"}},
-  {"coach","Coach",C(60,160,110),{"Good effort today.","See you at practice.","Hydrate!","Be on time.","Nice work."},"Hello. Ready for practice?",{"Practice moved to 4pm.","Don't be late tomorrow."}}}
- if not S.msgs then
-  S.msgs={mom={{me=false,t="Dinner's at 6, don't be late!",time="9:12 AM"}},jake={{me=false,t="bro did you see the new update",time="8:47 AM"}},sophie={{me=true,t="omg same lol",time="Yesterday"}},pizza={{me=false,t="Your order is on its way!",time="Yesterday"}},coach={{me=false,t="Practice moved to 4pm",time="Mon"}}}
-  S.unread={mom=true,jake=true}
- end
- local root=F({Size=u(1,0,1,0),BackgroundTransparency=1},b)
- local list,chat
- local function now() return (os.date("%I:%M %p"):gsub("^0","")) end
- local function clr() for _,c in ipairs(root:GetChildren()) do c:Destroy() end end
- local function avatar(par,c,x,y,s) local f=F({Position=u(0,x,0,y),Size=u(0,s,0,s),BackgroundColor3=c[3]},par) Cr(s/2,f) T({Text=c[2]:sub(1,1),Size=u(1,0,1,0),TextSize=s*.45,Font=FB},f) return f end
- local function deliver(c,txt)
-  local m={me=false,t=txt,time=now()} table.insert(S.msgs[c[1]],m)
-  if alive and cur==c[1] and push then push(m) else S.unread[c[1]]=true notify(c[2],txt,c[3]) if alive and cur==nil then list() end end
- end
- function list()
-  clr() cur=nil push=nil
-  hdr(root,"Messages",C(0,0,0))
-  local sf=N("ScrollingFrame",{Position=u(0,0,0,72),Size=u(1,0,1,-76),BackgroundTransparency=1,BorderSizePixel=0,ScrollBarThickness=3,AutomaticCanvasSize=Enum.AutomaticSize.Y,CanvasSize=u(0,0,0,0)},root)
-  N("UIListLayout",{SortOrder=Enum.SortOrder.LayoutOrder},sf)
-  for i,c in ipairs(CONT) do
-   local ms=S.msgs[c[1]] local last=ms[#ms]
-   local r=B({Size=u(0,414,0,56),BackgroundColor3=WH,LayoutOrder=i},sf)
-   if S.unread[c[1]] then local d=F({Position=u(0,6,0,24),Size=u(0,8,0,8),BackgroundColor3=C(10,132,255)},r) Cr(4,d) end
-   avatar(r,c,20,8,40)
-   T({Text=c[2],Position=u(0,68,0,8),Size=u(0,240,0,16),TextSize=13,Font=FB,TextColor3=C(0,0,0),TextXAlignment=XL},r)
-   T({Text=(last.me and "You: " or "")..last.t,Position=u(0,68,0,26),Size=u(0,260,0,16),TextSize=11,Font=FG,TextColor3=C(142,142,147),TextXAlignment=XL,TextTruncate=Enum.TextTruncate.AtEnd},r)
-   T({Text=last.time,Position=u(0,330,0,8),Size=u(0,72,0,16),TextSize=10,Font=FG,TextColor3=C(142,142,147),TextXAlignment=XR},r)
-   F({Position=u(0,68,1,-1),Size=u(1,-68,0,1),BackgroundColor3=C(218,218,222)},r)
-   r.MouseButton1Click:Connect(function() chat(c) end)
-  end
- end
- function chat(c)
-  clr() cur=c[1] S.unread[c[1]]=false
-  local top=F({Position=u(0,0,0,20),Size=u(0,414,0,40),BackgroundColor3=C(246,246,248),ZIndex=3},root) F({Position=u(0,0,1,-1),Size=u(1,0,0,1),BackgroundColor3=C(210,210,214)},top)
-  local bk=B({Position=u(0,8,0,0),Size=u(0,90,0,40),BackgroundTransparency=1,Text="< Messages",TextSize=12,TextColor3=C(10,132,255),Font=FM,TextXAlignment=XL},top) bk.MouseButton1Click:Connect(function() list() end)
-  avatar(top,c,152,9,22) T({Text=c[2],Position=u(0,180,0,0),Size=u(0,150,1,0),TextSize=12,Font=FB,TextColor3=C(0,0,0),TextXAlignment=XL},top)
-  local sf=N("ScrollingFrame",{Position=u(0,0,0,60),Size=u(1,0,0,200),BackgroundColor3=WH,BorderSizePixel=0,ScrollBarThickness=2,CanvasSize=u(0,0,0,0)},root)
-  local y=8
-  local function fit() sf.CanvasSize=u(0,0,0,y+4) sf.CanvasPosition=V2(0,math.max(0,y+4-200)) end
-  local function bubble(m)
-   local sz=TXS:GetTextSize(m.t,12,FM,V2(230,10000)) local w,h=sz.X+22,sz.Y+14
-   local row=F({Position=u(0,0,0,y),Size=u(0,414,0,h),BackgroundTransparency=1},sf)
-   local bb=F({Position=m.me and u(0,414-12-w,0,0) or u(0,12,0,0),Size=u(0,w,0,h),BackgroundColor3=m.me and C(10,132,255) or C(229,229,234)},row) Cr(14,bb)
-   T({Text=m.t,Position=u(0,11,0,0),Size=u(1,-22,1,0),TextSize=12,Font=FM,TextColor3=m.me and WH or C(0,0,0),TextWrapped=true,TextXAlignment=XL},bb)
-   y+=h+6 fit()
-  end
-  local function typing()
-   local row=F({Position=u(0,0,0,y),Size=u(0,414,0,28),BackgroundTransparency=1},sf)
-   local bb=F({Position=u(0,12,0,0),Size=u(0,54,0,28),BackgroundColor3=C(229,229,234)},row) Cr(14,bb)
-   local ds={} for i=1,3 do ds[i]=F({Position=u(0,12+(i-1)*12,0,11),Size=u(0,7,0,7),BackgroundColor3=C(150,150,156)},bb) Cr(4,ds[i]) end
-   y+=34 fit() local on2=true
-   task.spawn(function() local k=0 while on2 and row.Parent do k=k%3+1 for i,d in ipairs(ds) do d.BackgroundTransparency=(i==k) and 0 or .55 end task.wait(.25) end end)
-   return function() on2=false row:Destroy() y-=34 fit() end
-  end
-  for _,m in ipairs(S.msgs[c[1]]) do bubble(m) end
-  push=bubble
-  local inp=F({Position=u(0,0,0,262),Size=u(0,414,0,38),BackgroundColor3=C(246,246,248),ZIndex=3},root)
-  local tb=N("TextBox",{Position=u(0,12,0,4),Size=u(0,346,0,30),BackgroundColor3=WH,Text="",PlaceholderText="iMessage",PlaceholderColor3=C(150,150,156),TextColor3=C(0,0,0),Font=FM,TextSize=12,ClearTextOnFocus=false,TextXAlignment=XL,BorderSizePixel=0},inp) Cr(15,tb) N("UIPadding",{PaddingLeft=UDim.new(0,12),PaddingRight=UDim.new(0,8)},tb)
-  local sn=B({Position=u(0,366,0,4),Size=u(0,30,0,30),BackgroundColor3=C(10,132,255),Text="^",TextSize=16},inp) Cr(15,sn)
-  local function send()
-   local t=(tb.Text:gsub("^%s+",""):gsub("%s+$","")) if t=="" then return end tb.Text=""
-   local m={me=true,t=t,time=now()} table.insert(S.msgs[c[1]],m) bubble(m)
-   task.spawn(function()
-    task.wait(.6) local rm if alive and cur==c[1] then rm=typing() end
-    task.wait(1.2+math.random()*1.6) if rm and rm then pcall(rm) end
-    local l=t:lower() local out
-    if l:match("^hi") or l:match("^hey") or l:match("^hello") then out=c[5]
-    elseif l:find("%?") and math.random()<.5 then local q={"hmm good question lol","idk honestly","let me think...","maybe?"} out=q[math.random(#q)]
-    else out=c[4][math.random(#c[4])] end
-    deliver(c,out)
-   end)
-  end
-  sn.MouseButton1Click:Connect(send) tb.FocusLost:Connect(function(enter) if enter then send() end end)
- end
- task.spawn(function() while alive do task.wait(20+math.random()*20) if alive then local c=CONT[math.random(#CONT)] deliver(c,c[6][math.random(#c[6])]) end end end)
- list()
- return function() alive=false end
+local function esc(s)
+	return (s:gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;"))
 end
 
-local st0
-local function ptr(i) return i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch end
-UIS.InputBegan:Connect(function(i) if ptr(i) and G.Enabled and not S.isSleep then
- local p,s=Sc.AbsolutePosition,Sc.AbsoluteSize local x,y=i.Position.X,i.Position.Y local k=sc.Scale local ins=GS:GetGuiInset().Y
- if x>=p.X and x<=p.X+s.X and y>=p.Y-60 and y<=p.Y+s.Y+60 then local r1,r2=y+ins-p.Y,y-p.Y st0={p=i.Position,top=(r1>=-10 and r1<=34*k) or (r2>=-10 and r2<=34*k)} else st0=nil end end end)
-UIS.InputEnded:Connect(function(i) if st0 and ptr(i) then
- local d=i.Position-st0.p local k=sc.Scale local s=st0 st0=nil
- if ccOpen then if d.Y<-35*k then closeCC() end return end
- if s.top and d.Y>35*k and math.abs(d.Y)>math.abs(d.X) then openCC() return end
- if S.locked then if d.Y<-45*k then unlock() end return end
- if not S.activeAppId and math.abs(d.X)>40*k and math.abs(d.X)>math.abs(d.Y)*1.5 then setPage(d.X<0 and 1 or 0) end end end)
-task.spawn(function() local n=0 while G.Parent do
- local tt=os.date("%I:%M"):gsub("^0","") tm.Text=(os.date("%I:%M %p"):gsub("^0","")) dtl.Text=os.date("%a %b %d") lsT.Text=tt lsD.Text=os.date("%A, %B %d")
- n+=1 if n%45==0 and S.battery>1 then S.battery-=1 updBat() end
- if S.playing then local p=S.prog+1 if p>=180 then p=0 set("track",S.track%#TR+1) end set("prog",p) end
- task.wait(1) end end)
+local function drawToggle(parent, x, y, on)
+	local t = frame(parent, x, y, 64, 36, on and GREEN or Color3.fromRGB(80, 80, 92), 0, FULL)
+	frame(t, on and 30 or 2, 2, 32, 32, WHITE, 0, FULL)
+end
 
-renderHome() renderLib() setBar(false)
-local shown=false
-local function showPad(v)
- if v==shown then return end shown=v
- if v then G.Enabled=true tw(av,.7,{Value=1},Enum.EasingStyle.Back)
- else closeCC() tw(av,.45,{Value=0},Enum.EasingStyle.Quint,Enum.EasingDirection.In).Completed:Connect(function() if not shown then G.Enabled=false end end) end
+local function drawSlider(parent, x, y, w, frac)
+	local track = frame(parent, x, y, w, 12, Color3.fromRGB(70, 70, 84), 0, FULL)
+	local fill = frame(track, 0, 0, w * frac, 12, BLUE, 0, FULL)
+	local knob = frame(parent, x + w * frac - 16, y - 10, 32, 32, WHITE, 0, FULL)
+	return { fill = fill, knob = knob, x = x, y = y, w = w }
 end
-local function mkPad()
- local tool=N("Tool",{Name="iPad",RequiresHandle=true,CanBeDropped=false,ToolTip="iPad"})
- local h=N("Part",{Name="Handle",Size=Vector3.new(1.6,.09,1.15),Color=C(28,28,32),Material=Enum.Material.SmoothPlastic,CanCollide=false},tool)
- local sg=N("SurfaceGui",{Face=Enum.NormalId.Top,CanvasSize=V2(500,354)},h)
- local sbz=F({Size=u(1,0,1,0),BackgroundColor3=C(8,8,10)},sg) Cr(24,sbz)
- local ssc=F({Position=u(0,43,0,22),Size=u(0,414,0,310),BackgroundColor3=WH},sg) wall(ssc)
- T({Text="iPadOS",Size=u(1,0,1,0),TextSize=40,Font=FB},ssc)
- local sh2=F({Position=u(0,473,0,164),Size=u(0,24,0,24),BackgroundColor3=C(0,0,0)},sg) Cr(12,sh2) N("UIStroke",{Color=C(100,100,106),Thickness=2},sh2)
- tool.Equipped:Connect(function() showPad(true) end)
- tool.Unequipped:Connect(function() showPad(false) end)
- return tool
+
+local function setSlider(sl, frac)
+	if not sl then return end
+	sl.fill.Size = UDim2.fromOffset(sl.w * frac, 12)
+	sl.knob.Position = UDim2.fromOffset(sl.x + sl.w * frac - 16, sl.y - 10)
 end
-local function mkPhone()
- local tool=N("Tool",{Name="iPhone 17 Pro Max",RequiresHandle=true,CanBeDropped=false,ToolTip="iPhone 17 Pro Max"})
- local h=N("Part",{Name="Handle",Size=Vector3.new(.62,.08,1.32),Color=PHC,Material=Enum.Material.Metal,CanCollide=false},tool)
- local sg=N("SurfaceGui",{Face=Enum.NormalId.Top,CanvasSize=V2(282,600)},h)
- local bz=F({Size=u(1,0,1,0),BackgroundColor3=C(0,0,0)},sg) Cr(46,bz)
- local scr=F({Position=u(0,6,0,6),Size=u(1,-12,1,-12),BackgroundColor3=C(22,22,24)},sg) Cr(40,scr)
- local stT=T({Text="9:41",Position=u(0,30,0,14),Size=u(0,70,0,20),TextSize=16,Font=FB,TextXAlignment=XL},scr)
- local isl=F({Position=u(.5,-46,0,12),Size=u(0,92,0,27),BackgroundColor3=C(0,0,0)},scr) Cr(14,isl)
- local ln=F({Position=u(0,70,0,9),Size=u(0,8,0,8),BackgroundColor3=C(24,34,60)},isl) Cr(4,ln)
- for i,hh in ipairs({4,6,8,10}) do local bb=F({Position=u(0,170+(i-1)*4,0,29-hh),Size=u(0,3,0,hh),BackgroundColor3=WH},scr) Cr(1,bb) end
- local wc=F({Position=u(0,192,0,19),Size=u(0,16,0,10),BackgroundTransparency=1,ClipsDescendants=true},scr)
- for _,s in ipairs({16,10}) do local rg=F({Position=u(0,8-s/2,0,9-s/2),Size=u(0,s,0,s),BackgroundTransparency=1},wc) Cr(s/2,rg) N("UIStroke",{Color=WH,Thickness=2},rg) end
- local wd=F({Position=u(0,6,0,6),Size=u(0,4,0,4),BackgroundColor3=WH},wc) Cr(2,wd)
- local bt=F({Position=u(0,214,0,18),Size=u(0,22,0,11),BackgroundTransparency=1},scr) Cr(3,bt) N("UIStroke",{Color=WH,Thickness=1,Transparency=.4},bt)
- local bfl=F({Position=u(0,2,0,2),Size=u(.8,-2,1,-4),BackgroundColor3=WH},bt) Cr(2,bfl) F({Position=u(0,238,0,21),Size=u(0,2,0,5),BackgroundColor3=WH},scr)
- F({Position=u(.5,-7,0,98),Size=u(0,14,0,10),BackgroundColor3=WH},scr)
- local sh=F({Position=u(.5,-5,0,90),Size=u(0,10,0,12),BackgroundTransparency=1},scr) Cr(5,sh) N("UIStroke",{Color=WH,Thickness=1.5},sh)
- local dtL=T({Position=u(0,0,0,116),Size=u(1,0,0,20),TextSize=16,Font=FM,TextXAlignment=XC},scr)
- local tmL=T({Position=u(0,0,0,134),Size=u(1,0,0,90),TextSize=88,Font=FM,TextXAlignment=XC},scr)
- for i,x in ipairs({30,196}) do local cb=F({Position=u(0,x,0,500),Size=u(0,44,0,44),BackgroundColor3=C(60,60,64),BackgroundTransparency=.3},scr) Cr(22,cb) if i==2 then GL.camera(cb) else rc(cb,.5,.36,.3,.18,WH,.2) rc(cb,.5,.62,.2,.38,WH,.2) end end
- local hi=F({Position=u(.5,-56,0,568),Size=u(0,112,0,5),BackgroundColor3=WH},scr) Cr(3,hi)
- task.spawn(function() while h.Parent do local tt=(os.date("%I:%M"):gsub("^0","")) tmL.Text=tt stT.Text=tt dtL.Text=os.date("%A, %B %d") task.wait(1) end end)
- return tool
+
+---------------------------------------------------------------- icon + glyph library (drawn from shapes, no emoji)
+-- every coordinate is a fraction of the icon size `s` (pass s = 1 to use pixels)
+local function shape(parent, s, cx, cy, w, h, color, rot, round, tr)
+	local f = Instance.new("Frame")
+	f.BorderSizePixel = 0
+	f.AnchorPoint = Vector2.new(0.5, 0.5)
+	f.Position = UDim2.fromOffset(cx * s, cy * s)
+	f.Size = UDim2.fromOffset(math.max(1, w * s), math.max(1, h * s))
+	f.BackgroundColor3 = color
+	f.BackgroundTransparency = tr or 0
+	f.Rotation = rot or 0
+	if round then
+		local c = Instance.new("UICorner")
+		c.CornerRadius = UDim.new(round, 0)
+		c.Parent = f
+	end
+	f.Parent = parent
+	return f
 end
-local function dropBox()
- local ch=LP.Character local hrp=ch and ch:FindFirstChild("HumanoidRootPart")
- if not hrp then task.delay(2,dropBox) return end
- local lv=hrp.CFrame.LookVector local fw=Vector3.new(lv.X,0,lv.Z) fw=fw.Magnitude>.1 and fw.Unit or Vector3.new(0,0,-1)
- local tp=hrp.Position+fw*5
- local rp=RaycastParams.new() rp.FilterDescendantsInstances={ch} rp.FilterType=Enum.RaycastFilterType.Exclude
- local hit=workspace:Raycast(tp+Vector3.new(0,60,0),Vector3.new(0,-200,0),rp)
- local gy=(hit and hit.Position.Y or hrp.Position.Y-3)+.85
- local yaw=CFrame.Angles(0,math.rad(math.random(0,359)),0)
- local bx=N("Part",{Name="AmazonBox",Size=Vector3.new(2.4,1.7,1.9),Color=C(196,152,98),Material=Enum.Material.SmoothPlastic,Anchored=true,CanCollide=false,CFrame=CFrame.new(tp.X,gy+50,tp.Z)*yaw},workspace)
- local g1=N("SurfaceGui",{Face=Enum.NormalId.Front,CanvasSize=V2(240,170)},bx)
- T({Text="amazon",Position=u(0,0,0,30),Size=u(1,0,0,80),TextSize=44,Font=FB,TextColor3=C(30,30,34)},g1) rc(g1,.5,.72,.6,.06,C(255,153,0),.5)
- local g2=N("SurfaceGui",{Face=Enum.NormalId.Top,CanvasSize=V2(240,190)},bx) F({Position=u(.5,-14,0,0),Size=u(0,28,1,0),BackgroundColor3=C(222,196,150)},g2)
- tw(bx,.9,{CFrame=CFrame.new(tp.X,gy,tp.Z)*yaw},Enum.EasingStyle.Quad,Enum.EasingDirection.In).Completed:Connect(function()
-  tw(bx,.12,{CFrame=CFrame.new(tp.X,gy+.6,tp.Z)*yaw}).Completed:Connect(function() tw(bx,.15,{CFrame=CFrame.new(tp.X,gy,tp.Z)*yaw},Enum.EasingStyle.Quad,Enum.EasingDirection.In) end)
-  notify("Amazon","Your package has arrived nearby.",C(255,153,0))
-  local opened=false
-  local function open()
-   if opened then return end opened=true S.ownsPhone=true
-   local bp=LP:FindFirstChild("Backpack") if bp and not bp:FindFirstChild("iPhone 17 Pro Max") then mkPhone().Parent=bp end
-   notify("Package Opened","iPhone 17 Pro Max added to your items",C(255,153,0))
-   for _,d in ipairs(bx:GetChildren()) do if d:IsA("SurfaceGui") or d:IsA("ProximityPrompt") or d:IsA("ClickDetector") then d:Destroy() end end
-   tw(bx,.5,{Transparency=1}) task.delay(.6,function() bx:Destroy() end)
-  end
-  local pp=N("ProximityPrompt",{ActionText="Open",ObjectText="Amazon Package",HoldDuration=.4,MaxActivationDistance=14,RequiresLineOfSight=false},bx) pp.Triggered:Connect(open)
-  local cd=N("ClickDetector",{MaxActivationDistance=20},bx) cd.MouseClick:Connect(open)
- end)
+
+local function ringShape(parent, s, cx, cy, d, thick, color, tr)
+	local f = shape(parent, s, cx, cy, d, d, color, 0, 0.5, 1)
+	stroke(f, color, math.max(1, thick * s), tr)
+	return f
 end
-function placeOrder() task.delay(math.random()<.5 and 5 or 20,dropBox) end
-local function giveTools()
- local bp=LP:WaitForChild("Backpack")
- for _,n in ipairs({"iPad","iPhone 17 Pro Max"}) do local o=bp:FindFirstChild(n) if o then o:Destroy() end end
- mkPad().Parent=bp
- if S.ownsPhone then mkPhone().Parent=bp end
+
+-- triangle (height h, width h/2). dir "r" = points right, "l" = points left. x,y = top-left
+local function triShape(parent, s, dir, x, y, h, color)
+	local hh, ww = h * s, h * s / 2
+	local clip = Instance.new("Frame")
+	clip.BackgroundTransparency = 1
+	clip.BorderSizePixel = 0
+	clip.ClipsDescendants = true
+	clip.Position = UDim2.fromOffset(x * s, y * s)
+	clip.Size = UDim2.fromOffset(ww, hh)
+	clip.Parent = parent
+	local d = hh / math.sqrt(2)
+	local dia = Instance.new("Frame")
+	dia.BorderSizePixel = 0
+	dia.AnchorPoint = Vector2.new(0.5, 0.5)
+	dia.Position = UDim2.fromOffset(dir == "r" and 0 or ww, hh / 2)
+	dia.Size = UDim2.fromOffset(d, d)
+	dia.Rotation = 45
+	dia.BackgroundColor3 = color
+	dia.Parent = clip
+	return clip
 end
-LP.CharacterAdded:Connect(function() showPad(false) task.wait(.7) giveTools() end)
-giveTools()
+
+local function stopsGradient(parent, stops, rot)
+	local kps = {}
+	for _, st in ipairs(stops) do
+		table.insert(kps, ColorSequenceKeypoint.new(st[1], st[2]))
+	end
+	local g = Instance.new("UIGradient")
+	g.Color = ColorSequence.new(kps)
+	g.Rotation = rot or 90
+	g.Parent = parent
+	return g
+end
+
+local function drawGear(h, s, c, bg)
+	for _, r in ipairs({ 0, 45, 90, 135 }) do
+		shape(h, s, 0.5, 0.5, 0.15, 0.82, c, r, 0.2)
+	end
+	shape(h, s, 0.5, 0.5, 0.62, 0.62, c, 0, 0.5)
+	shape(h, s, 0.5, 0.5, 0.34, 0.34, bg, 0, 0.5)
+end
+
+-- small white glyphs (used in Settings + Control Center)
+local GLYPH = {}
+
+GLYPH.airplane = function(h, s, c)
+	shape(h, s, 0.5, 0.5, 0.8, 0.12, c, -45, 0.5)
+	shape(h, s, 0.56, 0.44, 0.62, 0.12, c, 45, 0.5)
+	shape(h, s, 0.29, 0.71, 0.26, 0.1, c, 45, 0.5)
+end
+GLYPH.airdrop = function(h, s, c)
+	ringShape(h, s, 0.5, 0.5, 0.84, 0.07, c)
+	ringShape(h, s, 0.5, 0.5, 0.56, 0.07, c)
+	shape(h, s, 0.5, 0.5, 0.2, 0.2, c, 0, 0.5)
+end
+GLYPH.wifi = function(h, s, c)
+	for i = 1, 3 do
+		local bh = 0.22 + (i - 1) * 0.22
+		shape(h, s, 0.22 + (i - 1) * 0.28, 0.82 - bh / 2, 0.18, bh, c, 0, 0.3)
+	end
+end
+GLYPH.bluetooth = function(h, s, c)
+	shape(h, s, 0.5, 0.5, 0.1, 0.8, c, 0, 0.5)
+	shape(h, s, 0.62, 0.23, 0.34, 0.09, c, 42, 0.5)
+	shape(h, s, 0.62, 0.77, 0.34, 0.09, c, -42, 0.5)
+	shape(h, s, 0.51, 0.5, 0.64, 0.09, c, -38, 0.5)
+	shape(h, s, 0.51, 0.5, 0.64, 0.09, c, 38, 0.5)
+end
+GLYPH.rotlock = function(h, s, c)
+	ringShape(h, s, 0.5, 0.5, 0.82, 0.07, c)
+	shape(h, s, 0.5, 0.56, 0.26, 0.2, c, 0, 0.15)
+	ringShape(h, s, 0.5, 0.42, 0.16, 0.045, c)
+end
+GLYPH.moon = function(h, s, c, bg)
+	shape(h, s, 0.48, 0.5, 0.62, 0.62, c, 0, 0.5)
+	shape(h, s, 0.64, 0.4, 0.52, 0.52, bg, 0, 0.5)
+end
+GLYPH.mirror = function(h, s, c, bg)
+	local a = shape(h, s, 0.4, 0.44, 0.56, 0.4, bg, 0, 0.12)
+	stroke(a, c, math.max(1.5, 0.06 * s))
+	local b = shape(h, s, 0.6, 0.58, 0.56, 0.4, bg, 0, 0.12)
+	stroke(b, c, math.max(1.5, 0.06 * s))
+end
+GLYPH.bell = function(h, s, c)
+	shape(h, s, 0.5, 0.4, 0.46, 0.46, c, 0, 0.5)
+	shape(h, s, 0.5, 0.58, 0.46, 0.28, c, 0, 0.1)
+	shape(h, s, 0.5, 0.7, 0.66, 0.1, c, 0, 0.5)
+	shape(h, s, 0.5, 0.82, 0.16, 0.1, c, 0, 0.5)
+end
+GLYPH.torch = function(h, s, c, bg)
+	shape(h, s, 0.5, 0.2, 0.36, 0.14, c, 0, 0.25)
+	shape(h, s, 0.5, 0.32, 0.22, 0.1, c, 0, 0.2)
+	shape(h, s, 0.5, 0.62, 0.26, 0.5, c, 0, 0.3)
+	shape(h, s, 0.5, 0.52, 0.08, 0.14, bg, 0, 0.5)
+end
+GLYPH.timer = function(h, s, c)
+	ringShape(h, s, 0.5, 0.52, 0.78, 0.07, c)
+	shape(h, s, 0.5, 0.4, 0.07, 0.24, c, 0, 0.5)
+	shape(h, s, 0.5, 0.52, 0.12, 0.12, c, 0, 0.5)
+	shape(h, s, 0.5, 0.07, 0.16, 0.06, c, 0, 0.4)
+end
+GLYPH.stopwatch = function(h, s, c)
+	ringShape(h, s, 0.5, 0.56, 0.72, 0.07, c)
+	shape(h, s, 0.5, 0.1, 0.16, 0.07, c, 0, 0.4)
+	shape(h, s, 0.78, 0.2, 0.12, 0.06, c, 45, 0.4)
+	shape(h, s, 0.58, 0.47, 0.07, 0.26, c, 35, 0.5)
+	shape(h, s, 0.5, 0.56, 0.1, 0.1, c, 0, 0.5)
+end
+GLYPH.camera = function(h, s, c, bg)
+	shape(h, s, 0.5, 0.58, 0.82, 0.54, c, 0, 0.2)
+	shape(h, s, 0.5, 0.28, 0.34, 0.14, c, 0, 0.4)
+	shape(h, s, 0.5, 0.58, 0.36, 0.36, bg, 0, 0.5)
+	shape(h, s, 0.5, 0.58, 0.2, 0.2, c, 0, 0.5)
+end
+GLYPH.record = function(h, s, c)
+	ringShape(h, s, 0.5, 0.5, 0.8, 0.07, c)
+	shape(h, s, 0.5, 0.5, 0.4, 0.4, c, 0, 0.5)
+end
+GLYPH.sun = function(h, s, c)
+	shape(h, s, 0.5, 0.5, 0.34, 0.34, c, 0, 0.5)
+	for i = 0, 7 do
+		local a = math.rad(i * 45)
+		shape(h, s, 0.5 + 0.38 * math.cos(a), 0.5 + 0.38 * math.sin(a), 0.1, 0.1, c, 0, 0.5)
+	end
+end
+GLYPH.speaker = function(h, s, c)
+	shape(h, s, 0.3, 0.5, 0.16, 0.24, c, 0, 0.15)
+	triShape(h, s, "l", 0.34, 0.26, 0.48, c)
+end
+GLYPH.gear = function(h, s, c, bg)
+	drawGear(h, s, c, bg)
+end
+GLYPH.siri = function(h, s, c)
+	local hs = { 0.3, 0.55, 0.8, 0.55, 0.3 }
+	for i, hh in ipairs(hs) do
+		shape(h, s, 0.14 + (i - 1) * 0.18, 0.5, 0.1, hh, c, 0, 0.5)
+	end
+end
+GLYPH.lock = function(h, s, c)
+	shape(h, s, 0.5, 0.6, 0.64, 0.46, c, 0, 0.18)
+	ringShape(h, s, 0.5, 0.32, 0.38, 0.1, c)
+end
+
+local function glyph(parent, name, cx, cy, size, color, bg)
+	local h = Instance.new("Frame")
+	h.BackgroundTransparency = 1
+	h.BorderSizePixel = 0
+	h.AnchorPoint = Vector2.new(0.5, 0.5)
+	h.Position = UDim2.fromOffset(cx, cy)
+	h.Size = UDim2.fromOffset(size, size)
+	h.Parent = parent
+	local fn = GLYPH[name]
+	if fn then fn(h, size, color or WHITE, bg or BG) end
+	return h
+end
+
+-- app icons
+local ICONS = {}
+
+ICONS.appstore = {
+	c1 = Color3.fromRGB(88, 196, 255), c2 = Color3.fromRGB(10, 100, 240),
+	draw = function(ic, s)
+		shape(ic, s, 0.4, 0.47, 0.1, 0.64, WHITE, 20, 0.5)
+		shape(ic, s, 0.6, 0.47, 0.1, 0.64, WHITE, -20, 0.5)
+		shape(ic, s, 0.5, 0.6, 0.34, 0.08, WHITE, 0, 0.5)
+		shape(ic, s, 0.3, 0.78, 0.18, 0.08, WHITE, 0, 0.5)
+		shape(ic, s, 0.7, 0.78, 0.18, 0.08, WHITE, 0, 0.5)
+	end,
+}
+ICONS.settings = {
+	c1 = Color3.fromRGB(205, 205, 212), c2 = Color3.fromRGB(120, 120, 132),
+	draw = function(ic, s)
+		drawGear(ic, s, Color3.fromRGB(240, 240, 246), Color3.fromRGB(150, 150, 162))
+	end,
+}
+ICONS.notes = {
+	c1 = WHITE, c2 = WHITE,
+	stops = {
+		{ 0, Color3.fromRGB(255, 204, 0) }, { 0.27, Color3.fromRGB(255, 204, 0) },
+		{ 0.271, Color3.fromRGB(255, 255, 255) }, { 1, Color3.fromRGB(242, 242, 246) },
+	},
+	draw = function(ic, s)
+		local g = Color3.fromRGB(215, 215, 222)
+		shape(ic, s, 0.5, 0.47, 0.72, 0.025, g)
+		shape(ic, s, 0.5, 0.6, 0.72, 0.025, g)
+		shape(ic, s, 0.5, 0.73, 0.72, 0.025, g)
+		shape(ic, s, 0.5, 0.86, 0.72, 0.025, g)
+		shape(ic, s, 0.37, 0.36, 0.34, 0.05, Color3.fromRGB(70, 70, 80), 0, 0.5)
+	end,
+}
+ICONS.podcasts = {
+	c1 = Color3.fromRGB(212, 120, 255), c2 = Color3.fromRGB(120, 45, 210),
+	draw = function(ic, s)
+		ringShape(ic, s, 0.5, 0.46, 0.34, 0.05, WHITE)
+		ringShape(ic, s, 0.5, 0.46, 0.6, 0.05, WHITE, 0.25)
+		ringShape(ic, s, 0.5, 0.46, 0.86, 0.04, WHITE, 0.55)
+		shape(ic, s, 0.5, 0.4, 0.14, 0.14, WHITE, 0, 0.5)
+		shape(ic, s, 0.5, 0.55, 0.1, 0.22, WHITE, 0, 0.5)
+	end,
+}
+ICONS.reminders = {
+	c1 = WHITE, c2 = Color3.fromRGB(236, 236, 242),
+	draw = function(ic, s)
+		local cols = { Color3.fromRGB(255, 149, 0), Color3.fromRGB(10, 132, 255), Color3.fromRGB(255, 59, 48) }
+		for i = 1, 3 do
+			local y = 0.22 + (i - 1) * 0.28
+			ringShape(ic, s, 0.24, y, 0.15, 0.035, cols[i])
+			shape(ic, s, 0.63, y, 0.4, 0.035, Color3.fromRGB(205, 205, 212), 0, 0.5)
+		end
+	end,
+}
+ICONS.x_chess = {
+	c1 = Color3.fromRGB(110, 115, 130), c2 = Color3.fromRGB(30, 32, 42),
+	draw = function(ic, s)
+		shape(ic, s, 0.5, 0.31, 0.2, 0.2, WHITE, 0, 0.5)
+		shape(ic, s, 0.5, 0.45, 0.28, 0.06, WHITE, 0, 0.5)
+		shape(ic, s, 0.5, 0.62, 0.3, 0.3, WHITE, 0, 0.4)
+		shape(ic, s, 0.5, 0.79, 0.52, 0.08, WHITE, 0, 0.4)
+	end,
+}
+ICONS.x_weather = {
+	c1 = Color3.fromRGB(110, 200, 255), c2 = Color3.fromRGB(30, 110, 230),
+	draw = function(ic, s)
+		shape(ic, s, 0.64, 0.34, 0.3, 0.3, Color3.fromRGB(255, 214, 10), 0, 0.5)
+		shape(ic, s, 0.37, 0.6, 0.28, 0.28, WHITE, 0, 0.5)
+		shape(ic, s, 0.55, 0.54, 0.34, 0.34, WHITE, 0, 0.5)
+		shape(ic, s, 0.7, 0.62, 0.24, 0.24, WHITE, 0, 0.5)
+		shape(ic, s, 0.54, 0.7, 0.5, 0.18, WHITE, 0, 0.5)
+	end,
+}
+ICONS.x_photo = {
+	c1 = WHITE, c2 = Color3.fromRGB(235, 235, 240),
+	draw = function(ic, s)
+		local cols = {
+			Color3.fromRGB(255, 120, 60), Color3.fromRGB(255, 200, 40), Color3.fromRGB(90, 210, 90),
+			Color3.fromRGB(60, 200, 230), Color3.fromRGB(80, 120, 255), Color3.fromRGB(230, 80, 200),
+		}
+		for i = 1, 6 do
+			local a = math.rad((i - 1) * 60)
+			shape(ic, s, 0.5 + 0.17 * math.cos(a), 0.5 + 0.17 * math.sin(a), 0.34, 0.34, cols[i], 0, 0.5, 0.25)
+		end
+	end,
+}
+ICONS.x_sketch = {
+	c1 = Color3.fromRGB(190, 120, 255), c2 = Color3.fromRGB(100, 60, 220),
+	draw = function(ic, s)
+		shape(ic, s, 0.5, 0.5, 0.16, 0.52, Color3.fromRGB(255, 214, 10), 45, 0.1)
+		shape(ic, s, 0.684, 0.316, 0.17, 0.1, Color3.fromRGB(255, 120, 150), 45, 0.2)
+		shape(ic, s, 0.31, 0.69, 0.11, 0.11, Color3.fromRGB(245, 215, 180), 45, 0.1)
+		shape(ic, s, 0.275, 0.725, 0.05, 0.05, Color3.fromRGB(60, 60, 70), 45, 0.1)
+	end,
+}
+ICONS.x_fit = {
+	c1 = Color3.fromRGB(40, 40, 46), c2 = Color3.fromRGB(0, 0, 0),
+	draw = function(ic, s)
+		ringShape(ic, s, 0.5, 0.5, 0.74, 0.1, Color3.fromRGB(255, 45, 85))
+		ringShape(ic, s, 0.5, 0.5, 0.52, 0.1, Color3.fromRGB(166, 255, 0))
+		ringShape(ic, s, 0.5, 0.5, 0.3, 0.1, Color3.fromRGB(0, 200, 255))
+	end,
+}
+ICONS.x_calc = {
+	c1 = Color3.fromRGB(255, 190, 60), c2 = Color3.fromRGB(230, 120, 20),
+	draw = function(ic, s)
+		shape(ic, s, 0.5, 0.26, 0.7, 0.16, Color3.fromRGB(40, 40, 46), 0, 0.3)
+		shape(ic, s, 0.32, 0.52, 0.3, 0.2, WHITE, 0, 0.3)
+		shape(ic, s, 0.68, 0.52, 0.3, 0.2, WHITE, 0, 0.3)
+		shape(ic, s, 0.32, 0.76, 0.3, 0.2, WHITE, 0, 0.3)
+		shape(ic, s, 0.68, 0.76, 0.3, 0.2, WHITE, 0, 0.3)
+	end,
+}
+
+local function drawIcon(parent, id, x, y, size)
+	local def = ICONS[id]
+	local ic = frame(parent, x, y, size, size, def.c1, 0, UDim.new(0.225, 0))
+	if def.stops then
+		stopsGradient(ic, def.stops, 90)
+	else
+		gradient(ic, def.c1, def.c2, 90)
+	end
+	def.draw(ic, size)
+	stroke(ic, WHITE, 1, 0.82)
+	return ic
+end
+
+-- live clock registry
+local clocks = {}
+local function clockLabel(lbl, kind)
+	table.insert(clocks, { lbl, kind })
+	return lbl
+end
+
+local function timeParts()
+	local d = os.date("*t")
+	local h12 = d.hour % 12
+	if h12 == 0 then h12 = 12 end
+	return d, h12, d.hour >= 12 and "PM" or "AM"
+end
+
+local function refreshClocks()
+	local d, h12, ap = timeParts()
+	for _, c in ipairs(clocks) do
+		local k = c[2]
+		if k == "time" then
+			c[1].Text = string.format("%d:%02d", h12, d.min)
+		elseif k == "status" then
+			c[1].Text = string.format("%d:%02d %s    %s %s %d", h12, d.min, ap, os.date("%a"), os.date("%b"), d.day)
+		elseif k == "date" then
+			c[1].Text = string.format("%s, %s %d", os.date("%A"), os.date("%B"), d.day)
+		end
+	end
+end
+
+---------------------------------------------------------------- state
+local state = "lock"            -- "lock" | "home" | "app"
+local curId = nil
+local screenOff = false
+local siriOpen, pwOpen = false, false
+local ccOpen = false
+local wifiOn, connected, connecting, connectToken = false, nil, nil, nil
+local airplane, btOn = false, false
+local siriOn, siriHold, siriVoice = true, true, 1
+local brightness = 1
+local vol = 8                    -- 0..16
+local wifiIcons = {}
+
+-- forward declarations (defined further down)
+local openApp, closeApp, lockNow, unlock, openSiri, closeSiri, openPw
+local setWifi, connectTo, onNetChanged, changeVolume, applyBrightness, layoutHome, getApp, showApp
+local ccRender, openCC, closeCC
+
+---------------------------------------------------------------- layers
+local root = frame(gui, 0, 0, CW, CH, Color3.new(0, 0, 0), 0, px(28))
+root.Size = UDim2.fromScale(1, 1)
+root.ClipsDescendants = true
+
+local function wallpaper(parent, rot)
+	local f = frame(parent, 0, 0, CW, CH, WHITE, 0)
+	f.ClipsDescendants = true
+	local g = Instance.new("UIGradient")
+	g.Rotation = rot
+	g.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(16, 22, 70)),
+		ColorSequenceKeypoint.new(0.5, Color3.fromRGB(104, 54, 170)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(244, 112, 150)),
+	})
+	g.Parent = f
+	frame(f, -120, 380, 520, 520, Color3.fromRGB(255, 170, 120), 0.82, FULL)
+	frame(f, 640, -160, 480, 480, Color3.fromRGB(90, 200, 255), 0.85, FULL)
+	return f
+end
+
+local function homeBar(parent)
+	frame(parent, 390, 680, 220, 8, WHITE, 0.1, px(4))
+end
+
+local function status(parent, withLeft)
+	if withLeft then
+		clockLabel(label(parent, "", 30, 8, 420, 28, 22, WHITE, Enum.Font.GothamBold, Enum.TextXAlignment.Left), "status")
+	end
+	local icon = { bars = {} }
+	for i = 1, 3 do -- wifi bars
+		local h = 4 + i * 4
+		icon.bars[i] = frame(parent, 818 + (i - 1) * 9, 32 - h, 6, h, WHITE, 0.65, px(2))
+	end
+	icon.slash = frame(parent, 828, 9, 3, 30, WHITE, 0, px(2))
+	icon.slash.Rotation = 45
+	table.insert(wifiIcons, icon)
+	label(parent, "87%", 850, 8, 62, 28, 20, WHITE, Enum.Font.GothamBold, Enum.TextXAlignment.Right)
+	local body = frame(parent, 920, 13, 40, 18, WHITE, 1, px(6))
+	stroke(body, WHITE, 1.5, 0.3)
+	frame(parent, 923, 16, 31, 12, WHITE, 0, px(3))
+	frame(parent, 962, 18, 3, 8, WHITE, 0.3, px(2))
+end
+
+---------------------------------------------------------------- on-screen keyboard
+local function makeKeyboard(parent, rx, ry, ax, ay)
+	local kb = { shift = false, keys = {} }
+	local f = frame(parent, rx, ry, 676, 346, Color3.fromRGB(26, 26, 34), 0, px(18))
+	f.ZIndex = 5
+	f.Visible = false
+	kb.frame = f
+	local KEYC, SPEC = Color3.fromRGB(78, 78, 96), Color3.fromRGB(52, 52, 66)
+
+	local function add(id, text, x, y, w, special)
+		local k = frame(f, 12 + x, 12 + y, w, 58, special and SPEC or KEYC, 0, px(10))
+		local l = label(k, text, 0, 0, w, 58, special and 19 or 26, WHITE, Enum.Font.GothamBold)
+		table.insert(kb.keys, { id = id, frame = k, lbl = l, special = special, rect = { ax + 12 + x, ay + 12 + y, w, 58 } })
+	end
+
+	local digits = "1234567890"
+	for i = 1, 10 do add(digits:sub(i, i), digits:sub(i, i), (i - 1) * 66, 0, 58) end
+	local r2 = "qwertyuiop"
+	for i = 1, 10 do add(r2:sub(i, i), r2:sub(i, i), (i - 1) * 66, 66, 58) end
+	local r3 = "asdfghjkl"
+	for i = 1, 9 do add(r3:sub(i, i), r3:sub(i, i), 33 + (i - 1) * 66, 132, 58) end
+	add("shift", "Shift", 0, 198, 92, true)
+	local r4 = "zxcvbnm"
+	for i = 1, 7 do add(r4:sub(i, i), r4:sub(i, i), 100 + (i - 1) * 66, 198, 58) end
+	add("back", "Del", 562, 198, 90, true)
+	add("done", "Done", 0, 264, 92, true)
+	add(",", ",", 100, 264, 58)
+	add(" ", "space", 166, 264, 300)
+	add(".", ".", 474, 264, 58)
+	add("return", "Return", 540, 264, 112, true)
+
+	function kb.refresh()
+		for _, k in ipairs(kb.keys) do
+			if not k.special then
+				if k.id == " " then
+					k.lbl.Text = "space"
+				elseif kb.shift and k.id:match("%a") then
+					k.lbl.Text = k.id:upper()
+				else
+					k.lbl.Text = k.id
+				end
+			elseif k.id == "shift" then
+				k.frame.BackgroundColor3 = kb.shift and Color3.fromRGB(240, 240, 250) or SPEC
+				k.lbl.TextColor3 = kb.shift and Color3.new(0, 0, 0) or WHITE
+			end
+		end
+	end
+
+	function kb.tap(x, y)
+		for _, k in ipairs(kb.keys) do
+			if inRect(x, y, k.rect[1], k.rect[2], k.rect[3], k.rect[4]) then
+				local id = k.id
+				if id == "shift" then
+					kb.shift = not kb.shift
+				elseif id == "back" then
+					if kb.onBack then kb.onBack() end
+				elseif id == "return" then
+					if kb.onReturn then kb.onReturn() end
+				elseif id == "done" then
+					if kb.onDone then kb.onDone() end
+				else
+					local ch = id
+					if kb.shift and ch:match("%a") then
+						ch = ch:upper()
+						kb.shift = false
+					end
+					if kb.onChar then kb.onChar(ch) end
+				end
+				kb.refresh()
+				local target = k.frame.BackgroundColor3
+				k.frame.BackgroundColor3 = Color3.fromRGB(140, 140, 165)
+				tw(k.frame, 0.18, { BackgroundColor3 = target })
+				return true
+			end
+		end
+		return false
+	end
+
+	return kb
+end
+
+---------------------------------------------------------------- HOME
+local homeF = frame(root, 500, 350, CW, CH, WHITE, 1)
+homeF.AnchorPoint = Vector2.new(0.5, 0.5)
+homeF.ZIndex = 1
+local homeScale = Instance.new("UIScale")
+homeScale.Parent = homeF
+wallpaper(homeF, 40)
+status(homeF, true)
+local iconsF = frame(homeF, 0, 0, CW, CH, WHITE, 1)
+frame(homeF, 440, 6, 120, 30, Color3.new(0, 0, 0), 0.6, px(15))
+label(homeF, "Lock", 440, 6, 120, 30, 18, WHITE, Enum.Font.GothamBold)
+homeBar(homeF)
+
+---------------------------------------------------------------- APP container
+local appF = frame(root, 500, 350, CW, CH, BG, 0, px(28))
+appF.AnchorPoint = Vector2.new(0.5, 0.5)
+appF.ZIndex = 2
+appF.Visible = false
+appF.ClipsDescendants = true
+local appScale = Instance.new("UIScale")
+appScale.Parent = appF
+
+local chromeF = frame(appF, 0, 0, CW, CH, WHITE, 1)
+chromeF.ZIndex = 4
+status(chromeF, true)
+frame(chromeF, 440, 6, 120, 30, Color3.new(0, 0, 0), 0.6, px(15))
+label(chromeF, "Home", 440, 6, 120, 30, 18, WHITE, Enum.Font.GothamBold)
+homeBar(chromeF)
+
+local apps = {}
+local pageFrames = {}
+local function newPage()
+	local p = { regions = {} }
+	p.frame = frame(appF, 0, 0, CW, CH, WHITE, 1)
+	p.frame.ZIndex = 1
+	p.frame.Visible = false
+	table.insert(pageFrames, p.frame)
+	function p.clear()
+		p.frame:ClearAllChildren()
+		p.regions = {}
+	end
+	function p.region(x, y, w, h, fn)
+		table.insert(p.regions, { x, y, w, h, fn })
+	end
+	function p.tap(x, y)
+		for i = #p.regions, 1, -1 do
+			local r = p.regions[i]
+			if inRect(x, y, r[1], r[2], r[3], r[4]) then
+				r[5](x, y)
+				return true
+			end
+		end
+		return false
+	end
+	return p
+end
+
+local kbApp = makeKeyboard(appF, 162, 330, 162, 330) -- shared by Notes + Reminders
+
+---------------------------------------------------------------- LOCK
+local lockF = frame(root, 0, 0, CW, CH, Color3.new(0, 0, 0), 1)
+lockF.ZIndex = 3
+wallpaper(lockF, 120)
+status(lockF, false)
+clockLabel(label(lockF, "", 0, 120, 1000, 40, 34, Color3.fromRGB(240, 240, 255), Enum.Font.GothamMedium), "date")
+clockLabel(label(lockF, "", 0, 155, 1000, 170, 160, WHITE, Enum.Font.GothamBold), "time")
+local hint = label(lockF, "Swipe up to unlock", 0, 625, 1000, 36, 26, WHITE, Enum.Font.GothamMedium)
+homeBar(lockF)
+
+---------------------------------------------------------------- Wi-Fi password prompt
+local NETWORKS = {
+	{ name = "Home_5G", pass = "12345678" },
+	{ name = "CoffeeShop_Free" },
+	{ name = "Roblox_Guest" },
+	{ name = "NeighborNet", pass = "password123" },
+	{ name = "Library_WiFi", pass = "readbooks" },
+}
+
+local pwF = frame(root, 0, 0, CW, CH, Color3.new(0, 0, 0), 0.35)
+pwF.ZIndex = 7
+pwF.Visible = false
+local PX, PY, PW, PH = 150, 50, 700, 600
+local pcard = frame(pwF, PX, PY, PW, PH, Color3.fromRGB(34, 34, 44), 0, px(28))
+local pwTitle = label(pcard, "", 150, 16, 400, 40, 24, WHITE, Enum.Font.GothamBold)
+frame(pcard, 24, 16, 110, 40, Color3.fromRGB(60, 60, 74), 0, px(20))
+label(pcard, "Cancel", 24, 16, 110, 40, 18, WHITE, Enum.Font.GothamBold)
+frame(pcard, 566, 16, 110, 40, BLUE, 0, px(20))
+label(pcard, "Join", 566, 16, 110, 40, 18, WHITE, Enum.Font.GothamBold)
+local pwField = frame(pcard, 60, 80, 580, 70, Color3.fromRGB(20, 20, 28), 0, px(16))
+local pwText = label(pwField, "", 16, 0, 548, 70, 36, WHITE, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+local pwErr = label(pcard, "", 60, 156, 580, 30, 20, Color3.fromRGB(255, 110, 110), Enum.Font.GothamMedium)
+local kbPw = makeKeyboard(pcard, 12, 196, PX + 12, PY + 196)
+kbPw.frame.Visible = true
+
+local pwBuf = ""
+local pwTarget = nil
+
+local function updatePw()
+	if #pwBuf == 0 then
+		pwText.Text = "Password"
+		pwText.TextColor3 = Color3.fromRGB(110, 110, 125)
+	else
+		pwText.Text = string.rep("•", #pwBuf - 1) .. pwBuf:sub(-1)
+		pwText.TextColor3 = WHITE
+	end
+end
+
+local function pwJoin()
+	if pwTarget and pwBuf == pwTarget.pass then
+		pwF.Visible = false
+		pwOpen = false
+		connectTo(pwTarget)
+	else
+		pwErr.Text = "Incorrect password"
+		pwBuf = ""
+		updatePw()
+	end
+end
+
+kbPw.onChar = function(ch)
+	if #pwBuf < 20 then pwBuf = pwBuf .. ch end
+	pwErr.Text = ""
+	updatePw()
+end
+kbPw.onBack = function()
+	pwBuf = pwBuf:sub(1, -2)
+	updatePw()
+end
+kbPw.onReturn = pwJoin
+
+local function pwTap(x, y)
+	if inRect(x, y, PX + 24, PY + 16, 110, 40) then
+		pwF.Visible = false
+		pwOpen = false
+		return
+	end
+	if inRect(x, y, PX + 566, PY + 16, 110, 40) then
+		pwJoin()
+		return
+	end
+	kbPw.tap(x, y)
+end
+
+openPw = function(n)
+	pwTarget = n
+	pwBuf = ""
+	pwErr.Text = ""
+	pwTitle.Text = n.name
+	updatePw()
+	pwOpen = true
+	pwF.Visible = true
+end
+
+---------------------------------------------------------------- Siri overlay
+local siriF = frame(root, 0, 0, CW, CH, Color3.new(0, 0, 0), 0.4)
+siriF.ZIndex = 8
+siriF.Visible = false
+local orb = frame(siriF, 500, 170, 120, 120, WHITE, 0, FULL)
+orb.AnchorPoint = Vector2.new(0.5, 0.5)
+local orbG = Instance.new("UIGradient")
+orbG.Color = ColorSequence.new({
+	ColorSequenceKeypoint.new(0, Color3.fromRGB(80, 220, 255)),
+	ColorSequenceKeypoint.new(0.35, Color3.fromRGB(190, 90, 255)),
+	ColorSequenceKeypoint.new(0.7, Color3.fromRGB(255, 120, 150)),
+	ColorSequenceKeypoint.new(1, Color3.fromRGB(80, 220, 255)),
+})
+orbG.Parent = orb
+label(siriF, "Hi, how can I help?", 0, 255, 1000, 50, 36, WHITE, Enum.Font.GothamBold)
+local siriReply = label(siriF, "", 100, 315, 800, 100, 26, Color3.fromRGB(225, 225, 240), Enum.Font.GothamMedium)
+siriReply.TextWrapped = true
+frame(siriF, 860, 56, 100, 40, Color3.fromRGB(60, 60, 74), 0, px(20))
+label(siriF, "Done", 860, 56, 100, 40, 18, WHITE, Enum.Font.GothamBold)
+
+local function fmtTime()
+	local d, h12, ap = timeParts()
+	return string.format("%d:%02d %s", h12, d.min, ap)
+end
+
+local SIRI_CHIPS = {
+	{ "What time is it?", 130, 450, function() return "It's " .. fmtTime() .. "." end },
+	{ "What's the date?", 510, 450, function()
+		local d = os.date("*t")
+		return string.format("Today is %s, %s %d.", os.date("%A"), os.date("%B"), d.day)
+	end },
+	{ "Turn Wi-Fi on", 130, 516, function()
+		setWifi(true)
+		return "Wi-Fi is on. Pick a network in Settings."
+	end },
+	{ "Open Notes", 510, 516, function()
+		closeSiri()
+		openApp("notes")
+		return nil
+	end },
+	{ "Tell me a joke", 320, 582, function()
+		return "Why don't scientists trust atoms? Because they make up everything."
+	end },
+}
+for _, chip in ipairs(SIRI_CHIPS) do
+	frame(siriF, chip[2], chip[3], 360, 52, Color3.fromRGB(60, 60, 78), 0.1, px(26))
+	label(siriF, chip[1], chip[2], chip[3], 360, 52, 20, WHITE, Enum.Font.GothamMedium)
+end
+
+local function siriTap(x, y)
+	if inRect(x, y, 860, 56, 100, 40) then
+		closeSiri()
+		return
+	end
+	for _, chip in ipairs(SIRI_CHIPS) do
+		if inRect(x, y, chip[2], chip[3], 360, 52) then
+			if not siriOn then
+				siriReply.Text = "Siri is turned off. You can turn it on in Settings > Siri."
+			else
+				local r = chip[4]()
+				if r then siriReply.Text = r end
+			end
+			return
+		end
+	end
+end
+
+openSiri = function()
+	if siriOpen or screenOff or state == "lock" then return end
+	siriOpen = true
+	siriReply.Text = siriOn and "" or "Siri is turned off. You can turn it on in Settings > Siri."
+	siriF.Visible = true
+end
+
+closeSiri = function()
+	siriOpen = false
+	siriF.Visible = false
+end
+
+---------------------------------------------------------------- ripples, volume HUD, brightness, screen-off
+local ripples = frame(root, 0, 0, CW, CH, WHITE, 1)
+ripples.ZIndex = 10
+local function ripple(u, v)
+	local r = frame(ripples, u * CW, v * CH, 10, 10, WHITE, 0.55, FULL)
+	r.AnchorPoint = Vector2.new(0.5, 0.5)
+	tw(r, 0.45, { Size = UDim2.fromOffset(110, 110), BackgroundTransparency = 1 })
+	Debris:AddItem(r, 0.5)
+end
+
+local hud = frame(root, 330, 50, 340, 46, Color3.fromRGB(20, 20, 28), 0.15, FULL)
+hud.ZIndex = 20
+hud.Visible = false
+label(hud, "Volume", 18, 0, 90, 46, 18, WHITE, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+local hudTrack = frame(hud, 120, 18, 190, 10, Color3.fromRGB(90, 90, 100), 0, FULL)
+local hudFill = frame(hudTrack, 0, 0, 95, 10, WHITE, 0, FULL)
+local hudToken = 0
+
+local dimF = frame(root, 0, 0, CW, CH, Color3.new(0, 0, 0), 1)
+dimF.ZIndex = 25
+local offF = frame(root, 0, 0, CW, CH, Color3.new(0, 0, 0), 1)
+offF.ZIndex = 30
+offF.Visible = false
+
+applyBrightness = function()
+	dimF.BackgroundTransparency = 1 - (1 - brightness) * 0.85
+end
+
+changeVolume = function(delta)
+	vol = math.clamp(vol + delta, 0, 16)
+	tw(hudFill, 0.1, { Size = UDim2.fromOffset(190 * vol / 16, 10) })
+	hud.Visible = true
+	hudToken = hudToken + 1
+	local my = hudToken
+	task.delay(1.6, function()
+		if hudToken == my then hud.Visible = false end
+	end)
+	if state == "app" and curId == "settings" and apps.settings.sel == "sounds" then
+		apps.settings.render()
+	end
+end
+
+---------------------------------------------------------------- networking
+onNetChanged = function()
+	for _, ic in ipairs(wifiIcons) do
+		for _, b in ipairs(ic.bars) do b.BackgroundTransparency = connected and 0 or 0.65 end
+		ic.slash.Visible = not wifiOn
+	end
+	if state == "app" then
+		local a = getApp()
+		if a and a.render then a.render() end
+	end
+	if ccOpen then ccRender() end
+end
+
+setWifi = function(on)
+	wifiOn = on
+	if on then
+		airplane = false
+	else
+		connected = nil
+		connecting = nil
+		connectToken = nil
+	end
+	onNetChanged()
+end
+
+connectTo = function(n)
+	connecting = n.name
+	connected = nil
+	local token = {}
+	connectToken = token
+	onNetChanged()
+	task.delay(1.3, function()
+		if connectToken == token and wifiOn then
+			connected = n.name
+			connecting = nil
+			onNetChanged()
+		end
+	end)
+end
+
+---------------------------------------------------------------- APP: Settings
+local S = { page = newPage(), sel = "wifi", drag = nil, slider = nil }
+apps.settings = S
+local BT_DEVICES = { { name = "AirPods Pro", on = false }, { name = "Magic Keyboard", on = false }, { name = "Portable Speaker", on = false } }
+local VOICES = { "American", "British", "Australian" }
+
+local SETTINGS_ITEMS = {
+	{ id = "airplane", name = "Airplane Mode", icon = "airplane", color = Color3.fromRGB(255, 149, 0) },
+	{ id = "wifi", name = "Wi-Fi", icon = "wifi", color = BLUE,
+		value = function() return (not wifiOn) and "Off" or (connected or "Not Connected") end },
+	{ id = "bluetooth", name = "Bluetooth", icon = "bluetooth", color = BLUE,
+		value = function() return btOn and "On" or "Off" end },
+	{ id = "siri", name = "Siri", icon = "siri", color = Color3.fromRGB(120, 90, 220),
+		value = function() return siriOn and "On" or "Off" end },
+	{ id = "display", name = "Display & Brightness", icon = "sun", color = Color3.fromRGB(10, 132, 255) },
+	{ id = "sounds", name = "Sounds", icon = "speaker", color = Color3.fromRGB(255, 59, 48) },
+	{ id = "general", name = "General", icon = "gear", color = Color3.fromRGB(142, 142, 147) },
+}
+
+local function card(f, x, y, w, h)
+	return frame(f, x, y, w, h, CARD, 0, px(14))
+end
+
+function S.render()
+	local p = S.page
+	p.clear()
+	local f = p.frame
+	S.slider, S.volLbl = nil, nil
+
+	-- sidebar
+	frame(f, 0, 44, 310, 656, Color3.fromRGB(32, 32, 42), 0)
+	label(f, "Settings", 24, 54, 260, 44, 34, WHITE, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+	for i, it in ipairs(SETTINGS_ITEMS) do
+		local y = 116 + (i - 1) * 58
+		local selected = (S.sel == it.id)
+		if selected then frame(f, 12, y, 286, 52, BLUE, 0, px(12)) end
+		local ib = frame(f, 24, y + 8, 36, 36, it.color, 0, px(9))
+		glyph(ib, it.icon, 18, 18, 24, WHITE, it.color)
+		if it.value then
+			label(f, it.name, 72, y + 4, 214, 26, 18, WHITE, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+			label(f, it.value(), 72, y + 28, 214, 20, 13, selected and WHITE or GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+		elseif it.id == "airplane" then
+			label(f, it.name, 72, y, 146, 52, 18, WHITE, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+		else
+			label(f, it.name, 72, y, 214, 52, 18, WHITE, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+		end
+		if it.id == "airplane" then
+			drawToggle(f, 222, y + 8, airplane)
+			p.region(12, y, 286, 52, function()
+				airplane = not airplane
+				if airplane then
+					btOn = false
+					setWifi(false)
+				else
+					S.render()
+				end
+			end)
+		else
+			p.region(12, y, 286, 52, function()
+				S.sel = it.id
+				S.render()
+			end)
+		end
+	end
+
+	-- detail
+	local sel = S.sel
+	if sel == "wifi" then
+		label(f, "Wi-Fi", 340, 54, 400, 44, 32, WHITE, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+		card(f, 340, 116, 630, 60)
+		label(f, "Wi-Fi", 360, 116, 300, 60, 22, WHITE, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+		drawToggle(f, 886, 128, wifiOn)
+		p.region(780, 116, 190, 60, function() setWifi(not wifiOn) end)
+		if wifiOn then
+			label(f, connected and ("Connected to " .. connected) or "Choose a network", 340, 184, 630, 28, 18, GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+			for i, n in ipairs(NETWORKS) do
+				local y = 222 + (i - 1) * 62
+				card(f, 340, y, 630, 56)
+				label(f, n.name, 360, y, 300, 56, 22, WHITE, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+				if n.pass then glyph(f, "lock", 790, y + 28, 20, GRAY, CARD) end
+				local st = (connecting == n.name) and "Connecting..." or ((connected == n.name) and "Connected" or "")
+				label(f, st, 810, y, 150, 56, 17, Color3.fromRGB(110, 170, 255), Enum.Font.GothamBold, Enum.TextXAlignment.Right)
+				p.region(340, y, 630, 56, function()
+					if connected == n.name then
+						connected = nil -- tap the connected network to disconnect
+						onNetChanged()
+					elseif connecting ~= n.name then
+						if n.pass then openPw(n) else connectTo(n) end
+					end
+				end)
+			end
+		else
+			label(f, "Wi-Fi is turned off", 340, 300, 630, 40, 24, GRAY, Enum.Font.GothamMedium)
+		end
+
+	elseif sel == "bluetooth" then
+		label(f, "Bluetooth", 340, 54, 400, 44, 32, WHITE, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+		card(f, 340, 116, 630, 60)
+		label(f, "Bluetooth", 360, 116, 300, 60, 22, WHITE, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+		drawToggle(f, 886, 128, btOn)
+		p.region(780, 116, 190, 60, function()
+			btOn = not btOn
+			if btOn then airplane = false else for _, d in ipairs(BT_DEVICES) do d.on = false end end
+			S.render()
+		end)
+		if btOn then
+			label(f, "MY DEVICES", 340, 190, 300, 22, 14, GRAY, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+			for i, d in ipairs(BT_DEVICES) do
+				local y = 220 + (i - 1) * 62
+				card(f, 340, y, 630, 56)
+				label(f, d.name, 360, y, 400, 56, 22, WHITE, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+				label(f, d.on and "Connected" or "Not Connected", 760, y, 200, 56, 17, d.on and Color3.fromRGB(110, 170, 255) or GRAY, Enum.Font.GothamBold, Enum.TextXAlignment.Right)
+				p.region(340, y, 630, 56, function()
+					d.on = not d.on
+					S.render()
+				end)
+			end
+		else
+			label(f, "Bluetooth is turned off", 340, 300, 630, 40, 24, GRAY, Enum.Font.GothamMedium)
+		end
+
+	elseif sel == "siri" then
+		label(f, "Siri", 340, 54, 400, 44, 32, WHITE, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+		card(f, 340, 116, 630, 60)
+		label(f, "Siri", 360, 116, 300, 60, 22, WHITE, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+		drawToggle(f, 886, 128, siriOn)
+		p.region(780, 116, 190, 60, function()
+			siriOn = not siriOn
+			S.render()
+		end)
+		card(f, 340, 184, 630, 60)
+		label(f, "Hold Home Bar for Siri", 360, 184, 450, 60, 22, WHITE, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+		drawToggle(f, 886, 196, siriHold)
+		p.region(780, 184, 190, 60, function()
+			siriHold = not siriHold
+			S.render()
+		end)
+		label(f, "SIRI VOICE", 340, 262, 300, 22, 14, GRAY, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+		for i, name in ipairs(VOICES) do
+			local y = 290 + (i - 1) * 62
+			local on = (siriVoice == i)
+			card(f, 340, y, 630, 56)
+			label(f, name, 360, y, 400, 56, 22, WHITE, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+			local r = frame(f, 930, y + 16, 24, 24, on and BLUE or CARD, 0, FULL)
+			stroke(r, on and BLUE or GRAY, 2)
+			p.region(340, y, 630, 56, function()
+				siriVoice = i
+				S.render()
+			end)
+		end
+		frame(f, 340, 494, 630, 56, BLUE, 0, px(14))
+		label(f, "Try Siri", 340, 494, 630, 56, 22, WHITE, Enum.Font.GothamBold)
+		p.region(340, 494, 630, 56, function() openSiri() end)
+
+	elseif sel == "display" then
+		label(f, "Display & Brightness", 340, 54, 600, 44, 32, WHITE, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+		card(f, 340, 116, 630, 130)
+		label(f, "Brightness", 360, 126, 300, 36, 22, WHITE, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+		S.slider = drawSlider(f, 370, 196, 570, (brightness - 0.1) / 0.9)
+		label(f, "Drag the slider to dim or brighten the screen.", 340, 262, 630, 28, 18, GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+
+	elseif sel == "sounds" then
+		label(f, "Sounds", 340, 54, 400, 44, 32, WHITE, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+		card(f, 340, 116, 630, 130)
+		label(f, "Volume", 360, 126, 300, 36, 22, WHITE, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+		S.volLbl = label(f, math.floor(vol / 16 * 100 + 0.5) .. "%", 820, 126, 130, 36, 20, GRAY, Enum.Font.GothamBold, Enum.TextXAlignment.Right)
+		S.slider = drawSlider(f, 370, 196, 570, vol / 16)
+		label(f, "You can also use the volume buttons on the side of the iPad.", 340, 262, 630, 28, 18, GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+
+	elseif sel == "general" then
+		label(f, "General", 340, 54, 400, 44, 32, WHITE, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+		local rows = { { "Name", "iPad" }, { "Model", "iPad Air" }, { "Software Version", "iPadOS 18.0" }, { "Capacity", "64 GB" } }
+		for i, r in ipairs(rows) do
+			local y = 116 + (i - 1) * 62
+			card(f, 340, y, 630, 56)
+			label(f, r[1], 360, y, 300, 56, 22, WHITE, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+			label(f, r[2], 640, y, 310, 56, 20, GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Right)
+		end
+	end
+end
+
+function S.onPress(x, y)
+	if (S.sel == "display" or S.sel == "sounds") and inRect(x, y, 350, 170, 620, 60) then
+		S.drag = (S.sel == "display") and "bright" or "vol"
+		S.onDrag(x, y)
+		return true
+	end
+	return false
+end
+
+function S.onDrag(x, y)
+	if not S.drag then return end
+	local frac = math.clamp((x - 370) / 570, 0, 1)
+	if S.drag == "bright" then
+		brightness = 0.1 + 0.9 * frac
+		applyBrightness()
+	else
+		vol = math.floor(frac * 16 + 0.5)
+		frac = vol / 16
+		if S.volLbl then S.volLbl.Text = math.floor(frac * 100 + 0.5) .. "%" end
+	end
+	setSlider(S.slider, frac)
+end
+
+function S.onRelease()
+	S.drag = nil
+end
+
+S.tap = S.page.tap
+
+---------------------------------------------------------------- APP: App Store
+local STORE = {
+	{ id = "x_chess", name = "Pocket Chess", sub = "Classic strategy board game", c1 = Color3.fromRGB(120, 120, 130), c2 = Color3.fromRGB(40, 40, 48) },
+	{ id = "x_weather", name = "Weather Now", sub = "Live forecasts for your city", c1 = Color3.fromRGB(110, 200, 255), c2 = Color3.fromRGB(30, 110, 230) },
+	{ id = "x_photo", name = "Photo Studio", sub = "Edit and share your photos", c1 = Color3.fromRGB(255, 170, 100), c2 = Color3.fromRGB(230, 70, 130) },
+	{ id = "x_sketch", name = "Sketchbook", sub = "Draw anywhere, any time", c1 = Color3.fromRGB(190, 120, 255), c2 = Color3.fromRGB(100, 60, 220) },
+	{ id = "x_fit", name = "Fitness Pal", sub = "Track workouts and goals", c1 = Color3.fromRGB(110, 230, 130), c2 = Color3.fromRGB(20, 160, 80) },
+	{ id = "x_calc", name = "Calc Pro", sub = "Powerful scientific calculator", c1 = Color3.fromRGB(255, 190, 60), c2 = Color3.fromRGB(230, 120, 20) },
+}
+local EXTRA = {}
+for _, it in ipairs(STORE) do EXTRA[it.id] = it end
+
+local homeApps = { "appstore", "settings", "notes", "podcasts", "reminders" }
+local DEFS = {
+	appstore = { name = "App Store", c1 = Color3.fromRGB(80, 170, 255), c2 = Color3.fromRGB(20, 90, 230) },
+	settings = { name = "Settings", c1 = Color3.fromRGB(170, 172, 180), c2 = Color3.fromRGB(100, 102, 112) },
+	notes = { name = "Notes", c1 = Color3.fromRGB(255, 226, 90), c2 = Color3.fromRGB(240, 180, 30) },
+	podcasts = { name = "Podcasts", c1 = Color3.fromRGB(200, 110, 255), c2 = Color3.fromRGB(120, 50, 210) },
+	reminders = { name = "Reminders", c1 = Color3.fromRGB(255, 255, 255), c2 = Color3.fromRGB(215, 215, 225) },
+}
+for _, it in ipairs(STORE) do DEFS[it.id] = { name = it.name, c1 = it.c1, c2 = it.c2 } end
+
+local AS = { page = newPage() }
+apps.appstore = AS
+local installed, downloading = {}, {}
+
+function AS.render()
+	local p = AS.page
+	p.clear()
+	local f = p.frame
+	label(f, "App Store", 60, 54, 500, 52, 42, WHITE, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+	if not connected then
+		label(f, "No Internet Connection", 0, 250, 1000, 50, 36, WHITE, Enum.Font.GothamBold)
+		label(f, "Connect to a Wi-Fi network in Settings to browse apps.", 0, 306, 1000, 34, 22, GRAY, Enum.Font.GothamMedium)
+		frame(f, 400, 370, 200, 54, BLUE, 0, px(27))
+		label(f, "Open Settings", 400, 370, 200, 54, 20, WHITE, Enum.Font.GothamBold)
+		p.region(400, 370, 200, 54, function()
+			S.sel = "wifi"
+			openApp("settings")
+		end)
+		return
+	end
+	label(f, "Featured Apps", 60, 104, 500, 28, 20, GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+	for i, it in ipairs(STORE) do
+		local y = 144 + (i - 1) * 86
+		drawIcon(f, it.id, 60, y, 70)
+		label(f, it.name, 148, y + 6, 520, 32, 26, WHITE, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+		label(f, it.sub, 148, y + 40, 520, 26, 18, GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+		local by = y + 13
+		if installed[it.id] then
+			frame(f, 800, by, 140, 44, Color3.fromRGB(70, 70, 84), 0, px(22))
+			label(f, "OPEN", 800, by, 140, 44, 18, WHITE, Enum.Font.GothamBold)
+			p.region(800, by, 140, 44, function() openApp(it.id) end)
+		elseif downloading[it.id] then
+			frame(f, 800, by, 140, 44, Color3.fromRGB(70, 70, 84), 0, px(22))
+			label(f, math.floor(downloading[it.id] * 100) .. "%", 800, by, 140, 44, 18, Color3.fromRGB(110, 170, 255), Enum.Font.GothamBold)
+		else
+			frame(f, 800, by, 140, 44, BLUE, 0, px(22))
+			label(f, "GET", 800, by, 140, 44, 18, WHITE, Enum.Font.GothamBold)
+			p.region(800, by, 140, 44, function()
+				downloading[it.id] = 0
+				AS.render()
+			end)
+		end
+	end
+end
+AS.tap = AS.page.tap
+
+---------------------------------------------------------------- APP: Demo (apps installed from the App Store)
+local demoApp = { page = newPage(), def = nil }
+function demoApp.render()
+	local p = demoApp.page
+	p.clear()
+	local f = p.frame
+	local d = demoApp.def
+	if not d then return end
+	drawIcon(f, d.id, 400, 150, 200)
+	label(f, d.name, 0, 380, 1000, 60, 46, WHITE, Enum.Font.GothamBold)
+	label(f, "Demo app - nothing here yet", 0, 440, 1000, 36, 24, GRAY, Enum.Font.GothamMedium)
+end
+demoApp.tap = demoApp.page.tap
+
+---------------------------------------------------------------- APP: Notes (works)
+local N = {
+	page = newPage(),
+	notes = { { body = "Welcome to Notes\nTap + to write a new note." } },
+	sel = 1,
+	editing = false,
+}
+apps.notes = N
+
+local function noteTitle(b)
+	local first = b:match("([^\n]*)") or ""
+	return first == "" and "New Note" or first
+end
+
+local function noteEditStart()
+	N.editing = true
+	kbApp.onChar = function(ch)
+		local n = N.notes[N.sel]
+		if n and #n.body < 600 then
+			n.body = n.body .. ch
+			N.render()
+		end
+	end
+	kbApp.onBack = function()
+		local n = N.notes[N.sel]
+		if n then
+			n.body = n.body:sub(1, -2)
+			N.render()
+		end
+	end
+	kbApp.onReturn = function()
+		local n = N.notes[N.sel]
+		if n and #n.body < 600 then
+			n.body = n.body .. "\n"
+			N.render()
+		end
+	end
+	kbApp.onDone = function()
+		N.editing = false
+		kbApp.frame.Visible = false
+		N.render()
+	end
+	kbApp.shift = false
+	kbApp.refresh()
+	kbApp.frame.Visible = true
+end
+
+function N.onShow()
+	N.editing = false
+	kbApp.frame.Visible = false
+end
+
+function N.render()
+	local p = N.page
+	p.clear()
+	local f = p.frame
+	frame(f, 0, 44, 310, 656, Color3.fromRGB(32, 32, 42), 0)
+	label(f, "Notes", 24, 54, 200, 44, 34, WHITE, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+	local plus = frame(f, 248, 58, 44, 44, Color3.fromRGB(255, 204, 0), 0, FULL)
+	label(plus, "+", 0, 0, 44, 44, 30, Color3.new(0, 0, 0), Enum.Font.GothamBold)
+	p.region(236, 50, 66, 60, function()
+		if #N.notes >= 8 then return end
+		table.insert(N.notes, 1, { body = "" })
+		N.sel = 1
+		noteEditStart()
+		N.render()
+	end)
+	for i, n in ipairs(N.notes) do
+		local y = 116 + (i - 1) * 70
+		local selected = (i == N.sel)
+		frame(f, 12, y, 286, 62, selected and Color3.fromRGB(255, 204, 0) or CARD, selected and 0.78 or 0, px(12))
+		label(f, noteTitle(n.body), 26, y + 6, 260, 28, 20, WHITE, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+		label(f, n.body:match("\n([^\n]*)") or "No additional text", 26, y + 34, 260, 22, 15, GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+		p.region(12, y, 286, 62, function()
+			N.sel = i
+			N.editing = false
+			kbApp.frame.Visible = false
+			N.render()
+		end)
+	end
+
+	local note = N.notes[N.sel]
+	if note then
+		frame(f, 700, 58, 110, 40, Color3.fromRGB(255, 69, 58), 0.15, px(20))
+		label(f, "Delete", 700, 58, 110, 40, 18, WHITE, Enum.Font.GothamBold)
+		p.region(700, 58, 110, 40, function()
+			table.remove(N.notes, N.sel)
+			N.sel = (#N.notes > 0) and math.min(N.sel, #N.notes) or nil
+			N.editing = false
+			kbApp.frame.Visible = false
+			N.render()
+		end)
+		if N.editing then
+			frame(f, 830, 58, 110, 40, BLUE, 0, px(20))
+			label(f, "Done", 830, 58, 110, 40, 18, WHITE, Enum.Font.GothamBold)
+			p.region(830, 58, 110, 40, function()
+				N.editing = false
+				kbApp.frame.Visible = false
+				N.render()
+			end)
+		end
+		local h = N.editing and 214 or 540
+		local ta
+		if note.body == "" then
+			ta = label(f, N.editing and "|" or "Tap here to start typing...", 340, 112, 620, h, 24, N.editing and WHITE or GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+		else
+			ta = label(f, note.body .. (N.editing and "|" or ""), 340, 112, 620, h, 24, WHITE, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+		end
+		ta.TextWrapped = true
+		ta.TextYAlignment = Enum.TextYAlignment.Top
+		p.region(330, 104, 640, h + 8, function()
+			if not N.editing then
+				noteEditStart()
+				N.render()
+			end
+		end)
+	else
+		label(f, "No note selected", 320, 300, 680, 40, 24, GRAY, Enum.Font.GothamMedium)
+	end
+end
+
+function N.tap(x, y)
+	if N.editing and kbApp.frame.Visible then
+		if kbApp.tap(x, y) then return end
+		if inRect(x, y, 162, 330, 676, 346) then return end
+	end
+	N.page.tap(x, y)
+end
+
+---------------------------------------------------------------- APP: Reminders (works)
+local Rm = {
+	page = newPage(),
+	items = { { text = "Buy milk", done = false }, { text = "Charge iPad", done = false } },
+	adding = false,
+	draft = "",
+}
+apps.reminders = Rm
+
+local function remCommit()
+	if #Rm.draft > 0 and #Rm.items < 9 then
+		table.insert(Rm.items, { text = Rm.draft, done = false })
+	end
+	Rm.adding = false
+	Rm.draft = ""
+	kbApp.frame.Visible = false
+	Rm.render()
+end
+
+local function remStart()
+	if #Rm.items >= 9 or Rm.adding then return end
+	Rm.adding = true
+	Rm.draft = ""
+	kbApp.onChar = function(ch)
+		if #Rm.draft < 60 then
+			Rm.draft = Rm.draft .. ch
+			Rm.render()
+		end
+	end
+	kbApp.onBack = function()
+		Rm.draft = Rm.draft:sub(1, -2)
+		Rm.render()
+	end
+	kbApp.onReturn = remCommit
+	kbApp.onDone = remCommit
+	kbApp.shift = false
+	kbApp.refresh()
+	kbApp.frame.Visible = true
+	Rm.render()
+end
+
+function Rm.onShow()
+	Rm.adding = false
+	Rm.draft = ""
+	kbApp.frame.Visible = false
+end
+
+function Rm.render()
+	local p = Rm.page
+	p.clear()
+	local f = p.frame
+	local remaining, anyDone = 0, false
+	for _, it in ipairs(Rm.items) do
+		if it.done then anyDone = true else remaining = remaining + 1 end
+	end
+	label(f, "Reminders", 60, 54, 500, 52, 42, BLUE, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+	label(f, remaining .. " remaining", 60, 106, 400, 26, 20, GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+	frame(f, 880, 58, 60, 46, BLUE, 0, px(23))
+	label(f, "+", 880, 58, 60, 46, 30, WHITE, Enum.Font.GothamBold)
+	p.region(870, 52, 80, 58, remStart)
+	if anyDone then
+		frame(f, 710, 58, 150, 46, Color3.fromRGB(60, 60, 74), 0, px(23))
+		label(f, "Clear Done", 710, 58, 150, 46, 18, WHITE, Enum.Font.GothamBold)
+		p.region(710, 58, 150, 46, function()
+			for i = #Rm.items, 1, -1 do
+				if Rm.items[i].done then table.remove(Rm.items, i) end
+			end
+			Rm.render()
+		end)
+	end
+
+	local y = 150
+	if Rm.adding then
+		frame(f, 60, y, 880, 56, CARD, 0, px(14))
+		local c = frame(f, 60, y + 10, 36, 36, BG, 0, FULL)
+		stroke(c, BLUE, 2)
+		label(f, Rm.draft == "" and "New Reminder|" or (Rm.draft .. "|"), 116, y, 800, 56, 26, Rm.draft == "" and GRAY or WHITE, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+		y = y + 62
+	end
+	for i, it in ipairs(Rm.items) do
+		local c = frame(f, 60, y + 10, 36, 36, it.done and BLUE or BG, 0, FULL)
+		stroke(c, BLUE, 2)
+		local lbl = label(f, it.done and ("<s>" .. esc(it.text) .. "</s>") or it.text, 116, y, 820, 56, 26, it.done and GRAY or WHITE, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+		lbl.RichText = it.done
+		frame(f, 116, y + 55, 824, 1, Color3.fromRGB(60, 60, 72), 0)
+		p.region(60, y, 880, 56, function()
+			it.done = not it.done
+			Rm.render()
+		end)
+		y = y + 56
+	end
+	if #Rm.items == 0 and not Rm.adding then
+		label(f, "All done! Tap + to add a reminder.", 0, 300, 1000, 40, 24, GRAY, Enum.Font.GothamMedium)
+	end
+end
+
+function Rm.tap(x, y)
+	if Rm.adding and kbApp.frame.Visible then
+		if kbApp.tap(x, y) then return end
+		if inRect(x, y, 162, 330, 676, 346) then return end
+	end
+	Rm.page.tap(x, y)
+end
+
+---------------------------------------------------------------- APP: Podcasts (demo)
+local SHOWS = {
+	{ "Morning Brew Chat", "Daily news & banter", "", Color3.fromRGB(255, 149, 0) },
+	{ "True Crime Tuesdays", "Mysteries unfolded", "", Color3.fromRGB(175, 82, 222) },
+	{ "Space Talk", "The cosmos explained", "", Color3.fromRGB(10, 132, 255) },
+	{ "Chill Beats Radio", "Lo-fi to relax to", "", Color3.fromRGB(52, 199, 89) },
+	{ "History Unpacked", "Stories from the past", "", Color3.fromRGB(255, 59, 48) },
+	{ "Code & Coffee", "Chats about programming", "", Color3.fromRGB(90, 200, 250) },
+}
+local Pod = { page = newPage(), sel = nil, playing = false, prog = 0, fill = nil }
+apps.podcasts = Pod
+
+function Pod.render()
+	local p = Pod.page
+	p.clear()
+	local f = p.frame
+	Pod.fill = nil
+	label(f, "Podcasts", 60, 54, 500, 52, 42, WHITE, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+	label(f, "Top Shows", 60, 106, 400, 26, 20, GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+	for i, s in ipairs(SHOWS) do
+		local col, row = (i - 1) % 3, math.floor((i - 1) / 3)
+		local x, y = 60 + col * 300, 146 + row * 200
+		local c = card(f, x, y, 280, 184)
+		if Pod.sel == i then stroke(c, s[4], 3) end
+		local art = frame(f, x + 16, y + 16, 72, 72, s[4], 0, px(16))
+		gradient(art, s[4], s[4]:Lerp(Color3.new(0, 0, 0), 0.35), 90)
+		label(art, s[1]:sub(1, 1), 0, 0, 72, 72, 40, WHITE, Enum.Font.GothamBold)
+		label(f, s[1], x + 16, y + 96, 248, 30, 22, WHITE, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+		label(f, s[2], x + 16, y + 128, 248, 24, 16, GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+		p.region(x, y, 280, 184, function()
+			if Pod.sel ~= i then Pod.prog = 0 end
+			Pod.sel = i
+			Pod.playing = true
+			Pod.render()
+		end)
+	end
+	card(f, 60, 548, 880, 108)
+	if Pod.sel then
+		local s = SHOWS[Pod.sel]
+		local art = frame(f, 76, 564, 76, 76, s[4], 0, px(16))
+		gradient(art, s[4], s[4]:Lerp(Color3.new(0, 0, 0), 0.35), 90)
+		label(art, s[1]:sub(1, 1), 0, 0, 76, 76, 40, WHITE, Enum.Font.GothamBold)
+		label(f, s[1], 170, 562, 560, 34, 24, WHITE, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+		label(f, "Episode 24  -  Demo", 170, 596, 560, 24, 17, GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+		local track = frame(f, 170, 632, 560, 8, Color3.fromRGB(80, 80, 94), 0, FULL)
+		Pod.fill = frame(track, 0, 0, 560 * Pod.prog, 8, WHITE, 0, FULL)
+		frame(f, 780, 586, 140, 44, BLUE, 0, px(22))
+		label(f, Pod.playing and "Pause" or "Play", 780, 586, 140, 44, 18, WHITE, Enum.Font.GothamBold)
+		p.region(780, 586, 140, 44, function()
+			Pod.playing = not Pod.playing
+			Pod.render()
+		end)
+	else
+		label(f, "Pick a show to start listening", 60, 548, 880, 108, 22, GRAY, Enum.Font.GothamMedium)
+	end
+end
+Pod.tap = Pod.page.tap
+
+---------------------------------------------------------------- CONTROL CENTER (swipe down from the top-right / Wi-Fi icon)
+local ccF = frame(root, 0, 0, CW, CH, Color3.new(0, 0, 0), 1)
+ccF.ZIndex = 9
+ccF.Visible = false
+local ccPanel = frame(ccF, 0, 0, CW, CH, WHITE, 1)
+local ccToast = frame(ccF, 330, 54, 340, 42, Color3.fromRGB(34, 34, 44), 0.1, FULL)
+ccToast.Visible = false
+local ccToastLbl = label(ccToast, "", 0, 0, 340, 42, 18, WHITE, Enum.Font.GothamBold)
+local ccToastToken = 0
+local cc = { regions = {}, sliders = {}, grab = nil }
+local ccState = { airdrop = false, rotlock = false, dnd = false, silent = false, torch = false, rec = false, music = false }
+local CCX, CCY = 706, 60
+local CC_DARK = Color3.fromRGB(34, 34, 46)
+local CC_OFF = Color3.fromRGB(70, 70, 86)
+local CC_TILE = Color3.fromRGB(44, 44, 58)
+
+local function ccShowToast(text)
+	ccToastLbl.Text = text
+	ccToast.Visible = true
+	ccToastToken = ccToastToken + 1
+	local my = ccToastToken
+	task.delay(1.6, function()
+		if ccToastToken == my then ccToast.Visible = false end
+	end)
+end
+
+ccRender = function()
+	ccPanel:ClearAllChildren()
+	cc.regions, cc.sliders = {}, {}
+	local function reg(x, y, w, h, fn) table.insert(cc.regions, { x, y, w, h, fn }) end
+	local function cell(c, r) return CCX + c * 66, CCY + r * 66 end
+	local function toggle(key, name)
+		ccState[key] = not ccState[key]
+		ccRender()
+		ccShowToast(name .. ": " .. (ccState[key] and "On" or "Off"))
+	end
+
+	-- connectivity block (airplane / airdrop / wifi / bluetooth)
+	local x0, y0 = cell(0, 0)
+	frame(ccPanel, x0, y0, 124, 124, CC_DARK, 0.08, px(30))
+	local conn = {
+		{ "airplane", 31, 31, airplane, Color3.fromRGB(255, 149, 0), function()
+			airplane = not airplane
+			if airplane then
+				btOn = false
+				for _, d in ipairs(BT_DEVICES) do d.on = false end
+				setWifi(false)
+			else
+				ccRender()
+			end
+		end },
+		{ "airdrop", 93, 31, ccState.airdrop, BLUE, function() toggle("airdrop", "AirDrop") end },
+		{ "wifi", 31, 93, wifiOn, BLUE, function() setWifi(not wifiOn) end },
+		{ "bluetooth", 93, 93, btOn, BLUE, function()
+			btOn = not btOn
+			if btOn then
+				airplane = false
+			else
+				for _, d in ipairs(BT_DEVICES) do d.on = false end
+			end
+			ccRender()
+		end },
+	}
+	for _, b in ipairs(conn) do
+		local cx, cy = x0 + b[2], y0 + b[3]
+		local col = b[4] and b[5] or CC_OFF
+		local c = frame(ccPanel, cx - 26, cy - 26, 52, 52, col, 0, FULL)
+		glyph(c, b[1], 26, 26, 30, WHITE, col)
+		reg(cx - 30, cy - 30, 60, 60, b[6])
+	end
+
+	-- music block
+	local mx, my = cell(2, 0)
+	frame(ccPanel, mx, my, 124, 124, CC_DARK, 0.08, px(30))
+	label(ccPanel, "Music", mx, my + 12, 124, 24, 16, WHITE, Enum.Font.GothamBold)
+	label(ccPanel, ccState.music and "Playing" or "Not Playing", mx, my + 34, 124, 20, 12, GRAY, Enum.Font.GothamMedium)
+	local py = my + 88
+	local ctl = Color3.fromRGB(200, 200, 210)
+	triShape(ccPanel, 1, "l", mx + 14, py - 9, 18, ctl)
+	triShape(ccPanel, 1, "l", mx + 23, py - 9, 18, ctl)
+	if ccState.music then
+		shape(ccPanel, 1, mx + 56, py, 8, 28, WHITE, 0, 0.3)
+		shape(ccPanel, 1, mx + 70, py, 8, 28, WHITE, 0, 0.3)
+	else
+		triShape(ccPanel, 1, "r", mx + 54, py - 14, 28, WHITE)
+	end
+	triShape(ccPanel, 1, "r", mx + 94, py - 9, 18, ctl)
+	triShape(ccPanel, 1, "r", mx + 103, py - 9, 18, ctl)
+	reg(mx + 4, py - 24, 44, 48, function() ccShowToast("Previous track (demo)") end)
+	reg(mx + 46, py - 24, 40, 48, function()
+		ccState.music = not ccState.music
+		ccRender()
+	end)
+	reg(mx + 86, py - 24, 36, 48, function() ccShowToast("Next track (demo)") end)
+
+	-- brightness + volume sliders
+	local bx, by = cell(2, 2)
+	for i = 1, 2 do
+		local sx = bx + (i - 1) * 66
+		local frac = (i == 1) and ((brightness - 0.1) / 0.9) or (vol / 16)
+		frame(ccPanel, sx, by, 58, 124, CC_OFF, 0.05, px(22))
+		local fh = math.floor(124 * frac)
+		local fill = frame(ccPanel, sx, by + 124 - fh, 58, fh, Color3.fromRGB(236, 236, 244), 0, px(22))
+		local gc = (frac > 0.2) and Color3.fromRGB(70, 70, 84) or WHITE
+		glyph(ccPanel, (i == 1) and "sun" or "speaker", sx + 29, by + 124 - 24, 28, gc, Color3.fromRGB(236, 236, 244))
+		cc.sliders[i] = { x = sx, y = by, w = 58, h = 124, fill = fill, id = (i == 1) and "bright" or "vol" }
+	end
+
+	-- small tiles
+	local function small(col, row, name, on, onColor, glyphOn, fn)
+		local x, y = cell(col, row)
+		local bg = on and onColor or CC_TILE
+		frame(ccPanel, x, y, 58, 58, bg, 0.08, px(18))
+		glyph(ccPanel, name, x + 29, y + 29, 30, (on and glyphOn) or WHITE, bg)
+		reg(x, y, 58, 58, fn)
+	end
+	small(0, 2, "rotlock", ccState.rotlock, Color3.fromRGB(255, 69, 58), WHITE, function() toggle("rotlock", "Orientation Lock") end)
+	small(1, 2, "moon", ccState.dnd, Color3.fromRGB(94, 92, 230), WHITE, function() toggle("dnd", "Do Not Disturb") end)
+
+	-- screen mirroring (wide)
+	local sx0, sy0 = cell(0, 3)
+	frame(ccPanel, sx0, sy0, 124, 58, CC_DARK, 0.08, px(18))
+	glyph(ccPanel, "mirror", sx0 + 28, sy0 + 29, 30, WHITE, CC_DARK)
+	label(ccPanel, "Screen\nMirroring", sx0 + 50, sy0, 70, 58, 13, WHITE, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+	reg(sx0, sy0, 124, 58, function() ccShowToast("Screen Mirroring: no devices found") end)
+
+	small(0, 4, "bell", ccState.silent, Color3.fromRGB(255, 69, 58), WHITE, function() toggle("silent", "Silent Mode") end)
+	small(1, 4, "torch", ccState.torch, Color3.fromRGB(240, 240, 248), Color3.fromRGB(30, 30, 40), function()
+		toggle("torch", "Flashlight")
+		setTorch(ccState.torch)
+	end)
+	small(2, 4, "timer", false, CC_TILE, WHITE, function() ccShowToast("Timer (demo)") end)
+	small(3, 4, "camera", false, CC_TILE, WHITE, function() ccShowToast("Camera (demo)") end)
+	small(0, 5, "record", ccState.rec, Color3.fromRGB(255, 69, 58), WHITE, function() toggle("rec", "Screen Recording") end)
+	small(1, 5, "stopwatch", false, CC_TILE, WHITE, function() ccShowToast("Stopwatch (demo)") end)
+end
+
+local function ccPress(x, y)
+	for _, sl in ipairs(cc.sliders) do
+		if inRect(x, y, sl.x - 4, sl.y - 4, sl.w + 8, sl.h + 8) then
+			cc.grab = sl
+			return true
+		end
+	end
+	return false
+end
+
+local function ccDrag(x, y)
+	local sl = cc.grab
+	if not sl then return end
+	local frac = math.clamp(1 - (y - sl.y) / sl.h, 0, 1)
+	local fh = math.floor(sl.h * frac)
+	sl.fill.Position = UDim2.fromOffset(sl.x, sl.y + sl.h - fh)
+	sl.fill.Size = UDim2.fromOffset(sl.w, fh)
+	if sl.id == "bright" then
+		brightness = 0.1 + 0.9 * frac
+		applyBrightness()
+	else
+		vol = math.floor(frac * 16 + 0.5)
+	end
+end
+
+local function ccRelease()
+	cc.grab = nil
+end
+
+local function ccFollow(p) -- finger is dragging the panel down
+	if not ccF.Visible then
+		ccRender()
+		ccF.Visible = true
+	end
+	ccPanel.Position = UDim2.fromOffset(0, -460 * (1 - p))
+	ccF.BackgroundTransparency = 1 - 0.45 * p
+end
+
+openCC = function(follow)
+	ccOpen = true
+	if not follow then
+		ccRender()
+		ccF.Visible = true
+		ccPanel.Position = UDim2.fromOffset(0, -460)
+		ccF.BackgroundTransparency = 1
+	end
+	tw(ccPanel, 0.28, { Position = UDim2.fromOffset(0, 0) }, Enum.EasingStyle.Quint)
+	tw(ccF, 0.28, { BackgroundTransparency = 0.55 })
+end
+
+closeCC = function(instant)
+	if not ccOpen and not ccF.Visible then return end
+	ccOpen = false
+	cc.grab = nil
+	if instant then
+		ccF.Visible = false
+		ccF.BackgroundTransparency = 1
+		ccToast.Visible = false
+		return
+	end
+	tw(ccPanel, 0.25, { Position = UDim2.fromOffset(0, -460) }, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
+	tw(ccF, 0.25, { BackgroundTransparency = 1 })
+	task.delay(0.27, function()
+		if not ccOpen then ccF.Visible = false end
+	end)
+end
+
+local function ccTap(x, y)
+	for i = #cc.regions, 1, -1 do
+		local r = cc.regions[i]
+		if inRect(x, y, r[1], r[2], r[3], r[4]) then
+			r[5]()
+			return
+		end
+	end
+	if not inRect(x, y, CCX - 16, CCY - 8, 288, 412) then closeCC() end
+end
+
+---------------------------------------------------------------- navigation
+local homeBtns, homeBtnPos = {}, {}
+
+local function press(sc)
+	sc.Scale = 0.86
+	tw(sc, 0.35, { Scale = 1 }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+end
+
+layoutHome = function()
+	iconsF:ClearAllChildren()
+	homeBtns, homeBtnPos = {}, {}
+	for i, id in ipairs(homeApps) do
+		local d = DEFS[id]
+		local col, row = (i - 1) % 6, math.floor((i - 1) / 6)
+		local cx, cy, size = 1000 * (col + 0.5) / 6, 150 + row * 165, 86
+		local c = frame(iconsF, cx - size / 2, cy - size / 2, size, size, WHITE, 1)
+		local sc = Instance.new("UIScale")
+		sc.Parent = c
+		drawIcon(c, id, 0, 0, size)
+		label(c, d.name, -20, size + 4, size + 40, 22, 18, WHITE, Enum.Font.GothamMedium)
+		table.insert(homeBtns, { x = cx - size / 2 - 8, y = cy - size / 2 - 6, w = size + 16, h = size + 34, id = id, scale = sc })
+		homeBtnPos[id] = { cx, cy }
+	end
+end
+
+getApp = function()
+	if not curId then return nil end
+	if apps[curId] then return apps[curId] end
+	if EXTRA[curId] then
+		demoApp.def = EXTRA[curId]
+		return demoApp
+	end
+	return nil
+end
+
+showApp = function(id)
+	curId = id
+	local a = getApp()
+	if not a then return end
+	for _, pf in ipairs(pageFrames) do pf.Visible = false end
+	kbApp.frame.Visible = false
+	a.page.frame.Visible = true
+	if a.onShow then a.onShow() end
+	a.render()
+end
+
+openApp = function(id)
+	if state == "app" then
+		showApp(id)
+		return
+	end
+	state = "app"
+	showApp(id)
+	local pos = homeBtnPos[id] or { 500, 350 }
+	appF.Position = UDim2.fromOffset(pos[1], pos[2])
+	appScale.Scale = 0.09
+	appF.Visible = true
+	tw(appF, 0.38, { Position = UDim2.fromOffset(500, 350) }, Enum.EasingStyle.Quint)
+	tw(appScale, 0.38, { Scale = 1 }, Enum.EasingStyle.Quint)
+	tw(homeScale, 0.38, { Scale = 0.92 }, Enum.EasingStyle.Quint)
+end
+
+closeApp = function()
+	if state ~= "app" then return end
+	state = "home"
+	kbApp.frame.Visible = false
+	local pos = homeBtnPos[curId] or { 500, 350 }
+	tw(appF, 0.3, { Position = UDim2.fromOffset(pos[1], pos[2]) }, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
+	tw(appScale, 0.3, { Scale = 0.09 }, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
+	tw(homeScale, 0.3, { Scale = 1 }, Enum.EasingStyle.Quint)
+	task.delay(0.32, function()
+		if state ~= "app" then appF.Visible = false end
+	end)
+end
+
+unlock = function()
+	state = "home"
+	tw(lockF, 0.35, { Position = UDim2.fromScale(0, -1) })
+	task.delay(0.36, function()
+		if state ~= "lock" then lockF.Visible = false end
+	end)
+end
+
+lockNow = function(instant)
+	closeCC(true)
+	pwF.Visible = false
+	pwOpen = false
+	closeSiri()
+	appF.Visible = false
+	appScale.Scale = 1
+	homeScale.Scale = 1
+	kbApp.frame.Visible = false
+	state = "lock"
+	curId = nil
+	lockF.Visible = true
+	if instant then
+		lockF.Position = UDim2.fromScale(0, 0)
+	else
+		lockF.Position = UDim2.fromScale(0, -1)
+		tw(lockF, 0.35, { Position = UDim2.fromScale(0, 0) })
+	end
+end
+
+-- power button: screen off / on (black screen)
+local function sleepScreen()
+	if screenOff then return end
+	screenOff = true
+	offF.Visible = true
+	offF.BackgroundTransparency = 1
+	tw(offF, 0.3, { BackgroundTransparency = 0 })
+	task.delay(0.32, function()
+		if screenOff then lockNow(true) end
+	end)
+end
+
+local function wakeScreen()
+	if not screenOff then return end
+	screenOff = false
+	lockNow(true)
+	tw(offF, 0.35, { BackgroundTransparency = 1 })
+	task.delay(0.37, function()
+		if not screenOff then offF.Visible = false end
+	end)
+end
+
+---------------------------------------------------------------- spring (tap force)
+local sp = { x = 0, y = 0, z = 0, rx = 0, ry = 0, xv = 0, yv = 0, zv = 0, rxv = 0, ryv = 0 }
+
+local function bounce(u, v)
+	sp.zv = sp.zv - 1.1                  -- pushed back a little
+	sp.rxv = sp.rxv + (v - 0.5) * 1.5    -- tilts away from where you tapped
+	sp.ryv = sp.ryv + (u - 0.5) * 1.5
+end
+
+---------------------------------------------------------------- taps on the screen
+local function openSettingsWifi()
+	S.sel = "wifi"
+	if state == "app" and curId == "settings" then
+		S.render()
+	else
+		openApp("settings")
+	end
+end
+
+local function handleTap(u, v)
+	if screenOff then return end
+	local x, y = u * CW, v * CH
+
+	if siriOpen then
+		siriTap(x, y)
+		return
+	end
+	if pwOpen then
+		pwTap(x, y)
+		return
+	end
+	if ccOpen then
+		ccTap(x, y)
+		return
+	end
+
+	if state == "home" then
+		if inRect(x, y, 430, 4, 140, 36) then
+			lockNow(false)
+			return
+		end
+		if inRect(x, y, 806, 2, 60, 38) then
+			openSettingsWifi()
+			return
+		end
+		for _, b in ipairs(homeBtns) do
+			if inRect(x, y, b.x, b.y, b.w, b.h) then
+				press(b.scale)
+				task.delay(0.12, function()
+					if state == "home" then openApp(b.id) end
+				end)
+				return
+			end
+		end
+
+	elseif state == "app" then
+		if inRect(x, y, 430, 4, 140, 36) then
+			closeApp()
+			return
+		end
+		if inRect(x, y, 806, 2, 60, 38) then
+			openSettingsWifi()
+			return
+		end
+		local a = getApp()
+		if a and a.tap then a.tap(x, y) end
+	end
+end
+
+---------------------------------------------------------------- side buttons (3D)
+local function rayBox(o, d, bmin, bmax)
+	local tmin, tmax = 0, math.huge
+	for _, ax in ipairs({ "X", "Y", "Z" }) do
+		local oo, dd = o[ax], d[ax]
+		if math.abs(dd) < 1e-6 then
+			if oo < bmin[ax] or oo > bmax[ax] then return nil end
+		else
+			local t1, t2 = (bmin[ax] - oo) / dd, (bmax[ax] - oo) / dd
+			if t1 > t2 then t1, t2 = t2, t1 end
+			tmin = math.max(tmin, t1)
+			tmax = math.min(tmax, t2)
+			if tmin > tmax then return nil end
+		end
+	end
+	return tmin
+end
+
+local PAD = Vector3.new(0.13, 0.13, 0.2) -- forgiving finger hitbox
+local function hitSide(pos)
+	local ray = camera:ScreenPointToRay(pos.X, pos.Y)
+	local cf = model.PrimaryPart.CFrame
+	local o = cf:PointToObjectSpace(ray.Origin)
+	local d = cf:VectorToObjectSpace(ray.Direction)
+	local best, bestT = nil, math.huge
+	for _, b in ipairs(SIDE_BTNS) do
+		local half = b.size / 2 + PAD
+		local t = rayBox(o, d, b.center - half, b.center + half)
+		if t and t < bestT then
+			best, bestT = b.name, t
+		end
+	end
+	return best
+end
+
+local function nudge(part, dir)
+	part.CFrame = part.CFrame * CFrame.new(dir)
+	task.delay(0.09, function()
+		part.CFrame = part.CFrame * CFrame.new(-dir)
+	end)
+end
+
+local function sideAction(name)
+	sp.zv = sp.zv - 0.7
+	if name == "power" then
+		nudge(powerPart, Vector3.new(0, -0.02, 0))
+		if screenOff then wakeScreen() else sleepScreen() end
+	elseif name == "volup" then
+		nudge(volUpPart, Vector3.new(-0.02, 0, 0))
+		changeVolume(1)
+	elseif name == "voldown" then
+		nudge(volDownPart, Vector3.new(-0.02, 0, 0))
+		changeVolume(-1)
+	end
+end
+
+---------------------------------------------------------------- input (ray -> screen)
+local function screenUV(pos)
+	local ray = camera:ScreenPointToRay(pos.X, pos.Y)
+	local cf = screen.CFrame
+	local n = -cf.LookVector -- back-face normal (towards you)
+	local denom = ray.Direction:Dot(n)
+	if denom > -1e-4 then return nil end
+	local p0 = cf:PointToWorldSpace(Vector3.new(0, 0, 0.003))
+	local t = (p0 - ray.Origin):Dot(n) / denom
+	if t < 0 then return nil end
+	local lp = cf:PointToObjectSpace(ray.Origin + ray.Direction * t)
+	return lp.X / SW + 0.5, 0.5 - lp.Y / SH
+end
+
+local drag = { active = false }
+
+local function startDrag(input, ty, u, v)
+	drag = {
+		active = true, input = input, type = ty, su = u, sv = v, u = u, v = v,
+		moved = false, mode = "tap", t0 = os.clock(),
+	}
+	if not screenOff and not siriOpen and not pwOpen then
+		if ccOpen then
+			drag.mode = "cc"
+			if ccPress(u * CW, v * CH) then drag.mode = "ccdrag" end
+		elseif u * CW >= 690 and v * CH <= 55 then
+			drag.mode = "ccopen"
+		elseif state == "lock" then
+			drag.mode = "unlock"
+		elseif (state == "app" and v > 0.9) or (state == "home" and v > 0.94) then
+			drag.mode = "bottom"
+		elseif state == "app" then
+			local a = getApp()
+			if a and a.onPress and a.onPress(u * CW, v * CH) then drag.mode = "appdrag" end
+		end
+	end
+	bounce(u, v)
+	if not screenOff then ripple(u, v) end
+end
+
+local function moveDrag(u, v)
+	drag.u, drag.v = u, v
+	if math.abs(v - drag.sv) > 0.03 or math.abs(u - drag.su) > 0.03 then drag.moved = true end
+	if drag.mode == "unlock" then
+		lockF.Position = UDim2.fromScale(0, -math.clamp(drag.sv - v, 0, 1))
+	elseif drag.mode == "ccopen" then
+		local p = math.clamp((v - drag.sv) / 0.2, 0, 1)
+		if p > 0.02 then ccFollow(p) end
+	elseif drag.mode == "ccdrag" then
+		ccDrag(u * CW, v * CH)
+	elseif drag.mode == "bottom" and state == "app" then
+		appScale.Scale = 1 - math.clamp(drag.sv - v, 0, 0.6) * 0.35
+	elseif drag.mode == "appdrag" then
+		local a = getApp()
+		if a and a.onDrag then a.onDrag(u * CW, v * CH) end
+	end
+end
+
+local function endDrag()
+	local d = drag
+	drag = { active = false }
+	if d.mode == "side" then return end
+	if d.mode == "ccdrag" then
+		ccRelease()
+		return
+	end
+	if d.mode == "cc" then
+		if (d.sv - d.v) > 0.06 then
+			closeCC()
+		elseif not d.moved then
+			handleTap(d.su, d.sv)
+		end
+		return
+	end
+	if d.mode == "ccopen" then
+		local p = math.clamp((d.v - d.sv) / 0.2, 0, 1)
+		if p > 0.35 then
+			openCC(true)
+		elseif ccF.Visible then
+			closeCC()
+		elseif not d.moved then
+			handleTap(d.su, d.sv)
+		end
+		return
+	end
+	if d.mode == "appdrag" then
+		local a = getApp()
+		if a and a.onRelease then a.onRelease() end
+		return
+	end
+	local p = d.sv - d.v
+	if d.mode == "unlock" then
+		local fast = p > 0.12 and (os.clock() - d.t0) < 0.35
+		if p > 0.3 or fast then
+			unlock()
+		else
+			tw(lockF, 0.3, { Position = UDim2.fromScale(0, 0) }, Enum.EasingStyle.Back)
+		end
+	elseif d.mode == "bottom" then
+		if d.siriDone then
+			tw(appScale, 0.25, { Scale = 1 }, Enum.EasingStyle.Back)
+		elseif state == "app" and p > 0.08 then
+			closeApp()
+		else
+			tw(appScale, 0.25, { Scale = 1 }, Enum.EasingStyle.Back)
+		end
+	elseif not d.moved then
+		handleTap(d.su, d.sv)
+	end
+end
+
+local PASS, SINK = Enum.ContextActionResult.Pass, Enum.ContextActionResult.Sink
+
+local function onInput(_, st, input)
+	if not shown then return PASS end
+	local ty = input.UserInputType
+
+	if ty == Enum.UserInputType.MouseMovement then
+		if drag.active and drag.type == Enum.UserInputType.MouseButton1 and drag.mode ~= "side" then
+			local u, v = screenUV(input.Position)
+			if u then moveDrag(u, v) end
+			return SINK
+		end
+		return PASS
+	end
+
+	if st == Enum.UserInputState.Begin then
+		if drag.active then return PASS end
+		local u, v = screenUV(input.Position)
+		if u and u >= 0 and u <= 1 and v >= 0 and v <= 1 then
+			startDrag(input, ty, u, v)
+			return SINK
+		end
+		local side = hitSide(input.Position)
+		if side then
+			drag = { active = true, input = input, type = ty, mode = "side" }
+			sideAction(side)
+			return SINK
+		end
+		return PASS
+	end
+
+	local same = drag.active and ((ty == Enum.UserInputType.Touch and input == drag.input)
+		or (ty ~= Enum.UserInputType.Touch and ty == drag.type))
+	if not same then return PASS end
+
+	if st == Enum.UserInputState.Change then
+		if drag.mode ~= "side" then
+			local u, v = screenUV(input.Position)
+			if u then moveDrag(u, v) end
+		end
+		return SINK
+	elseif st == Enum.UserInputState.End or st == Enum.UserInputState.Cancel then
+		endDrag()
+		return SINK
+	end
+	return PASS
+end
+
+CAS:BindActionAtPriority(
+	"DeltaIPadInput", onInput, false, 3000,
+	Enum.UserInputType.Touch, Enum.UserInputType.MouseButton1, Enum.UserInputType.MouseMovement
+)
+
+---------------------------------------------------------------- per-frame update
+local ARM_NAMES = {
+	"LeftUpperArm", "LeftLowerArm", "LeftHand", "RightUpperArm", "RightLowerArm", "RightHand",
+	"Left Arm", "Right Arm",
+}
+local prevCam = camera.CFrame
+local t0 = os.clock()
+
+local function setShown(on)
+	shown = on
+	drag = { active = false }
+	model.Parent = on and workspace or nil
+	pcall(function()
+		player.CameraMode = on and Enum.CameraMode.LockFirstPerson or Enum.CameraMode.Classic
+	end)
+end
+
+RunService:BindToRenderStep("DeltaIPad", Enum.RenderPriority.Camera.Value + 2, function(dt)
+	camera = workspace.CurrentCamera
+	torchPart.CFrame = camera.CFrame * CFrame.new(0.5, -0.6, -1.5)
+	if not shown then
+		prevCam = camera.CFrame
+		return
+	end
+	dt = math.min(dt, 1 / 30)
+
+	-- little inertia when you turn the camera
+	local rel = prevCam:ToObjectSpace(camera.CFrame)
+	local rx, ry = rel:ToEulerAnglesYXZ()
+	prevCam = camera.CFrame
+	sp.x = math.clamp(sp.x + ry * 0.9, -0.2, 0.2)
+	sp.y = math.clamp(sp.y - rx * 0.9, -0.2, 0.2)
+
+	-- springs (this is the tap bounce)
+	for _, k in ipairs({ "x", "y", "z", "rx", "ry" }) do
+		local kv = k .. "v"
+		sp[kv] = sp[kv] + (-K * sp[k] - C * sp[kv]) * dt
+		sp[k] = sp[k] + sp[kv] * dt
+	end
+
+	local bob = math.sin((os.clock() - t0) * 1.4) * 0.012
+	model:PivotTo(
+		camera.CFrame * HOLD
+		* CFrame.new(sp.x, sp.y + bob, sp.z)
+		* CFrame.Angles(sp.rx, sp.ry, 0)
+	)
+
+	-- hide the default first-person arms (we have our own hands)
+	local ch = player.Character
+	if ch then
+		for _, n in ipairs(ARM_NAMES) do
+			local p = ch:FindFirstChild(n)
+			if p and p:IsA("BasePart") then p.LocalTransparencyModifier = 1 end
+		end
+	end
+
+	-- PC: hold Left Ctrl to free the mouse
+	if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then
+		UIS.MouseBehavior = Enum.MouseBehavior.Default
+		UIS.MouseIconEnabled = true
+	end
+end)
+
+local lastSec = -1
+local dlTimer = 0
+table.insert(conns, RunService.Heartbeat:Connect(function(dt)
+	local ts = os.time()
+	if ts ~= lastSec then
+		lastSec = ts
+		refreshClocks()
+	end
+
+	if state == "lock" and lockF.Visible and not drag.active and not screenOff then
+		hint.TextTransparency = 0.15 + 0.4 * (0.5 + 0.5 * math.sin(os.clock() * 2.4))
+	end
+
+	-- Siri orb animation
+	if siriOpen then
+		orbG.Rotation = (os.clock() * 140) % 360
+		local s = 120 + 8 * math.sin(os.clock() * 4)
+		orb.Size = UDim2.fromOffset(s, s)
+	end
+
+	-- hold the home bar = Siri
+	if drag.active and drag.mode == "bottom" and not drag.moved and not drag.siriDone
+		and siriOn and siriHold and (os.clock() - drag.t0) > 0.6 then
+		drag.siriDone = true
+		openSiri()
+	end
+
+	-- podcasts progress (demo)
+	if Pod.playing and Pod.sel then
+		Pod.prog = math.min(1, Pod.prog + dt / 240)
+		if Pod.fill and state == "app" and curId == "podcasts" then
+			Pod.fill.Size = UDim2.fromOffset(560 * Pod.prog, 8)
+		end
+	end
+
+	-- App Store downloads
+	if not connected then
+		if next(downloading) then
+			table.clear(downloading)
+			if state == "app" and curId == "appstore" then AS.render() end
+		end
+	else
+		local any = false
+		for id, pr in pairs(downloading) do
+			any = true
+			local np = pr + dt / 2.2
+			if np >= 1 then
+				downloading[id] = nil
+				installed[id] = true
+				table.insert(homeApps, id)
+				layoutHome()
+			else
+				downloading[id] = np
+			end
+		end
+		if any then
+			dlTimer = dlTimer + dt
+			if dlTimer > 0.1 or not next(downloading) then
+				dlTimer = 0
+				if state == "app" and curId == "appstore" then AS.render() end
+			end
+		end
+	end
+end))
+
+---------------------------------------------------------------- "pull it out" button
+local sg = Instance.new("ScreenGui")
+sg.Name = "DeltaIPadToggle"
+sg.ResetOnSpawn = false
+sg.DisplayOrder = 50
+local tb = Instance.new("TextButton")
+tb.AnchorPoint = Vector2.new(1, 0)
+tb.Position = UDim2.new(1, -12, 0, 56)
+tb.Size = UDim2.fromOffset(56, 34)
+tb.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
+tb.BackgroundTransparency = 0.3
+tb.Text = "iPad"
+tb.TextColor3 = WHITE
+tb.TextSize = 16
+tb.Font = Enum.Font.GothamBold
+tb.Parent = sg
+local tc = Instance.new("UICorner")
+tc.CornerRadius = px(10)
+tc.Parent = tb
+table.insert(conns, tb.Activated:Connect(function()
+	setShown(not shown)
+end))
+sg.Parent = player:WaitForChild("PlayerGui")
+
+---------------------------------------------------------------- go
+layoutHome()
+refreshClocks()
+applyBrightness()
+onNetChanged()
+model:PivotTo(camera.CFrame * HOLD)
+setShown(true)
+
+env.__DeltaIPadCleanup = function()
+	pcall(function() RunService:UnbindFromRenderStep("DeltaIPad") end)
+	pcall(function() CAS:UnbindAction("DeltaIPadInput") end)
+	for _, c in ipairs(conns) do pcall(function() c:Disconnect() end) end
+	pcall(function() model:Destroy() end)
+	pcall(function() torchPart:Destroy() end)
+	pcall(function() sg:Destroy() end)
+	pcall(function() player.CameraMode = Enum.CameraMode.Classic end)
+end
