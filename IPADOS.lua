@@ -3,7 +3,9 @@
 	- Real 3D iPad in workspace (rounded corners, bezel, camera, side buttons), both hands hold it
 	- Swipe up to unlock
 	- Apps: App Store, Play Store (empty demo), Settings, Classroom, Notes (works), Podcasts (demo),
-	  Reminders (works), Flappy Bird (tap = flap, with your sounds)
+	  Reminders (works). Flappy Bird is NOT preinstalled - download it from the App Store (tap = flap, with your sounds)
+	- Apps that need Wi-Fi (App Store, Play Store, Podcasts, Classroom) only work while Wi-Fi is on AND connected.
+	  Offline apps: Settings, Notes, Reminders, Flappy Bird (once downloaded)
 	- Settings > Display & Brightness: Dark / Light mode. The brightness + volume sliders are design only
 	- Settings: Airplane Mode, Wi-Fi (off by default, some networks need a password), Bluetooth,
 	  Siri (on/off, hold-home-bar, voice, "Try Siri"), Display & Brightness, Sounds (volume), General
@@ -890,6 +892,19 @@ end
 
 local kbApp = makeKeyboard(appF, 162, 330, 162, 330) -- shared by Notes + Reminders
 
+-- shown by apps that need the internet while Wi-Fi isn't connected
+local function offlineScreen(p, f, title)
+	label(f, title, 60, 54, 500, 52, 42, TXT, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+	label(f, "No Internet Connection", 0, 250, 1000, 50, 36, TXT, Enum.Font.GothamBold)
+	label(f, "Connect to a Wi-Fi network in Settings to use " .. title .. ".", 0, 306, 1000, 34, 22, GRAY, Enum.Font.GothamMedium)
+	frame(f, 400, 370, 200, 54, BLUE, 0, px(27))
+	label(f, "Open Settings", 400, 370, 200, 54, 20, WHITE, Enum.Font.GothamBold)
+	p.region(400, 370, 200, 54, function()
+		apps.settings.sel = "wifi"
+		openApp("settings")
+	end)
+end
+
 -- dark / light mode
 applyTheme = function()
 	local dark = (themeMode == "dark")
@@ -1383,6 +1398,7 @@ end
 
 ---------------------------------------------------------------- APP: App Store
 local STORE = {
+	{ id = "flappy", name = "Flappy Bird", sub = "Tap to flap through the pipes", c1 = Color3.fromRGB(122, 205, 220), c2 = Color3.fromRGB(70, 165, 195) },
 	{ id = "x_chess", name = "Pocket Chess", sub = "Classic strategy board game", c1 = Color3.fromRGB(120, 120, 130), c2 = Color3.fromRGB(40, 40, 48) },
 	{ id = "x_weather", name = "Weather Now", sub = "Live forecasts for your city", c1 = Color3.fromRGB(110, 200, 255), c2 = Color3.fromRGB(30, 110, 230) },
 	{ id = "x_photo", name = "Photo Studio", sub = "Edit and share your photos", c1 = Color3.fromRGB(255, 170, 100), c2 = Color3.fromRGB(230, 70, 130) },
@@ -1393,7 +1409,7 @@ local STORE = {
 local EXTRA = {}
 for _, it in ipairs(STORE) do EXTRA[it.id] = it end
 
-local homeApps = { "appstore", "playstore", "settings", "classroom", "notes", "podcasts", "reminders", "flappy" }
+local homeApps = { "appstore", "playstore", "settings", "classroom", "notes", "podcasts", "reminders" }
 local DEFS = {
 	appstore = { name = "App Store", c1 = Color3.fromRGB(80, 170, 255), c2 = Color3.fromRGB(20, 90, 230) },
 	settings = { name = "Settings", c1 = Color3.fromRGB(170, 172, 180), c2 = Color3.fromRGB(100, 102, 112) },
@@ -1428,7 +1444,7 @@ function AS.render()
 	end
 	label(f, "Featured Apps", 60, 104, 500, 28, 20, GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
 	for i, it in ipairs(STORE) do
-		local y = 144 + (i - 1) * 86
+		local y = 144 + (i - 1) * 76
 		drawIcon(f, it.id, 60, y, 70)
 		label(f, it.name, 148, y + 6, 520, 32, 26, TXT, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
 		label(f, it.sub, 148, y + 40, 520, 26, 18, GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
@@ -1722,6 +1738,11 @@ function Pod.render()
 	p.clear()
 	local f = p.frame
 	Pod.fill = nil
+	if not connected then
+		Pod.playing = false
+		offlineScreen(p, f, "Podcasts")
+		return
+	end
 	label(f, "Podcasts", 60, 54, 500, 52, 42, TXT, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
 	label(f, "Top Shows", 60, 106, 400, 26, 20, GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
 	for i, s in ipairs(SHOWS) do
@@ -1823,6 +1844,10 @@ do
 		local p = Cr.page
 		p.clear()
 		local f = p.frame
+		if not connected then
+			offlineScreen(p, f, "Classroom")
+			return
+		end
 		if not Cr.sel then
 			label(f, "Classroom", 60, 54, 500, 52, 42, TXT, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
 			label(f, "Your classes", 60, 106, 400, 26, 20, GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
@@ -2793,6 +2818,10 @@ table.insert(conns, RunService.Heartbeat:Connect(function(dt)
 	-- podcasts progress (demo)
 	if state == "app" and curId == "flappy" then
 		apps.flappy.update(dt)
+	end
+
+	if Pod.playing and not connected then
+		Pod.playing = false
 	end
 
 	if Pod.playing and Pod.sel then
