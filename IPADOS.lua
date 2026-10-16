@@ -2,9 +2,12 @@
 	iPad (first person) - Roblox Delta LocalScript  (v4)
 	- Real 3D iPad in workspace (rounded corners, bezel, camera, side buttons), both hands hold it
 	- Swipe up to unlock
-	- Apps: App Store, Play Store (empty demo), Settings, Classroom, Notes (works), Podcasts (demo),
-	  Reminders (works). Flappy Bird is NOT preinstalled - download it from the App Store (tap = flap, with your sounds)
-	- Apps that need Wi-Fi (App Store, Play Store, Podcasts, Classroom) only work while Wi-Fi is on AND connected.
+	- Apps: App Store, Settings, Classroom, Notes (works), Podcasts (demo),
+	  Reminders (works), Camera + Gallery, Calculator (works). Flappy Bird is NOT preinstalled - download it from the App Store (tap = flap, with your sounds)
+	- Camera: tap the shutter. The iPad hides for a split second and a real screenshot is saved. Tap Flip for selfie mode
+	  (the camera turns around and photographs YOU). Gallery shows photos full-screen (arrows / delete).
+	  If screenshots are blocked in the game you get a placeholder picture instead
+	- Apps that need Wi-Fi (App Store, Podcasts, Classroom) only work while Wi-Fi is on AND connected.
 	  Offline apps: Settings, Notes, Reminders, Flappy Bird (once downloaded)
 	- Settings > Display & Brightness: Dark / Light mode. The brightness + volume sliders are design only
 	- Settings: Airplane Mode, Wi-Fi (off by default, some networks need a password), Bluetooth,
@@ -467,6 +470,11 @@ do
 			shape(h, s, 0.14 + (i - 1) * 0.18, 0.5, 0.1, hh, c, 0, 0.5)
 		end
 	end
+	GLYPH.flip = function(h, s, c)
+		ringShape(h, s, 0.5, 0.5, 0.6, 0.08, c)
+		triShape(h, s, "r", 0.6, 0.06, 0.26, c)
+		triShape(h, s, "l", 0.14, 0.68, 0.26, c)
+	end
 	GLYPH.lock = function(h, s, c)
 		shape(h, s, 0.5, 0.6, 0.64, 0.46, c, 0, 0.18)
 		ringShape(h, s, 0.5, 0.32, 0.38, 0.1, c)
@@ -540,17 +548,6 @@ do
 			end
 		end,
 	}
-	ICONS.playstore = {
-		c1 = WHITE, c2 = Color3.fromRGB(236, 236, 242),
-		draw = function(ic, s)
-			triShape(ic, s, "r", 0.34, 0.2, 0.6, WHITE, {
-				{ 0, Color3.fromRGB(0, 176, 255) }, { 0.25, Color3.fromRGB(0, 176, 255) },
-				{ 0.2501, Color3.fromRGB(0, 200, 83) }, { 0.5, Color3.fromRGB(0, 200, 83) },
-				{ 0.5001, Color3.fromRGB(255, 214, 0) }, { 0.75, Color3.fromRGB(255, 214, 0) },
-				{ 0.7501, Color3.fromRGB(244, 67, 54) }, { 1, Color3.fromRGB(244, 67, 54) },
-			})
-		end,
-	}
 	ICONS.classroom = {
 		c1 = Color3.fromRGB(52, 168, 83), c2 = Color3.fromRGB(20, 120, 55),
 		draw = function(ic, s)
@@ -572,6 +569,43 @@ do
 			shape(ic, s, 0.5, 0.38, 0.14, 0.14, WHITE, 0, 0.5)
 			shape(ic, s, 0.53, 0.38, 0.06, 0.06, Color3.new(0, 0, 0), 0, 0.5)
 			shape(ic, s, 0.66, 0.49, 0.17, 0.1, Color3.fromRGB(255, 120, 40), 0, 0.4)
+		end,
+	}
+	ICONS.camera = {
+		c1 = Color3.fromRGB(120, 122, 132), c2 = Color3.fromRGB(40, 40, 48),
+		draw = function(ic, s)
+			shape(ic, s, 0.5, 0.33, 0.28, 0.1, Color3.fromRGB(235, 235, 240), 0, 0.4)
+			shape(ic, s, 0.5, 0.57, 0.7, 0.46, Color3.fromRGB(235, 235, 240), 0, 0.18)
+			shape(ic, s, 0.5, 0.58, 0.34, 0.34, Color3.fromRGB(40, 40, 48), 0, 0.5)
+			shape(ic, s, 0.5, 0.58, 0.24, 0.24, Color3.fromRGB(70, 110, 190), 0, 0.5)
+			shape(ic, s, 0.46, 0.54, 0.07, 0.07, WHITE, 0, 0.5, 0.2)
+			shape(ic, s, 0.72, 0.43, 0.06, 0.06, Color3.fromRGB(255, 204, 0), 0, 0.5)
+		end,
+	}
+	ICONS.gallery = {
+		c1 = Color3.fromRGB(88, 196, 255), c2 = Color3.fromRGB(30, 110, 220),
+		draw = function(ic, s)
+			shape(ic, s, 0.5, 0.5, 0.7, 0.54, WHITE, 0, 0.1)
+			local w, h = 0.6 * s, 0.44 * s
+			local inner = shape(ic, s, 0.5, 0.5, 0.6, 0.44, Color3.fromRGB(150, 210, 255), 0, 0.05)
+			inner.ClipsDescendants = true
+			shape(inner, 1, w * 0.74, h * 0.3, w * 0.16, w * 0.16, Color3.fromRGB(255, 214, 10), 0, 0.5)
+			shape(inner, 1, w * 0.3, h * 1.05, w * 0.9, w * 0.9, Color3.fromRGB(86, 168, 92), 0, 0.5)
+			shape(inner, 1, w * 0.82, h * 1.12, w * 0.8, w * 0.8, Color3.fromRGB(60, 140, 76), 0, 0.5)
+		end,
+	}
+	ICONS.calculator = {
+		c1 = Color3.fromRGB(70, 70, 76), c2 = Color3.fromRGB(22, 22, 26),
+		draw = function(ic, s)
+			shape(ic, s, 0.5, 0.25, 0.72, 0.17, Color3.fromRGB(46, 46, 52), 0, 0.25)
+			shape(ic, s, 0.74, 0.25, 0.22, 0.045, WHITE, 0, 0.5)
+			for r = 0, 2 do
+				for c = 0, 3 do
+					local col = Color3.fromRGB(90, 90, 98)
+					if c == 3 then col = Color3.fromRGB(255, 149, 0) elseif r == 0 then col = Color3.fromRGB(165, 165, 165) end
+					shape(ic, s, 0.2 + c * 0.2, 0.47 + r * 0.17, 0.16, 0.12, col, 0, 0.4)
+				end
+			end
 		end,
 	}
 	ICONS.x_chess = {
@@ -683,6 +717,7 @@ local curId = nil
 local screenOff = false
 local siriOpen, pwOpen = false, false
 local ccOpen = false
+local selfieActive = false          -- true for a moment while a selfie is being taken
 local themeMode = "dark"          -- "dark" | "light"
 local wifiOn, connected, connecting, connectToken = false, nil, nil, nil
 local airplane, btOn = false, false
@@ -905,6 +940,12 @@ local function offlineScreen(p, f, title)
 	end)
 end
 
+local function setChrome(c)
+	for _, l in ipairs(chromeReg.labels) do l.TextColor3 = c end
+	for _, fr in ipairs(chromeReg.frames) do fr.BackgroundColor3 = c end
+	for _, st in ipairs(chromeReg.strokes) do st.Color = c end
+end
+
 -- dark / light mode
 applyTheme = function()
 	local dark = (themeMode == "dark")
@@ -913,9 +954,7 @@ applyTheme = function()
 	SIDEBAR = dark and Color3.fromRGB(32, 32, 42) or Color3.fromRGB(226, 226, 232)
 	TXT = dark and WHITE or Color3.fromRGB(20, 20, 26)
 	appF.BackgroundColor3 = BG
-	for _, l in ipairs(chromeReg.labels) do l.TextColor3 = TXT end
-	for _, fr in ipairs(chromeReg.frames) do fr.BackgroundColor3 = TXT end
-	for _, st in ipairs(chromeReg.strokes) do st.Color = TXT end
+	setChrome(TXT)
 	if state == "app" then
 		local a = getApp()
 		if a and a.render then a.render() end
@@ -1409,7 +1448,7 @@ local STORE = {
 local EXTRA = {}
 for _, it in ipairs(STORE) do EXTRA[it.id] = it end
 
-local homeApps = { "appstore", "playstore", "settings", "classroom", "notes", "podcasts", "reminders" }
+local homeApps = { "appstore", "settings", "classroom", "notes", "podcasts", "reminders", "camera", "gallery", "calculator" }
 local DEFS = {
 	appstore = { name = "App Store", c1 = Color3.fromRGB(80, 170, 255), c2 = Color3.fromRGB(20, 90, 230) },
 	settings = { name = "Settings", c1 = Color3.fromRGB(170, 172, 180), c2 = Color3.fromRGB(100, 102, 112) },
@@ -1418,9 +1457,11 @@ local DEFS = {
 	reminders = { name = "Reminders", c1 = Color3.fromRGB(255, 255, 255), c2 = Color3.fromRGB(215, 215, 225) },
 }
 for _, it in ipairs(STORE) do DEFS[it.id] = { name = it.name, c1 = it.c1, c2 = it.c2 } end
-DEFS.playstore = { name = "Play Store" }
 DEFS.classroom = { name = "Classroom" }
 DEFS.flappy = { name = "Flappy Bird" }
+DEFS.camera = { name = "Camera" }
+DEFS.gallery = { name = "Gallery" }
+DEFS.calculator = { name = "Calculator" }
 
 local AS = { page = newPage() }
 apps.appstore = AS
@@ -1784,35 +1825,6 @@ function Pod.render()
 end
 Pod.tap = Pod.page.tap
 
----------------------------------------------------------------- APP: Play Store (demo - no apps yet)
-do
-	local Ps = { page = newPage() }
-	apps.playstore = Ps
-
-	function Ps.render()
-		local p = Ps.page
-		p.clear()
-		local f = p.frame
-		label(f, "Play Store", 60, 54, 500, 52, 42, TXT, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
-		if not connected then
-			label(f, "No Internet Connection", 0, 250, 1000, 50, 36, TXT, Enum.Font.GothamBold)
-			label(f, "Connect to a Wi-Fi network in Settings to open the Play Store.", 0, 306, 1000, 34, 22, GRAY, Enum.Font.GothamMedium)
-			frame(f, 400, 370, 200, 54, BLUE, 0, px(27))
-			label(f, "Open Settings", 400, 370, 200, 54, 20, WHITE, Enum.Font.GothamBold)
-			p.region(400, 370, 200, 54, function()
-				S.sel = "wifi"
-				openApp("settings")
-			end)
-			return
-		end
-		frame(f, 60, 124, 880, 52, CARD, 0, px(26))
-		label(f, "Search apps & games", 92, 124, 600, 52, 20, GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
-		label(f, "No apps available yet", 0, 290, 1000, 50, 34, TXT, Enum.Font.GothamBold)
-		label(f, "This is a demo - the Play Store is empty for now.", 0, 344, 1000, 34, 22, GRAY, Enum.Font.GothamMedium)
-	end
-	Ps.tap = Ps.page.tap
-end
-
 ---------------------------------------------------------------- APP: Classroom
 do
 	local CLASSES = {
@@ -2112,6 +2124,381 @@ do
 	Fl.tap = Fl.page.tap
 end
 
+---------------------------------------------------------------- APP: Camera + Gallery
+do
+	local MAXP = 12
+	local photos = {}   -- newest first: { ts = "Oct 16, 09:41 PM", content = <image id>, pending = bool, failed = bool }
+	local Cam = { page = newPage(), busy = false, selfie = false }
+	local Gal = { page = newPage(), view = nil, openLatest = false }
+	apps.camera = Cam
+	apps.gallery = Gal
+
+	local function setImg(im, c)
+		if typeof(c) == "string" then
+			im.Image = c
+		else
+			pcall(function() im.ImageContent = c end)
+		end
+	end
+
+	-- little landscape drawing, shown when the real screenshot isn't available
+	local function placeholder(parent, x, y, w, h, note)
+		local f = frame(parent, x, y, w, h, Color3.fromRGB(120, 190, 235), 0, px(14))
+		gradient(f, Color3.fromRGB(110, 185, 235), Color3.fromRGB(225, 238, 250), 90)
+		f.ClipsDescendants = true
+		frame(f, w * 0.68, h * 0.14, w * 0.14, w * 0.14, Color3.fromRGB(255, 214, 10), 0, FULL)
+		frame(f, -w * 0.1, h * 0.62, w * 0.75, w * 0.75, Color3.fromRGB(86, 168, 92), 0, FULL)
+		frame(f, w * 0.4, h * 0.72, w * 0.8, w * 0.8, Color3.fromRGB(64, 140, 78), 0, FULL)
+		if note then
+			label(f, note, 0, h - 90, w, 40, 22, WHITE, Enum.Font.GothamBold)
+		end
+		return f
+	end
+
+	local function photoView(parent, ph, x, y, w, h, fit, big)
+		if ph.content then
+			local im = Instance.new("ImageLabel")
+			im.BackgroundColor3 = Color3.new(0, 0, 0)
+			im.BorderSizePixel = 0
+			im.Position = UDim2.fromOffset(x, y)
+			im.Size = UDim2.fromOffset(w, h)
+			im.ScaleType = fit and Enum.ScaleType.Fit or Enum.ScaleType.Crop
+			setImg(im, ph.content)
+			if not big then
+				local c = Instance.new("UICorner")
+				c.CornerRadius = px(14)
+				c.Parent = im
+			end
+			im.Parent = parent
+			return im
+		elseif ph.pending then
+			local f = frame(parent, x, y, w, h, Color3.fromRGB(40, 40, 48), 0, (not big) and px(14) or nil)
+			label(f, "Saving...", 0, 0, w, h, big and 28 or 16, GRAY, Enum.Font.GothamMedium)
+			return f
+		end
+		return placeholder(parent, x, y, w, h, big and "Placeholder photo (screenshots aren't available here)" or nil)
+	end
+
+	---------------- Camera
+	function Cam.drawThumb()
+		local h = Cam.thumbHolder
+		if not h or not h.Parent then return end
+		h:ClearAllChildren()
+		if photos[1] then
+			photoView(h, photos[1], 0, 0, 90, 90, false, false)
+		else
+			frame(h, 0, 0, 90, 90, Color3.fromRGB(40, 40, 48), 0, px(14))
+		end
+	end
+
+	local function takePhoto()
+		if Cam.busy then return end
+		Cam.busy = true
+		local selfie = Cam.selfie
+		local ph = { ts = os.date("%b %d, %I:%M %p"), pending = true, selfie = selfie }
+		table.insert(photos, 1, ph)
+		while #photos > MAXP do table.remove(photos) end
+		if Cam.flash and Cam.flash.Parent then
+			Cam.flash.BackgroundTransparency = 0.1
+			tw(Cam.flash, 0.35, { BackgroundTransparency = 1 })
+		end
+		Cam.drawThumb()
+		task.spawn(function()
+			local tg = player:FindFirstChild("PlayerGui") and player.PlayerGui:FindFirstChild("DeltaIPadToggle")
+			local got = nil
+			local oldType = nil
+			task.wait(0.15) -- let the flash show first
+			pcall(function()
+				-- hide the iPad (and its little button) for a moment so the picture shows the world
+				if tg then tg.Enabled = false end
+				model.Parent = nil
+				if selfie then
+					-- flip the camera around: look at your own face from the front
+					local ch = player.Character
+					local head = ch and ch:FindFirstChild("Head")
+					local cam = workspace.CurrentCamera
+					if head and cam then
+						oldType = cam.CameraType
+						selfieActive = true
+						cam.CameraType = Enum.CameraType.Scriptable
+						local pos = head.Position + head.CFrame.LookVector * 6 + Vector3.new(0, 0.6, 0)
+						cam.CFrame = CFrame.lookAt(pos, head.Position + Vector3.new(0, -0.5, 0))
+					end
+				end
+				RunService.RenderStepped:Wait()
+				RunService.RenderStepped:Wait()
+				RunService.RenderStepped:Wait()
+				local done = false
+				game:GetService("CaptureService"):CaptureScreenshot(function(id)
+					got = id
+					done = true
+				end)
+				local t1 = os.clock()
+				while not done and os.clock() - t1 < 3 do task.wait() end
+			end)
+			-- always put everything back
+			if selfieActive then
+				selfieActive = false
+				pcall(function() workspace.CurrentCamera.CameraType = oldType or Enum.CameraType.Custom end)
+			end
+			model.Parent = shown and workspace or nil
+			if tg then tg.Enabled = true end
+			ph.pending = false
+			if got then ph.content = got else ph.failed = true end
+			Cam.busy = false
+			if state == "app" and curId == "camera" then Cam.drawThumb() end
+			if state == "app" and curId == "gallery" then Gal.render() end
+		end)
+	end
+
+	function Cam.render()
+		local p = Cam.page
+		p.clear()
+		local f = p.frame
+		setChrome(WHITE)
+		frame(f, 0, 0, CW, CH, Color3.new(0, 0, 0), 0)
+		local vf = frame(f, 30, 56, 800, 590, Color3.fromRGB(28, 28, 34), 0, px(18))
+		gradient(vf, Color3.fromRGB(46, 50, 62), Color3.fromRGB(14, 14, 18), 90)
+		for i = 1, 2 do
+			frame(vf, 800 * i / 3, 0, 1, 590, WHITE, 0.75)
+			frame(vf, 0, 590 * i / 3, 800, 1, WHITE, 0.75)
+		end
+		local focus = frame(vf, 340, 245, 120, 100, WHITE, 1)
+		stroke(focus, Color3.fromRGB(255, 204, 0), 2)
+		if Cam.selfie then
+			frame(vf, 360, 170, 80, 80, Color3.fromRGB(70, 74, 90), 0, FULL)
+			frame(vf, 300, 262, 200, 120, Color3.fromRGB(70, 74, 90), 0, px(60))
+		end
+		label(vf, Cam.selfie and "Selfie camera - you'll be in the picture" or "Look at something, then tap the shutter", 0, 540, 800, 30, 18, Color3.fromRGB(200, 200, 212), Enum.Font.GothamMedium)
+		Cam.flash = frame(f, 30, 56, 800, 590, WHITE, 1, px(18))
+
+		label(f, "PHOTO", 850, 64, 150, 28, 18, Color3.fromRGB(255, 204, 0), Enum.Font.GothamBold)
+		Cam.thumbHolder = frame(f, 880, 150, 90, 90, WHITE, 1)
+		Cam.drawThumb()
+		p.region(870, 140, 110, 110, function()
+			if photos[1] then
+				Gal.openLatest = true
+				openApp("gallery")
+			end
+		end)
+
+		local ring = frame(f, 880, 330, 90, 90, WHITE, 1, FULL)
+		stroke(ring, WHITE, 4)
+		frame(f, 891, 341, 68, 68, WHITE, 0, FULL)
+		p.region(870, 320, 110, 110, takePhoto)
+		label(f, #photos .. " saved", 850, 440, 150, 26, 16, GRAY, Enum.Font.GothamMedium)
+		local flip = frame(f, 885, 500, 80, 80, Color3.fromRGB(52, 52, 62), 0, FULL)
+		glyph(flip, "flip", 40, 40, 40, WHITE, Color3.fromRGB(52, 52, 62))
+		label(f, Cam.selfie and "Selfie" or "Back", 850, 584, 150, 24, 16, Cam.selfie and Color3.fromRGB(255, 204, 0) or GRAY, Enum.Font.GothamBold)
+		p.region(870, 490, 110, 120, function()
+			Cam.selfie = not Cam.selfie
+			Cam.render()
+		end)
+	end
+	Cam.tap = Cam.page.tap
+
+	---------------- Gallery
+	function Gal.onShow()
+		Gal.view = (Gal.openLatest and photos[1]) and 1 or nil
+		Gal.openLatest = false
+	end
+
+	function Gal.render()
+		local p = Gal.page
+		p.clear()
+		local f = p.frame
+		if Gal.view and not photos[Gal.view] then
+			Gal.view = (#photos > 0) and math.min(Gal.view, #photos) or nil
+		end
+		setChrome(Gal.view and WHITE or TXT)
+
+		if Gal.view then
+			local ph = photos[Gal.view]
+			frame(f, 0, 0, CW, CH, Color3.new(0, 0, 0), 0)
+			photoView(f, ph, 0, 0, CW, CH, true, true)
+			frame(f, 0, 0, CW, 70, Color3.new(0, 0, 0), 0.45)
+			frame(f, 30, 66, 130, 42, Color3.new(0, 0, 0), 0.5, px(21))
+			label(f, "Photos", 30, 66, 130, 42, 18, WHITE, Enum.Font.GothamBold)
+			p.region(30, 66, 130, 42, function()
+				Gal.view = nil
+				Gal.render()
+			end)
+			frame(f, 840, 66, 130, 42, Color3.fromRGB(255, 69, 58), 0.1, px(21))
+			label(f, "Delete", 840, 66, 130, 42, 18, WHITE, Enum.Font.GothamBold)
+			p.region(840, 66, 130, 42, function()
+				table.remove(photos, Gal.view)
+				Gal.view = (#photos > 0) and math.min(Gal.view, #photos) or nil
+				Gal.render()
+			end)
+			frame(f, 0, 640, CW, 60, Color3.new(0, 0, 0), 0.45)
+			label(f, ph.ts .. "     " .. Gal.view .. " of " .. #photos, 0, 646, CW, 30, 20, WHITE, Enum.Font.GothamMedium)
+			if Gal.view > 1 then
+				frame(f, 24, 320, 64, 64, Color3.new(0, 0, 0), 0.5, FULL)
+				triShape(f, 1, "l", 44, 336, 32, WHITE)
+				p.region(14, 300, 84, 104, function()
+					Gal.view = Gal.view - 1
+					Gal.render()
+				end)
+			end
+			if Gal.view < #photos then
+				frame(f, 912, 320, 64, 64, Color3.new(0, 0, 0), 0.5, FULL)
+				triShape(f, 1, "r", 936, 336, 32, WHITE)
+				p.region(902, 300, 84, 104, function()
+					Gal.view = Gal.view + 1
+					Gal.render()
+				end)
+			end
+		else
+			label(f, "Gallery", 60, 54, 500, 52, 42, TXT, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+			label(f, #photos .. (#photos == 1 and " photo" or " photos"), 60, 106, 400, 26, 20, GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+			if #photos == 0 then
+				label(f, "No Photos", 0, 270, 1000, 50, 36, TXT, Enum.Font.GothamBold)
+				label(f, "Take pictures with the Camera app and they'll show up here.", 0, 326, 1000, 34, 22, GRAY, Enum.Font.GothamMedium)
+			end
+			for i, ph in ipairs(photos) do
+				local col, row = (i - 1) % 4, math.floor((i - 1) / 4)
+				local x, y = 60 + col * 225, 150 + row * 166
+				photoView(f, ph, x, y, 205, 150, false, false)
+				p.region(x, y, 205, 150, function()
+					Gal.view = i
+					Gal.render()
+				end)
+			end
+		end
+	end
+	Gal.tap = Gal.page.tap
+end
+
+---------------------------------------------------------------- APP: Calculator
+do
+	local Calc = { page = newPage(), cur = "0", acc = nil, op = nil, fresh = true }
+	apps.calculator = Calc
+
+	local KEYS = {
+		{ "AC", "+/-", "%", "/" },
+		{ "7", "8", "9", "x" },
+		{ "4", "5", "6", "-" },
+		{ "1", "2", "3", "+" },
+		{ "0", ".", "=" },
+	}
+	local COLS5 = { 1, 3, 4 } -- bottom row: the 0 key is double wide
+
+	local function fmt(n)
+		if n ~= n or n == math.huge or n == -math.huge then return "Error" end
+		if math.abs(n) >= 1e12 then return string.format("%.6g", n) end
+		if n == math.floor(n) then return string.format("%.0f", n) end
+		local s = string.format("%.8f", n)
+		s = s:gsub("0+$", "")
+		return s
+	end
+
+	local function compute(a, op, b)
+		if op == "+" then
+			return a + b
+		elseif op == "-" then
+			return a - b
+		elseif op == "x" then
+			return a * b
+		elseif op == "/" then
+			if b == 0 then return math.huge end
+			return a / b
+		end
+		return b
+	end
+
+	local function reset()
+		Calc.cur, Calc.acc, Calc.op, Calc.fresh = "0", nil, nil, true
+	end
+
+	local function press(k)
+		local c = Calc
+		if c.cur == "Error" and k ~= "AC" then reset() end
+		if k == "AC" then
+			reset()
+		elseif k == "+/-" then
+			if c.cur ~= "0" then
+				if c.cur:sub(1, 1) == "-" then c.cur = c.cur:sub(2) else c.cur = "-" .. c.cur end
+			end
+		elseif k == "%" then
+			c.cur = fmt(tonumber(c.cur) / 100)
+			c.fresh = true
+		elseif k == "." then
+			if c.fresh then
+				c.cur = "0."
+				c.fresh = false
+			elseif not c.cur:find("%.") then
+				c.cur = c.cur .. "."
+			end
+		elseif k:match("^%d$") then
+			if c.fresh then
+				c.cur = k
+				c.fresh = false
+			elseif c.cur == "0" then
+				c.cur = k
+			elseif #c.cur < 12 then
+				c.cur = c.cur .. k
+			end
+		elseif k == "=" then
+			if c.op and c.acc then
+				c.cur = fmt(compute(c.acc, c.op, tonumber(c.cur)))
+				c.acc, c.op, c.fresh = nil, nil, true
+			end
+		else -- + - x /
+			if c.op and c.acc and not c.fresh then
+				c.acc = compute(c.acc, c.op, tonumber(c.cur))
+				c.cur = fmt(c.acc)
+				if c.cur == "Error" then
+					c.acc, c.op, c.fresh = nil, nil, true
+					return
+				end
+			else
+				c.acc = tonumber(c.cur)
+			end
+			c.op = k
+			c.fresh = true
+		end
+	end
+
+	function Calc.render()
+		local p = Calc.page
+		p.clear()
+		local f = p.frame
+		setChrome(WHITE)
+		frame(f, 0, 0, CW, CH, Color3.new(0, 0, 0), 0)
+		label(f, Calc.cur, 60, 70, 880, 110, #Calc.cur > 10 and 60 or 84, WHITE, Enum.Font.GothamMedium, Enum.TextXAlignment.Right)
+		local KW, KH, GAP = 200, 76, 12
+		local x0, y0 = 82, 196
+		local ORANGE = Color3.fromRGB(255, 149, 0)
+		for r, row in ipairs(KEYS) do
+			for c, k in ipairs(row) do
+				local ci = (r == 5) and COLS5[c] or c
+				local x = x0 + (ci - 1) * (KW + GAP)
+				local y = y0 + (r - 1) * (KH + GAP)
+				local w = (k == "0") and (KW * 2 + GAP) or KW
+				local isOp = (k == "/" or k == "x" or k == "-" or k == "+" or k == "=")
+				local active = isOp and k ~= "=" and Calc.op == k and Calc.fresh
+				local bg, fg
+				if active then
+					bg, fg = WHITE, ORANGE
+				elseif isOp then
+					bg, fg = ORANGE, WHITE
+				elseif r == 1 then
+					bg, fg = Color3.fromRGB(165, 165, 165), Color3.new(0, 0, 0)
+				else
+					bg, fg = Color3.fromRGB(51, 51, 51), WHITE
+				end
+				frame(f, x, y, w, KH, bg, 0, px(38))
+				label(f, k, x, y, w, KH, 32, fg, Enum.Font.GothamMedium)
+				p.region(x, y, w, KH, function()
+					press(k)
+					Calc.render()
+				end)
+			end
+		end
+	end
+	Calc.tap = Calc.page.tap
+end
+
 ---------------------------------------------------------------- CONTROL CENTER (swipe down from the top-right / Wi-Fi icon)
 local ccF, ccPress, ccDrag, ccRelease, ccFollow, ccTap
 do
@@ -2353,6 +2740,7 @@ showApp = function(id)
 	for _, pf in ipairs(pageFrames) do pf.Visible = false end
 	kbApp.frame.Visible = false
 	a.page.frame.Visible = true
+	setChrome(TXT)
 	if a.onShow then a.onShow() end
 	a.render()
 end
@@ -2744,6 +3132,17 @@ end
 
 RunService:BindToRenderStep("DeltaIPad", Enum.RenderPriority.Camera.Value + 2, function(dt)
 	camera = workspace.CurrentCamera
+	if selfieActive then
+		-- selfie in progress: keep the camera where it was put and show the whole avatar
+		prevCam = camera.CFrame
+		local ch0 = player.Character
+		if ch0 then
+			for _, d in ipairs(ch0:GetDescendants()) do
+				if d:IsA("BasePart") then d.LocalTransparencyModifier = 0 end
+			end
+		end
+		return
+	end
 	torchPart.CFrame = camera.CFrame * CFrame.new(0.5, -0.6, -1.5)
 	if not shown then
 		prevCam = camera.CFrame
