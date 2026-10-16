@@ -2,7 +2,9 @@
 	iPad (first person) - Roblox Delta LocalScript  (v4)
 	- Real 3D iPad in workspace (rounded corners, bezel, camera, side buttons), both hands hold it
 	- Swipe up to unlock
-	- Apps: App Store, Settings, Notes (works), Podcasts (demo), Reminders (works)
+	- Apps: App Store, Play Store (empty demo), Settings, Classroom, Notes (works), Podcasts (demo),
+	  Reminders (works), Flappy Bird (tap = flap, with your sounds)
+	- Settings > Display & Brightness: Dark / Light mode. The brightness + volume sliders are design only
 	- Settings: Airplane Mode, Wi-Fi (off by default, some networks need a password), Bluetooth,
 	  Siri (on/off, hold-home-bar, voice, "Try Siri"), Display & Brightness, Sounds (volume), General
 	- App Store needs Wi-Fi. GET installs demo apps onto the home screen
@@ -40,6 +42,8 @@ local WHITE = Color3.new(1, 1, 1)
 local BG = Color3.fromRGB(26, 26, 34)
 local CARD = Color3.fromRGB(46, 46, 58)
 local GRAY = Color3.fromRGB(150, 150, 165)
+local TXT = WHITE                      -- main text colour (changes with dark / light mode)
+local SIDEBAR = Color3.fromRGB(32, 32, 42)
 local BLUE = Color3.fromRGB(10, 132, 255)
 local GREEN = Color3.fromRGB(52, 199, 89)
 local FULL = UDim.new(1, 0)
@@ -56,134 +60,142 @@ local conns = {}
 local shown = true
 
 ---------------------------------------------------------------- 3D model
-local model = Instance.new("Model")
-model.Name = "DeltaIPad"
+local model, screen, powerPart, volUpPart, volDownPart, SIDE_BTNS
+do
+	model = Instance.new("Model")
+	model.Name = "DeltaIPad"
 
-local function mk(size, cf, color, mat, shape)
-	local p = Instance.new("Part")
-	p.Anchored = true
-	p.CanCollide = false
-	p.CanQuery = false
-	p.CanTouch = false
-	p.CastShadow = false
-	p.Size = size
-	p.CFrame = cf
-	p.Color = color
-	p.Material = mat or SP
-	if shape then p.Shape = shape end
-	p.Parent = model
-	return p
-end
+	local function mk(size, cf, color, mat, shape)
+		local p = Instance.new("Part")
+		p.Anchored = true
+		p.CanCollide = false
+		p.CanQuery = false
+		p.CanTouch = false
+		p.CastShadow = false
+		p.Size = size
+		p.CFrame = cf
+		p.Color = color
+		p.Material = mat or SP
+		if shape then p.Shape = shape end
+		p.Parent = model
+		return p
+	end
 
--- rounded rectangle slab (smooth corners made from cylinders)
-local function roundedBox(w, h, d, r, center, color, mat)
-	mk(Vector3.new(w - 2 * r, h, d), CFrame.new(center), color, mat)
-	mk(Vector3.new(w, h - 2 * r, d - 0.002), CFrame.new(center), color, mat)
-	for _, sx in ipairs({ -1, 1 }) do
-		for _, sy in ipairs({ -1, 1 }) do
-			mk(
-				Vector3.new(d - 0.004, 2 * r, 2 * r),
-				CFrame.new(center + Vector3.new(sx * (w / 2 - r), sy * (h / 2 - r), 0)) * CFrame.Angles(0, math.pi / 2, 0),
-				color, mat, CYL
-			)
+	-- rounded rectangle slab (smooth corners made from cylinders)
+	local function roundedBox(w, h, d, r, center, color, mat)
+		mk(Vector3.new(w - 2 * r, h, d), CFrame.new(center), color, mat)
+		mk(Vector3.new(w, h - 2 * r, d - 0.002), CFrame.new(center), color, mat)
+		for _, sx in ipairs({ -1, 1 }) do
+			for _, sy in ipairs({ -1, 1 }) do
+				mk(
+					Vector3.new(d - 0.004, 2 * r, 2 * r),
+					CFrame.new(center + Vector3.new(sx * (w / 2 - r), sy * (h / 2 - r), 0)) * CFrame.Angles(0, math.pi / 2, 0),
+					color, mat, CYL
+				)
+			end
 		end
 	end
-end
 
-local silver = Color3.fromRGB(196, 198, 204)
-roundedBox(W, H, T, R, Vector3.zero, silver, Enum.Material.Metal)               -- aluminium body (first part = pivot)
-model.PrimaryPart = model:FindFirstChildWhichIsA("BasePart")
-roundedBox(W - 0.05, H - 0.05, 0.012, R - 0.03, Vector3.new(0, 0, T / 2 + 0.004), Color3.fromRGB(8, 8, 10), SP) -- black bezel
+	local silver = Color3.fromRGB(196, 198, 204)
+	roundedBox(W, H, T, R, Vector3.zero, silver, Enum.Material.Metal)               -- aluminium body (first part = pivot)
+	model.PrimaryPart = model:FindFirstChildWhichIsA("BasePart")
+	roundedBox(W - 0.05, H - 0.05, 0.012, R - 0.03, Vector3.new(0, 0, T / 2 + 0.004), Color3.fromRGB(8, 8, 10), SP) -- black bezel
 
-local screen = mk(Vector3.new(SW, SH, 0.006), CFrame.new(0, 0, T / 2 + 0.0135), Color3.new(0, 0, 0), SP)
-screen.Name = "Screen"
+	screen = mk(Vector3.new(SW, SH, 0.006), CFrame.new(0, 0, T / 2 + 0.0135), Color3.new(0, 0, 0), SP)
+	screen.Name = "Screen"
 
--- front camera
-mk(Vector3.new(0.004, 0.045, 0.045), CFrame.new(0, H / 2 - M / 2, T / 2 + 0.0125) * CFrame.Angles(0, math.pi / 2, 0), Color3.fromRGB(25, 28, 40), Enum.Material.Glass, CYL)
+	-- front camera
+	mk(Vector3.new(0.004, 0.045, 0.045), CFrame.new(0, H / 2 - M / 2, T / 2 + 0.0125) * CFrame.Angles(0, math.pi / 2, 0), Color3.fromRGB(25, 28, 40), Enum.Material.Glass, CYL)
 
--- clickable side buttons
-local btnCol = Color3.fromRGB(214, 216, 222)
-local powerPart = mk(Vector3.new(0.3, 0.06, 0.06), CFrame.new(W / 2 - 0.55, H / 2 + 0.012, 0), btnCol, Enum.Material.Metal)
-local volUpPart = mk(Vector3.new(0.06, 0.2, 0.06), CFrame.new(W / 2 + 0.012, H / 2 - 0.55, 0), btnCol, Enum.Material.Metal)
-local volDownPart = mk(Vector3.new(0.06, 0.2, 0.06), CFrame.new(W / 2 + 0.012, H / 2 - 0.85, 0), btnCol, Enum.Material.Metal)
+	-- clickable side buttons
+	local btnCol = Color3.fromRGB(214, 216, 222)
+	powerPart = mk(Vector3.new(0.3, 0.06, 0.06), CFrame.new(W / 2 - 0.55, H / 2 + 0.012, 0), btnCol, Enum.Material.Metal)
+	volUpPart = mk(Vector3.new(0.06, 0.2, 0.06), CFrame.new(W / 2 + 0.012, H / 2 - 0.55, 0), btnCol, Enum.Material.Metal)
+	volDownPart = mk(Vector3.new(0.06, 0.2, 0.06), CFrame.new(W / 2 + 0.012, H / 2 - 0.85, 0), btnCol, Enum.Material.Metal)
 
-local SIDE_BTNS = {
-	{ name = "power", center = Vector3.new(W / 2 - 0.55, H / 2 + 0.012, 0), size = Vector3.new(0.3, 0.06, 0.06) },
-	{ name = "volup", center = Vector3.new(W / 2 + 0.012, H / 2 - 0.55, 0), size = Vector3.new(0.06, 0.2, 0.06) },
-	{ name = "voldown", center = Vector3.new(W / 2 + 0.012, H / 2 - 0.85, 0), size = Vector3.new(0.06, 0.2, 0.06) },
-}
+	SIDE_BTNS = {
+		{ name = "power", center = Vector3.new(W / 2 - 0.55, H / 2 + 0.012, 0), size = Vector3.new(0.3, 0.06, 0.06) },
+		{ name = "volup", center = Vector3.new(W / 2 + 0.012, H / 2 - 0.55, 0), size = Vector3.new(0.06, 0.2, 0.06) },
+		{ name = "voldown", center = Vector3.new(W / 2 + 0.012, H / 2 - 0.85, 0), size = Vector3.new(0.06, 0.2, 0.06) },
+	}
 
----------------------------------------------------------------- hands
-local skin = Color3.fromRGB(234, 184, 146)
-pcall(function()
-	local hd = player.Character and player.Character:FindFirstChild("Head")
-	if hd and hd:IsA("BasePart") then skin = hd.Color end
-end)
-local sleeve = Color3.fromRGB(44, 48, 62)
+	---------------------------------------------------------------- hands
+	local skin = Color3.fromRGB(234, 184, 146)
+	pcall(function()
+		local hd = player.Character and player.Character:FindFirstChild("Head")
+		if hd and hd:IsA("BasePart") then skin = hd.Color end
+	end)
+	local sleeve = Color3.fromRGB(44, 48, 62)
 
-local function limb(a, b, th, color, mat, caps)
-	local mid = (a + b) / 2
-	local len = (b - a).Magnitude
-	mk(Vector3.new(len, th, th), CFrame.lookAt(mid, b) * CFrame.Angles(0, math.pi / 2, 0), color, mat, CYL)
-	if caps then
-		mk(Vector3.new(th, th, th), CFrame.new(a), color, mat, BALL)
-		mk(Vector3.new(th, th, th), CFrame.new(b), color, mat, BALL)
+	local function limb(a, b, th, color, mat, caps)
+		local mid = (a + b) / 2
+		local len = (b - a).Magnitude
+		mk(Vector3.new(len, th, th), CFrame.lookAt(mid, b) * CFrame.Angles(0, math.pi / 2, 0), color, mat, CYL)
+		if caps then
+			mk(Vector3.new(th, th, th), CFrame.new(a), color, mat, BALL)
+			mk(Vector3.new(th, th, th), CFrame.new(b), color, mat, BALL)
+		end
 	end
-end
 
-local function buildHand(s) -- s = -1 left, +1 right
-	local x = W / 2
-	-- thumb wraps over the front bezel
-	local A = Vector3.new(s * (x + 0.05), -0.62, 0.15)
-	local B = Vector3.new(s * (x - 0.17), -0.5, T / 2 + 0.12)
-	local Cc = Vector3.new(s * (x - 0.6), -0.43, T / 2 + 0.125)
-	limb(A, B, 0.2, skin, SP, true)
-	limb(B, Cc, 0.19, skin, SP, true)
-	mk(Vector3.new(0.13, 0.1, 0.012), CFrame.new(Cc.X - s * 0.02, Cc.Y, Cc.Z + 0.098), Color3.fromRGB(245, 225, 215), SP)
-	-- palm gripping the back edge
-	mk(Vector3.new(0.95, 0.52, 0.52), CFrame.new(s * (x + 0.29), -0.12, -0.18) * CFrame.Angles(0, 0, math.pi / 2), skin, SP, CYL)
-	-- forearm + sleeve going down out of view
-	local p0 = Vector3.new(s * (x + 0.32), -0.55, -0.15)
-	local p1 = Vector3.new(s * (x + 0.9), -2.1, 0.95)
-	mk(Vector3.new(0.46, 0.46, 0.46), CFrame.new(p0), skin, SP, BALL)
-	limb(p0, p1, 0.44, skin, SP, false)
-	limb(p0:Lerp(p1, 0.42), p1 + (p1 - p0) * 0.2, 0.58, sleeve, Enum.Material.Fabric, false)
+	local function buildHand(s) -- s = -1 left, +1 right
+		local x = W / 2
+		-- thumb wraps over the front bezel
+		local A = Vector3.new(s * (x + 0.05), -0.62, 0.15)
+		local B = Vector3.new(s * (x - 0.17), -0.5, T / 2 + 0.12)
+		local Cc = Vector3.new(s * (x - 0.6), -0.43, T / 2 + 0.125)
+		limb(A, B, 0.2, skin, SP, true)
+		limb(B, Cc, 0.19, skin, SP, true)
+		mk(Vector3.new(0.13, 0.1, 0.012), CFrame.new(Cc.X - s * 0.02, Cc.Y, Cc.Z + 0.098), Color3.fromRGB(245, 225, 215), SP)
+		-- palm gripping the back edge
+		mk(Vector3.new(0.95, 0.52, 0.52), CFrame.new(s * (x + 0.29), -0.12, -0.18) * CFrame.Angles(0, 0, math.pi / 2), skin, SP, CYL)
+		-- forearm + sleeve going down out of view
+		local p0 = Vector3.new(s * (x + 0.32), -0.55, -0.15)
+		local p1 = Vector3.new(s * (x + 0.9), -2.1, 0.95)
+		mk(Vector3.new(0.46, 0.46, 0.46), CFrame.new(p0), skin, SP, BALL)
+		limb(p0, p1, 0.44, skin, SP, false)
+		limb(p0:Lerp(p1, 0.42), p1 + (p1 - p0) * 0.2, 0.58, sleeve, Enum.Material.Fabric, false)
+	end
+	buildHand(-1)
+	buildHand(1)
+
 end
-buildHand(-1)
-buildHand(1)
 
 ---------------------------------------------------------------- flashlight (real light aimed where you look)
-local torchPart = Instance.new("Part")
-torchPart.Name = "DeltaIPadTorch"
-torchPart.Anchored = true
-torchPart.CanCollide = false
-torchPart.CanQuery = false
-torchPart.CanTouch = false
-torchPart.CastShadow = false
-torchPart.Transparency = 1
-torchPart.Size = Vector3.new(0.2, 0.2, 0.2)
-torchPart.Parent = workspace
+local torchPart, setTorch
+do
+	torchPart = Instance.new("Part")
+	torchPart.Name = "DeltaIPadTorch"
+	torchPart.Anchored = true
+	torchPart.CanCollide = false
+	torchPart.CanQuery = false
+	torchPart.CanTouch = false
+	torchPart.CastShadow = false
+	torchPart.Transparency = 1
+	torchPart.Size = Vector3.new(0.2, 0.2, 0.2)
+	torchPart.Parent = workspace
 
-local torchBeam = Instance.new("SpotLight")
-torchBeam.Face = Enum.NormalId.Front          -- front = the way the camera looks
-torchBeam.Brightness = 4
-torchBeam.Range = 70
-torchBeam.Angle = 65
-torchBeam.Shadows = true
-torchBeam.Color = Color3.fromRGB(255, 244, 225)
-torchBeam.Enabled = false
-torchBeam.Parent = torchPart
+	local torchBeam = Instance.new("SpotLight")
+	torchBeam.Face = Enum.NormalId.Front          -- front = the way the camera looks
+	torchBeam.Brightness = 4
+	torchBeam.Range = 70
+	torchBeam.Angle = 65
+	torchBeam.Shadows = true
+	torchBeam.Color = Color3.fromRGB(255, 244, 225)
+	torchBeam.Enabled = false
+	torchBeam.Parent = torchPart
 
-local torchGlow = Instance.new("PointLight")   -- soft glow right around you
-torchGlow.Brightness = 0.8
-torchGlow.Range = 14
-torchGlow.Color = Color3.fromRGB(255, 244, 225)
-torchGlow.Enabled = false
-torchGlow.Parent = torchPart
+	local torchGlow = Instance.new("PointLight")   -- soft glow right around you
+	torchGlow.Brightness = 0.8
+	torchGlow.Range = 14
+	torchGlow.Color = Color3.fromRGB(255, 244, 225)
+	torchGlow.Enabled = false
+	torchGlow.Parent = torchPart
 
-local function setTorch(on)
-	torchBeam.Enabled = on
-	torchGlow.Enabled = on
+	setTorch = function(on)
+		torchBeam.Enabled = on
+		torchGlow.Enabled = on
+	end
+
 end
 
 ---------------------------------------------------------------- screen UI helpers
@@ -278,311 +290,364 @@ local function setSlider(sl, frac)
 end
 
 ---------------------------------------------------------------- icon + glyph library (drawn from shapes, no emoji)
-local function shape(parent, s, cx, cy, w, h, color, rot, round, tr)
-	local f = Instance.new("Frame")
-	f.BorderSizePixel = 0
-	f.AnchorPoint = Vector2.new(0.5, 0.5)
-	f.Position = UDim2.fromOffset(cx * s, cy * s)
-	f.Size = UDim2.fromOffset(math.max(1, w * s), math.max(1, h * s))
-	f.BackgroundColor3 = color
-	f.BackgroundTransparency = tr or 0
-	f.Rotation = rot or 0
-	if round then
-		local c = Instance.new("UICorner")
-		c.CornerRadius = UDim.new(round, 0)
-		c.Parent = f
+local shape, ringShape, triShape, glyph, drawIcon
+do
+	-- every coordinate is a fraction of the icon size `s` (pass s = 1 to use pixels)
+	shape = function(parent, s, cx, cy, w, h, color, rot, round, tr)
+		local f = Instance.new("Frame")
+		f.BorderSizePixel = 0
+		f.AnchorPoint = Vector2.new(0.5, 0.5)
+		f.Position = UDim2.fromOffset(cx * s, cy * s)
+		f.Size = UDim2.fromOffset(math.max(1, w * s), math.max(1, h * s))
+		f.BackgroundColor3 = color
+		f.BackgroundTransparency = tr or 0
+		f.Rotation = rot or 0
+		if round then
+			local c = Instance.new("UICorner")
+			c.CornerRadius = UDim.new(round, 0)
+			c.Parent = f
+		end
+		f.Parent = parent
+		return f
 	end
-	f.Parent = parent
-	return f
-end
 
-local function ringShape(parent, s, cx, cy, d, thick, color, tr)
-	local f = shape(parent, s, cx, cy, d, d, color, 0, 0.5, 1)
-	stroke(f, color, math.max(1, thick * s), tr)
-	return f
-end
-
-local function triShape(parent, s, dir, x, y, h, color)
-	local hh, ww = h * s, h * s / 2
-	local clip = Instance.new("Frame")
-	clip.BackgroundTransparency = 1
-	clip.BorderSizePixel = 0
-	clip.ClipsDescendants = true
-	clip.Position = UDim2.fromOffset(x * s, y * s)
-	clip.Size = UDim2.fromOffset(ww, hh)
-	clip.Parent = parent
-	local d = hh / math.sqrt(2)
-	local dia = Instance.new("Frame")
-	dia.BorderSizePixel = 0
-	dia.AnchorPoint = Vector2.new(0.5, 0.5)
-	dia.Position = UDim2.fromOffset(dir == "r" and 0 or ww, hh / 2)
-	dia.Size = UDim2.fromOffset(d, d)
-	dia.Rotation = 45
-	dia.BackgroundColor3 = color
-	dia.Parent = clip
-	return clip
-end
-
-local function stopsGradient(parent, stops, rot)
-	local kps = {}
-	for _, st in ipairs(stops) do
-		table.insert(kps, ColorSequenceKeypoint.new(st[1], st[2]))
+	ringShape = function(parent, s, cx, cy, d, thick, color, tr)
+		local f = shape(parent, s, cx, cy, d, d, color, 0, 0.5, 1)
+		stroke(f, color, math.max(1, thick * s), tr)
+		return f
 	end
-	local g = Instance.new("UIGradient")
-	g.Color = ColorSequence.new(kps)
-	g.Rotation = rot or 90
-	g.Parent = parent
-	return g
-end
 
-local function drawGear(h, s, c, bg)
-	for _, r in ipairs({ 0, 45, 90, 135 }) do
-		shape(h, s, 0.5, 0.5, 0.15, 0.82, c, r, 0.2)
+	-- triangle (height h, width h/2). dir "r" = points right, "l" = points left. x,y = top-left
+	triShape = function(parent, s, dir, x, y, h, color, stops)
+		local hh, ww = h * s, h * s / 2
+		local clip = Instance.new("Frame")
+		clip.BackgroundTransparency = 1
+		clip.BorderSizePixel = 0
+		clip.ClipsDescendants = true
+		clip.Position = UDim2.fromOffset(x * s, y * s)
+		clip.Size = UDim2.fromOffset(ww, hh)
+		clip.Parent = parent
+		local d = hh / math.sqrt(2)
+		local dia = Instance.new("Frame")
+		dia.BorderSizePixel = 0
+		dia.AnchorPoint = Vector2.new(0.5, 0.5)
+		dia.Position = UDim2.fromOffset(dir == "r" and 0 or ww, hh / 2)
+		dia.Size = UDim2.fromOffset(d, d)
+		dia.Rotation = 45
+		dia.BackgroundColor3 = color
+		if stops then
+			local kps = {}
+			for _, st in ipairs(stops) do
+				table.insert(kps, ColorSequenceKeypoint.new(st[1], st[2]))
+			end
+			local g = Instance.new("UIGradient")
+			g.Color = ColorSequence.new(kps)
+			g.Rotation = 45
+			g.Parent = dia
+		end
+		dia.Parent = clip
+		return clip
 	end
-	shape(h, s, 0.5, 0.5, 0.62, 0.62, c, 0, 0.5)
-	shape(h, s, 0.5, 0.5, 0.34, 0.34, bg, 0, 0.5)
-end
 
-local GLYPH = {}
-
-GLYPH.airplane = function(h, s, c)
-	shape(h, s, 0.5, 0.5, 0.8, 0.12, c, -45, 0.5)
-	shape(h, s, 0.56, 0.44, 0.62, 0.12, c, 45, 0.5)
-	shape(h, s, 0.29, 0.71, 0.26, 0.1, c, 45, 0.5)
-end
-GLYPH.airdrop = function(h, s, c)
-	ringShape(h, s, 0.5, 0.5, 0.84, 0.07, c)
-	ringShape(h, s, 0.5, 0.5, 0.56, 0.07, c)
-	shape(h, s, 0.5, 0.5, 0.2, 0.2, c, 0, 0.5)
-end
-GLYPH.wifi = function(h, s, c)
-	for i = 1, 3 do
-		local bh = 0.22 + (i - 1) * 0.22
-		shape(h, s, 0.22 + (i - 1) * 0.28, 0.82 - bh / 2, 0.18, bh, c, 0, 0.3)
+	local function stopsGradient(parent, stops, rot)
+		local kps = {}
+		for _, st in ipairs(stops) do
+			table.insert(kps, ColorSequenceKeypoint.new(st[1], st[2]))
+		end
+		local g = Instance.new("UIGradient")
+		g.Color = ColorSequence.new(kps)
+		g.Rotation = rot or 90
+		g.Parent = parent
+		return g
 	end
-end
-GLYPH.bluetooth = function(h, s, c)
-	shape(h, s, 0.5, 0.5, 0.1, 0.8, c, 0, 0.5)
-	shape(h, s, 0.62, 0.23, 0.34, 0.09, c, 42, 0.5)
-	shape(h, s, 0.62, 0.77, 0.34, 0.09, c, -42, 0.5)
-	shape(h, s, 0.51, 0.5, 0.64, 0.09, c, -38, 0.5)
-	shape(h, s, 0.51, 0.5, 0.64, 0.09, c, 38, 0.5)
-end
-GLYPH.rotlock = function(h, s, c)
-	ringShape(h, s, 0.5, 0.5, 0.82, 0.07, c)
-	shape(h, s, 0.5, 0.56, 0.26, 0.2, c, 0, 0.15)
-	ringShape(h, s, 0.5, 0.42, 0.16, 0.045, c)
-end
-GLYPH.moon = function(h, s, c, bg)
-	shape(h, s, 0.48, 0.5, 0.62, 0.62, c, 0, 0.5)
-	shape(h, s, 0.64, 0.4, 0.52, 0.52, bg, 0, 0.5)
-end
-GLYPH.mirror = function(h, s, c, bg)
-	local a = shape(h, s, 0.4, 0.44, 0.56, 0.4, bg, 0, 0.12)
-	stroke(a, c, math.max(1.5, 0.06 * s))
-	local b = shape(h, s, 0.6, 0.58, 0.56, 0.4, bg, 0, 0.12)
-	stroke(b, c, math.max(1.5, 0.06 * s))
-end
-GLYPH.bell = function(h, s, c)
-	shape(h, s, 0.5, 0.4, 0.46, 0.46, c, 0, 0.5)
-	shape(h, s, 0.5, 0.58, 0.46, 0.28, c, 0, 0.1)
-	shape(h, s, 0.5, 0.7, 0.66, 0.1, c, 0, 0.5)
-	shape(h, s, 0.5, 0.82, 0.16, 0.1, c, 0, 0.5)
-end
-GLYPH.torch = function(h, s, c, bg)
-	shape(h, s, 0.5, 0.2, 0.36, 0.14, c, 0, 0.25)
-	shape(h, s, 0.5, 0.32, 0.22, 0.1, c, 0, 0.2)
-	shape(h, s, 0.5, 0.62, 0.26, 0.5, c, 0, 0.3)
-	shape(h, s, 0.5, 0.52, 0.08, 0.14, bg, 0, 0.5)
-end
-GLYPH.timer = function(h, s, c)
-	ringShape(h, s, 0.5, 0.52, 0.78, 0.07, c)
-	shape(h, s, 0.5, 0.4, 0.07, 0.24, c, 0, 0.5)
-	shape(h, s, 0.5, 0.52, 0.12, 0.12, c, 0, 0.5)
-	shape(h, s, 0.5, 0.07, 0.16, 0.06, c, 0, 0.4)
-end
-GLYPH.stopwatch = function(h, s, c)
-	ringShape(h, s, 0.5, 0.56, 0.72, 0.07, c)
-	shape(h, s, 0.5, 0.1, 0.16, 0.07, c, 0, 0.4)
-	shape(h, s, 0.78, 0.2, 0.12, 0.06, c, 45, 0.4)
-	shape(h, s, 0.58, 0.47, 0.07, 0.26, c, 35, 0.5)
-	shape(h, s, 0.5, 0.56, 0.1, 0.1, c, 0, 0.5)
-end
-GLYPH.camera = function(h, s, c, bg)
-	shape(h, s, 0.5, 0.58, 0.82, 0.54, c, 0, 0.2)
-	shape(h, s, 0.5, 0.28, 0.34, 0.14, c, 0, 0.4)
-	shape(h, s, 0.5, 0.58, 0.36, 0.36, bg, 0, 0.5)
-	shape(h, s, 0.5, 0.58, 0.2, 0.2, c, 0, 0.5)
-end
-GLYPH.record = function(h, s, c)
-	ringShape(h, s, 0.5, 0.5, 0.8, 0.07, c)
-	shape(h, s, 0.5, 0.5, 0.4, 0.4, c, 0, 0.5)
-end
-GLYPH.sun = function(h, s, c)
-	shape(h, s, 0.5, 0.5, 0.34, 0.34, c, 0, 0.5)
-	for i = 0, 7 do
-		local a = math.rad(i * 45)
-		shape(h, s, 0.5 + 0.38 * math.cos(a), 0.5 + 0.38 * math.sin(a), 0.1, 0.1, c, 0, 0.5)
+
+	local function drawGear(h, s, c, bg)
+		for _, r in ipairs({ 0, 45, 90, 135 }) do
+			shape(h, s, 0.5, 0.5, 0.15, 0.82, c, r, 0.2)
+		end
+		shape(h, s, 0.5, 0.5, 0.62, 0.62, c, 0, 0.5)
+		shape(h, s, 0.5, 0.5, 0.34, 0.34, bg, 0, 0.5)
 	end
-end
-GLYPH.speaker = function(h, s, c)
-	shape(h, s, 0.3, 0.5, 0.16, 0.24, c, 0, 0.15)
-	triShape(h, s, "l", 0.34, 0.26, 0.48, c)
-end
-GLYPH.gear = function(h, s, c, bg)
-	drawGear(h, s, c, bg)
-end
-GLYPH.siri = function(h, s, c)
-	local hs = { 0.3, 0.55, 0.8, 0.55, 0.3 }
-	for i, hh in ipairs(hs) do
-		shape(h, s, 0.14 + (i - 1) * 0.18, 0.5, 0.1, hh, c, 0, 0.5)
+
+	-- small white glyphs (used in Settings + Control Center)
+	local GLYPH = {}
+
+	GLYPH.airplane = function(h, s, c)
+		shape(h, s, 0.5, 0.5, 0.8, 0.12, c, -45, 0.5)
+		shape(h, s, 0.56, 0.44, 0.62, 0.12, c, 45, 0.5)
+		shape(h, s, 0.29, 0.71, 0.26, 0.1, c, 45, 0.5)
 	end
-end
-GLYPH.lock = function(h, s, c)
-	shape(h, s, 0.5, 0.6, 0.64, 0.46, c, 0, 0.18)
-	ringShape(h, s, 0.5, 0.32, 0.38, 0.1, c)
-end
-
-local function glyph(parent, name, cx, cy, size, color, bg)
-	local h = Instance.new("Frame")
-	h.BackgroundTransparency = 1
-	h.BorderSizePixel = 0
-	h.AnchorPoint = Vector2.new(0.5, 0.5)
-	h.Position = UDim2.fromOffset(cx, cy)
-	h.Size = UDim2.fromOffset(size, size)
-	h.Parent = parent
-	local fn = GLYPH[name]
-	if fn then fn(h, size, color or WHITE, bg or BG) end
-	return h
-end
-
-local ICONS = {}
-
-ICONS.appstore = {
-	c1 = Color3.fromRGB(88, 196, 255), c2 = Color3.fromRGB(10, 100, 240),
-	draw = function(ic, s)
-		shape(ic, s, 0.4, 0.47, 0.1, 0.64, WHITE, 20, 0.5)
-		shape(ic, s, 0.6, 0.47, 0.1, 0.64, WHITE, -20, 0.5)
-		shape(ic, s, 0.5, 0.6, 0.34, 0.08, WHITE, 0, 0.5)
-		shape(ic, s, 0.3, 0.78, 0.18, 0.08, WHITE, 0, 0.5)
-		shape(ic, s, 0.7, 0.78, 0.18, 0.08, WHITE, 0, 0.5)
-	end,
-}
-ICONS.settings = {
-	c1 = Color3.fromRGB(205, 205, 212), c2 = Color3.fromRGB(120, 120, 132),
-	draw = function(ic, s)
-		drawGear(ic, s, Color3.fromRGB(240, 240, 246), Color3.fromRGB(150, 150, 162))
-	end,
-}
-ICONS.notes = {
-	c1 = WHITE, c2 = WHITE,
-	stops = {
-		{ 0, Color3.fromRGB(255, 204, 0) }, { 0.27, Color3.fromRGB(255, 204, 0) },
-		{ 0.271, Color3.fromRGB(255, 255, 255) }, { 1, Color3.fromRGB(242, 242, 246) },
-	},
-	draw = function(ic, s)
-		local g = Color3.fromRGB(215, 215, 222)
-		shape(ic, s, 0.5, 0.47, 0.72, 0.025, g)
-		shape(ic, s, 0.5, 0.6, 0.72, 0.025, g)
-		shape(ic, s, 0.5, 0.73, 0.72, 0.025, g)
-		shape(ic, s, 0.5, 0.86, 0.72, 0.025, g)
-		shape(ic, s, 0.37, 0.36, 0.34, 0.05, Color3.fromRGB(70, 70, 80), 0, 0.5)
-	end,
-}
-ICONS.podcasts = {
-	c1 = Color3.fromRGB(212, 120, 255), c2 = Color3.fromRGB(120, 45, 210),
-	draw = function(ic, s)
-		ringShape(ic, s, 0.5, 0.46, 0.34, 0.05, WHITE)
-		ringShape(ic, s, 0.5, 0.46, 0.6, 0.05, WHITE, 0.25)
-		ringShape(ic, s, 0.5, 0.46, 0.86, 0.04, WHITE, 0.55)
-		shape(ic, s, 0.5, 0.4, 0.14, 0.14, WHITE, 0, 0.5)
-		shape(ic, s, 0.5, 0.55, 0.1, 0.22, WHITE, 0, 0.5)
-	end,
-}
-ICONS.reminders = {
-	c1 = WHITE, c2 = Color3.fromRGB(236, 236, 242),
-	draw = function(ic, s)
-		local cols = { Color3.fromRGB(255, 149, 0), Color3.fromRGB(10, 132, 255), Color3.fromRGB(255, 59, 48) }
+	GLYPH.airdrop = function(h, s, c)
+		ringShape(h, s, 0.5, 0.5, 0.84, 0.07, c)
+		ringShape(h, s, 0.5, 0.5, 0.56, 0.07, c)
+		shape(h, s, 0.5, 0.5, 0.2, 0.2, c, 0, 0.5)
+	end
+	GLYPH.wifi = function(h, s, c)
 		for i = 1, 3 do
-			local y = 0.22 + (i - 1) * 0.28
-			ringShape(ic, s, 0.24, y, 0.15, 0.035, cols[i])
-			shape(ic, s, 0.63, y, 0.4, 0.035, Color3.fromRGB(205, 205, 212), 0, 0.5)
+			local bh = 0.22 + (i - 1) * 0.22
+			shape(h, s, 0.22 + (i - 1) * 0.28, 0.82 - bh / 2, 0.18, bh, c, 0, 0.3)
 		end
-	end,
-}
-ICONS.x_chess = {
-	c1 = Color3.fromRGB(110, 115, 130), c2 = Color3.fromRGB(30, 32, 42),
-	draw = function(ic, s)
-		shape(ic, s, 0.5, 0.31, 0.2, 0.2, WHITE, 0, 0.5)
-		shape(ic, s, 0.5, 0.45, 0.28, 0.06, WHITE, 0, 0.5)
-		shape(ic, s, 0.5, 0.62, 0.3, 0.3, WHITE, 0, 0.4)
-		shape(ic, s, 0.5, 0.79, 0.52, 0.08, WHITE, 0, 0.4)
-	end,
-}
-ICONS.x_weather = {
-	c1 = Color3.fromRGB(110, 200, 255), c2 = Color3.fromRGB(30, 110, 230),
-	draw = function(ic, s)
-		shape(ic, s, 0.64, 0.34, 0.3, 0.3, Color3.fromRGB(255, 214, 10), 0, 0.5)
-		shape(ic, s, 0.37, 0.6, 0.28, 0.28, WHITE, 0, 0.5)
-		shape(ic, s, 0.55, 0.54, 0.34, 0.34, WHITE, 0, 0.5)
-		shape(ic, s, 0.7, 0.62, 0.24, 0.24, WHITE, 0, 0.5)
-		shape(ic, s, 0.54, 0.7, 0.5, 0.18, WHITE, 0, 0.5)
-	end,
-}
-ICONS.x_photo = {
-	c1 = WHITE, c2 = Color3.fromRGB(235, 235, 240),
-	draw = function(ic, s)
-		local cols = {
-			Color3.fromRGB(255, 120, 60), Color3.fromRGB(255, 200, 40), Color3.fromRGB(90, 210, 90),
-			Color3.fromRGB(60, 200, 230), Color3.fromRGB(80, 120, 255), Color3.fromRGB(230, 80, 200),
-		}
-		for i = 1, 6 do
-			local a = math.rad((i - 1) * 60)
-			shape(ic, s, 0.5 + 0.17 * math.cos(a), 0.5 + 0.17 * math.sin(a), 0.34, 0.34, cols[i], 0, 0.5, 0.25)
-		end
-	end,
-}
-ICONS.x_sketch = {
-	c1 = Color3.fromRGB(190, 120, 255), c2 = Color3.fromRGB(100, 60, 220),
-	draw = function(ic, s)
-		shape(ic, s, 0.5, 0.5, 0.16, 0.52, Color3.fromRGB(255, 214, 10), 45, 0.1)
-		shape(ic, s, 0.684, 0.316, 0.17, 0.1, Color3.fromRGB(255, 120, 150), 45, 0.2)
-		shape(ic, s, 0.31, 0.69, 0.11, 0.11, Color3.fromRGB(245, 215, 180), 45, 0.1)
-		shape(ic, s, 0.275, 0.725, 0.05, 0.05, Color3.fromRGB(60, 60, 70), 45, 0.1)
-	end,
-}
-ICONS.x_fit = {
-	c1 = Color3.fromRGB(40, 40, 46), c2 = Color3.fromRGB(0, 0, 0),
-	draw = function(ic, s)
-		ringShape(ic, s, 0.5, 0.5, 0.74, 0.1, Color3.fromRGB(255, 45, 85))
-		ringShape(ic, s, 0.5, 0.5, 0.52, 0.1, Color3.fromRGB(166, 255, 0))
-		ringShape(ic, s, 0.5, 0.5, 0.3, 0.1, Color3.fromRGB(0, 200, 255))
-	end,
-}
-ICONS.x_calc = {
-	c1 = Color3.fromRGB(255, 190, 60), c2 = Color3.fromRGB(230, 120, 20),
-	draw = function(ic, s)
-		shape(ic, s, 0.5, 0.26, 0.7, 0.16, Color3.fromRGB(40, 40, 46), 0, 0.3)
-		shape(ic, s, 0.32, 0.52, 0.3, 0.2, WHITE, 0, 0.3)
-		shape(ic, s, 0.68, 0.52, 0.3, 0.2, WHITE, 0, 0.3)
-		shape(ic, s, 0.32, 0.76, 0.3, 0.2, WHITE, 0, 0.3)
-		shape(ic, s, 0.68, 0.76, 0.3, 0.2, WHITE, 0, 0.3)
-	end,
-}
-
-local function drawIcon(parent, id, x, y, size)
-	local def = ICONS[id]
-	local ic = frame(parent, x, y, size, size, def.c1, 0, UDim.new(0.225, 0))
-	if def.stops then
-		stopsGradient(ic, def.stops, 90)
-	else
-		gradient(ic, def.c1, def.c2, 90)
 	end
-	def.draw(ic, size)
-	stroke(ic, WHITE, 1, 0.82)
-	return ic
+	GLYPH.bluetooth = function(h, s, c)
+		shape(h, s, 0.5, 0.5, 0.1, 0.8, c, 0, 0.5)
+		shape(h, s, 0.62, 0.23, 0.34, 0.09, c, 42, 0.5)
+		shape(h, s, 0.62, 0.77, 0.34, 0.09, c, -42, 0.5)
+		shape(h, s, 0.51, 0.5, 0.64, 0.09, c, -38, 0.5)
+		shape(h, s, 0.51, 0.5, 0.64, 0.09, c, 38, 0.5)
+	end
+	GLYPH.rotlock = function(h, s, c)
+		ringShape(h, s, 0.5, 0.5, 0.82, 0.07, c)
+		shape(h, s, 0.5, 0.56, 0.26, 0.2, c, 0, 0.15)
+		ringShape(h, s, 0.5, 0.42, 0.16, 0.045, c)
+	end
+	GLYPH.moon = function(h, s, c, bg)
+		shape(h, s, 0.48, 0.5, 0.62, 0.62, c, 0, 0.5)
+		shape(h, s, 0.64, 0.4, 0.52, 0.52, bg, 0, 0.5)
+	end
+	GLYPH.mirror = function(h, s, c, bg)
+		local a = shape(h, s, 0.4, 0.44, 0.56, 0.4, bg, 0, 0.12)
+		stroke(a, c, math.max(1.5, 0.06 * s))
+		local b = shape(h, s, 0.6, 0.58, 0.56, 0.4, bg, 0, 0.12)
+		stroke(b, c, math.max(1.5, 0.06 * s))
+	end
+	GLYPH.bell = function(h, s, c)
+		shape(h, s, 0.5, 0.4, 0.46, 0.46, c, 0, 0.5)
+		shape(h, s, 0.5, 0.58, 0.46, 0.28, c, 0, 0.1)
+		shape(h, s, 0.5, 0.7, 0.66, 0.1, c, 0, 0.5)
+		shape(h, s, 0.5, 0.82, 0.16, 0.1, c, 0, 0.5)
+	end
+	GLYPH.torch = function(h, s, c, bg)
+		shape(h, s, 0.5, 0.2, 0.36, 0.14, c, 0, 0.25)
+		shape(h, s, 0.5, 0.32, 0.22, 0.1, c, 0, 0.2)
+		shape(h, s, 0.5, 0.62, 0.26, 0.5, c, 0, 0.3)
+		shape(h, s, 0.5, 0.52, 0.08, 0.14, bg, 0, 0.5)
+	end
+	GLYPH.timer = function(h, s, c)
+		ringShape(h, s, 0.5, 0.52, 0.78, 0.07, c)
+		shape(h, s, 0.5, 0.4, 0.07, 0.24, c, 0, 0.5)
+		shape(h, s, 0.5, 0.52, 0.12, 0.12, c, 0, 0.5)
+		shape(h, s, 0.5, 0.07, 0.16, 0.06, c, 0, 0.4)
+	end
+	GLYPH.stopwatch = function(h, s, c)
+		ringShape(h, s, 0.5, 0.56, 0.72, 0.07, c)
+		shape(h, s, 0.5, 0.1, 0.16, 0.07, c, 0, 0.4)
+		shape(h, s, 0.78, 0.2, 0.12, 0.06, c, 45, 0.4)
+		shape(h, s, 0.58, 0.47, 0.07, 0.26, c, 35, 0.5)
+		shape(h, s, 0.5, 0.56, 0.1, 0.1, c, 0, 0.5)
+	end
+	GLYPH.camera = function(h, s, c, bg)
+		shape(h, s, 0.5, 0.58, 0.82, 0.54, c, 0, 0.2)
+		shape(h, s, 0.5, 0.28, 0.34, 0.14, c, 0, 0.4)
+		shape(h, s, 0.5, 0.58, 0.36, 0.36, bg, 0, 0.5)
+		shape(h, s, 0.5, 0.58, 0.2, 0.2, c, 0, 0.5)
+	end
+	GLYPH.record = function(h, s, c)
+		ringShape(h, s, 0.5, 0.5, 0.8, 0.07, c)
+		shape(h, s, 0.5, 0.5, 0.4, 0.4, c, 0, 0.5)
+	end
+	GLYPH.sun = function(h, s, c)
+		shape(h, s, 0.5, 0.5, 0.34, 0.34, c, 0, 0.5)
+		for i = 0, 7 do
+			local a = math.rad(i * 45)
+			shape(h, s, 0.5 + 0.38 * math.cos(a), 0.5 + 0.38 * math.sin(a), 0.1, 0.1, c, 0, 0.5)
+		end
+	end
+	GLYPH.speaker = function(h, s, c)
+		shape(h, s, 0.3, 0.5, 0.16, 0.24, c, 0, 0.15)
+		triShape(h, s, "l", 0.34, 0.26, 0.48, c)
+	end
+	GLYPH.gear = function(h, s, c, bg)
+		drawGear(h, s, c, bg)
+	end
+	GLYPH.siri = function(h, s, c)
+		local hs = { 0.3, 0.55, 0.8, 0.55, 0.3 }
+		for i, hh in ipairs(hs) do
+			shape(h, s, 0.14 + (i - 1) * 0.18, 0.5, 0.1, hh, c, 0, 0.5)
+		end
+	end
+	GLYPH.lock = function(h, s, c)
+		shape(h, s, 0.5, 0.6, 0.64, 0.46, c, 0, 0.18)
+		ringShape(h, s, 0.5, 0.32, 0.38, 0.1, c)
+	end
+
+	glyph = function(parent, name, cx, cy, size, color, bg)
+		local h = Instance.new("Frame")
+		h.BackgroundTransparency = 1
+		h.BorderSizePixel = 0
+		h.AnchorPoint = Vector2.new(0.5, 0.5)
+		h.Position = UDim2.fromOffset(cx, cy)
+		h.Size = UDim2.fromOffset(size, size)
+		h.Parent = parent
+		local fn = GLYPH[name]
+		if fn then fn(h, size, color or WHITE, bg or BG) end
+		return h
+	end
+
+	-- app icons
+	local ICONS = {}
+
+	ICONS.appstore = {
+		c1 = Color3.fromRGB(88, 196, 255), c2 = Color3.fromRGB(10, 100, 240),
+		draw = function(ic, s)
+			shape(ic, s, 0.4, 0.47, 0.1, 0.64, WHITE, 20, 0.5)
+			shape(ic, s, 0.6, 0.47, 0.1, 0.64, WHITE, -20, 0.5)
+			shape(ic, s, 0.5, 0.6, 0.34, 0.08, WHITE, 0, 0.5)
+			shape(ic, s, 0.3, 0.78, 0.18, 0.08, WHITE, 0, 0.5)
+			shape(ic, s, 0.7, 0.78, 0.18, 0.08, WHITE, 0, 0.5)
+		end,
+	}
+	ICONS.settings = {
+		c1 = Color3.fromRGB(205, 205, 212), c2 = Color3.fromRGB(120, 120, 132),
+		draw = function(ic, s)
+			drawGear(ic, s, Color3.fromRGB(240, 240, 246), Color3.fromRGB(150, 150, 162))
+		end,
+	}
+	ICONS.notes = {
+		c1 = WHITE, c2 = WHITE,
+		stops = {
+			{ 0, Color3.fromRGB(255, 204, 0) }, { 0.27, Color3.fromRGB(255, 204, 0) },
+			{ 0.271, Color3.fromRGB(255, 255, 255) }, { 1, Color3.fromRGB(242, 242, 246) },
+		},
+		draw = function(ic, s)
+			local g = Color3.fromRGB(215, 215, 222)
+			shape(ic, s, 0.5, 0.47, 0.72, 0.025, g)
+			shape(ic, s, 0.5, 0.6, 0.72, 0.025, g)
+			shape(ic, s, 0.5, 0.73, 0.72, 0.025, g)
+			shape(ic, s, 0.5, 0.86, 0.72, 0.025, g)
+			shape(ic, s, 0.37, 0.36, 0.34, 0.05, Color3.fromRGB(70, 70, 80), 0, 0.5)
+		end,
+	}
+	ICONS.podcasts = {
+		c1 = Color3.fromRGB(212, 120, 255), c2 = Color3.fromRGB(120, 45, 210),
+		draw = function(ic, s)
+			ringShape(ic, s, 0.5, 0.46, 0.34, 0.05, WHITE)
+			ringShape(ic, s, 0.5, 0.46, 0.6, 0.05, WHITE, 0.25)
+			ringShape(ic, s, 0.5, 0.46, 0.86, 0.04, WHITE, 0.55)
+			shape(ic, s, 0.5, 0.4, 0.14, 0.14, WHITE, 0, 0.5)
+			shape(ic, s, 0.5, 0.55, 0.1, 0.22, WHITE, 0, 0.5)
+		end,
+	}
+	ICONS.reminders = {
+		c1 = WHITE, c2 = Color3.fromRGB(236, 236, 242),
+		draw = function(ic, s)
+			local cols = { Color3.fromRGB(255, 149, 0), Color3.fromRGB(10, 132, 255), Color3.fromRGB(255, 59, 48) }
+			for i = 1, 3 do
+				local y = 0.22 + (i - 1) * 0.28
+				ringShape(ic, s, 0.24, y, 0.15, 0.035, cols[i])
+				shape(ic, s, 0.63, y, 0.4, 0.035, Color3.fromRGB(205, 205, 212), 0, 0.5)
+			end
+		end,
+	}
+	ICONS.playstore = {
+		c1 = WHITE, c2 = Color3.fromRGB(236, 236, 242),
+		draw = function(ic, s)
+			triShape(ic, s, "r", 0.34, 0.2, 0.6, WHITE, {
+				{ 0, Color3.fromRGB(0, 176, 255) }, { 0.25, Color3.fromRGB(0, 176, 255) },
+				{ 0.2501, Color3.fromRGB(0, 200, 83) }, { 0.5, Color3.fromRGB(0, 200, 83) },
+				{ 0.5001, Color3.fromRGB(255, 214, 0) }, { 0.75, Color3.fromRGB(255, 214, 0) },
+				{ 0.7501, Color3.fromRGB(244, 67, 54) }, { 1, Color3.fromRGB(244, 67, 54) },
+			})
+		end,
+	}
+	ICONS.classroom = {
+		c1 = Color3.fromRGB(52, 168, 83), c2 = Color3.fromRGB(20, 120, 55),
+		draw = function(ic, s)
+			local board = shape(ic, s, 0.5, 0.44, 0.7, 0.46, Color3.new(0, 0, 0), 0, 0.1, 1)
+			stroke(board, WHITE, math.max(2, 0.045 * s))
+			shape(ic, s, 0.5, 0.37, 0.16, 0.16, WHITE, 0, 0.5)
+			shape(ic, s, 0.5, 0.56, 0.3, 0.2, WHITE, 0, 0.5)
+			shape(ic, s, 0.5, 0.8, 0.5, 0.05, WHITE, 0, 0.5)
+		end,
+	}
+	ICONS.flappy = {
+		c1 = Color3.fromRGB(122, 205, 220), c2 = Color3.fromRGB(70, 165, 195),
+		draw = function(ic, s)
+			shape(ic, s, 0.8, 0.8, 0.22, 0.5, Color3.fromRGB(115, 191, 46), 0, 0.08)
+			shape(ic, s, 0.8, 0.57, 0.3, 0.1, Color3.fromRGB(140, 214, 62), 0, 0.2)
+			shape(ic, s, 0.5, 0.92, 1, 0.16, Color3.fromRGB(222, 216, 149), 0)
+			shape(ic, s, 0.4, 0.45, 0.46, 0.36, Color3.fromRGB(255, 208, 40), 0, 0.5)
+			shape(ic, s, 0.33, 0.5, 0.2, 0.13, Color3.fromRGB(255, 236, 150), 15, 0.5)
+			shape(ic, s, 0.5, 0.38, 0.14, 0.14, WHITE, 0, 0.5)
+			shape(ic, s, 0.53, 0.38, 0.06, 0.06, Color3.new(0, 0, 0), 0, 0.5)
+			shape(ic, s, 0.66, 0.49, 0.17, 0.1, Color3.fromRGB(255, 120, 40), 0, 0.4)
+		end,
+	}
+	ICONS.x_chess = {
+		c1 = Color3.fromRGB(110, 115, 130), c2 = Color3.fromRGB(30, 32, 42),
+		draw = function(ic, s)
+			shape(ic, s, 0.5, 0.31, 0.2, 0.2, WHITE, 0, 0.5)
+			shape(ic, s, 0.5, 0.45, 0.28, 0.06, WHITE, 0, 0.5)
+			shape(ic, s, 0.5, 0.62, 0.3, 0.3, WHITE, 0, 0.4)
+			shape(ic, s, 0.5, 0.79, 0.52, 0.08, WHITE, 0, 0.4)
+		end,
+	}
+	ICONS.x_weather = {
+		c1 = Color3.fromRGB(110, 200, 255), c2 = Color3.fromRGB(30, 110, 230),
+		draw = function(ic, s)
+			shape(ic, s, 0.64, 0.34, 0.3, 0.3, Color3.fromRGB(255, 214, 10), 0, 0.5)
+			shape(ic, s, 0.37, 0.6, 0.28, 0.28, WHITE, 0, 0.5)
+			shape(ic, s, 0.55, 0.54, 0.34, 0.34, WHITE, 0, 0.5)
+			shape(ic, s, 0.7, 0.62, 0.24, 0.24, WHITE, 0, 0.5)
+			shape(ic, s, 0.54, 0.7, 0.5, 0.18, WHITE, 0, 0.5)
+		end,
+	}
+	ICONS.x_photo = {
+		c1 = WHITE, c2 = Color3.fromRGB(235, 235, 240),
+		draw = function(ic, s)
+			local cols = {
+				Color3.fromRGB(255, 120, 60), Color3.fromRGB(255, 200, 40), Color3.fromRGB(90, 210, 90),
+				Color3.fromRGB(60, 200, 230), Color3.fromRGB(80, 120, 255), Color3.fromRGB(230, 80, 200),
+			}
+			for i = 1, 6 do
+				local a = math.rad((i - 1) * 60)
+				shape(ic, s, 0.5 + 0.17 * math.cos(a), 0.5 + 0.17 * math.sin(a), 0.34, 0.34, cols[i], 0, 0.5, 0.25)
+			end
+		end,
+	}
+	ICONS.x_sketch = {
+		c1 = Color3.fromRGB(190, 120, 255), c2 = Color3.fromRGB(100, 60, 220),
+		draw = function(ic, s)
+			shape(ic, s, 0.5, 0.5, 0.16, 0.52, Color3.fromRGB(255, 214, 10), 45, 0.1)
+			shape(ic, s, 0.684, 0.316, 0.17, 0.1, Color3.fromRGB(255, 120, 150), 45, 0.2)
+			shape(ic, s, 0.31, 0.69, 0.11, 0.11, Color3.fromRGB(245, 215, 180), 45, 0.1)
+			shape(ic, s, 0.275, 0.725, 0.05, 0.05, Color3.fromRGB(60, 60, 70), 45, 0.1)
+		end,
+	}
+	ICONS.x_fit = {
+		c1 = Color3.fromRGB(40, 40, 46), c2 = Color3.fromRGB(0, 0, 0),
+		draw = function(ic, s)
+			ringShape(ic, s, 0.5, 0.5, 0.74, 0.1, Color3.fromRGB(255, 45, 85))
+			ringShape(ic, s, 0.5, 0.5, 0.52, 0.1, Color3.fromRGB(166, 255, 0))
+			ringShape(ic, s, 0.5, 0.5, 0.3, 0.1, Color3.fromRGB(0, 200, 255))
+		end,
+	}
+	ICONS.x_calc = {
+		c1 = Color3.fromRGB(255, 190, 60), c2 = Color3.fromRGB(230, 120, 20),
+		draw = function(ic, s)
+			shape(ic, s, 0.5, 0.26, 0.7, 0.16, Color3.fromRGB(40, 40, 46), 0, 0.3)
+			shape(ic, s, 0.32, 0.52, 0.3, 0.2, WHITE, 0, 0.3)
+			shape(ic, s, 0.68, 0.52, 0.3, 0.2, WHITE, 0, 0.3)
+			shape(ic, s, 0.32, 0.76, 0.3, 0.2, WHITE, 0, 0.3)
+			shape(ic, s, 0.68, 0.76, 0.3, 0.2, WHITE, 0, 0.3)
+		end,
+	}
+
+	drawIcon = function(parent, id, x, y, size)
+		local def = ICONS[id]
+		local ic = frame(parent, x, y, size, size, def.c1, 0, UDim.new(0.225, 0))
+		if def.stops then
+			stopsGradient(ic, def.stops, 90)
+		else
+			gradient(ic, def.c1, def.c2, 90)
+		end
+		def.draw(ic, size)
+		stroke(ic, WHITE, 1, 0.82)
+		return ic
+	end
+
 end
 
+-- live clock registry
 local clocks = {}
 local function clockLabel(lbl, kind)
 	table.insert(clocks, { lbl, kind })
@@ -611,21 +676,23 @@ local function refreshClocks()
 end
 
 ---------------------------------------------------------------- state
-local state = "lock"
+local state = "lock"            -- "lock" | "home" | "app"
 local curId = nil
 local screenOff = false
 local siriOpen, pwOpen = false, false
 local ccOpen = false
+local themeMode = "dark"          -- "dark" | "light"
 local wifiOn, connected, connecting, connectToken = false, nil, nil, nil
 local airplane, btOn = false, false
 local siriOn, siriHold, siriVoice = true, true, 1
 local brightness = 1
-local vol = 8
+local vol = 8                    -- 0..16
 local wifiIcons = {}
 
+-- forward declarations (defined further down)
 local openApp, closeApp, lockNow, unlock, openSiri, closeSiri, openPw
 local setWifi, connectTo, onNetChanged, changeVolume, applyBrightness, layoutHome, getApp, showApp
-local ccRender, openCC, closeCC
+local ccRender, openCC, closeCC, applyTheme
 
 ---------------------------------------------------------------- layers
 local root = frame(gui, 0, 0, CW, CH, Color3.new(0, 0, 0), 0, px(28))
@@ -648,27 +715,38 @@ local function wallpaper(parent, rot)
 	return f
 end
 
-local function homeBar(parent)
-	frame(parent, 390, 680, 220, 8, WHITE, 0.1, px(4))
+local function homeBar(parent, reg)
+	local b = frame(parent, 390, 680, 220, 8, WHITE, 0.1, px(4))
+	if reg then table.insert(reg.frames, b) end
 end
 
-local function status(parent, withLeft)
+local function status(parent, withLeft, reg)
 	if withLeft then
-		clockLabel(label(parent, "", 30, 8, 420, 28, 22, WHITE, Enum.Font.GothamBold, Enum.TextXAlignment.Left), "status")
+		local l = label(parent, "", 30, 8, 420, 28, 22, WHITE, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+		clockLabel(l, "status")
+		if reg then table.insert(reg.labels, l) end
 	end
 	local icon = { bars = {} }
-	for i = 1, 3 do
+	for i = 1, 3 do -- wifi bars
 		local h = 4 + i * 4
 		icon.bars[i] = frame(parent, 818 + (i - 1) * 9, 32 - h, 6, h, WHITE, 0.65, px(2))
+		if reg then table.insert(reg.frames, icon.bars[i]) end
 	end
 	icon.slash = frame(parent, 828, 9, 3, 30, WHITE, 0, px(2))
 	icon.slash.Rotation = 45
+	if reg then table.insert(reg.frames, icon.slash) end
 	table.insert(wifiIcons, icon)
-	label(parent, "87%", 850, 8, 62, 28, 20, WHITE, Enum.Font.GothamBold, Enum.TextXAlignment.Right)
+	local pct = label(parent, "87%", 850, 8, 62, 28, 20, WHITE, Enum.Font.GothamBold, Enum.TextXAlignment.Right)
 	local body = frame(parent, 920, 13, 40, 18, WHITE, 1, px(6))
-	stroke(body, WHITE, 1.5, 0.3)
-	frame(parent, 923, 16, 31, 12, WHITE, 0, px(3))
-	frame(parent, 962, 18, 3, 8, WHITE, 0.3, px(2))
+	local bst = stroke(body, WHITE, 1.5, 0.3)
+	local fillb = frame(parent, 923, 16, 31, 12, WHITE, 0, px(3))
+	local tip = frame(parent, 962, 18, 3, 8, WHITE, 0.3, px(2))
+	if reg then
+		table.insert(reg.labels, pct)
+		table.insert(reg.strokes, bst)
+		table.insert(reg.frames, fillb)
+		table.insert(reg.frames, tip)
+	end
 end
 
 ---------------------------------------------------------------- on-screen keyboard
@@ -776,10 +854,11 @@ appScale.Parent = appF
 
 local chromeF = frame(appF, 0, 0, CW, CH, WHITE, 1)
 chromeF.ZIndex = 4
-status(chromeF, true)
+local chromeReg = { labels = {}, frames = {}, strokes = {} }
+status(chromeF, true, chromeReg)
 frame(chromeF, 440, 6, 120, 30, Color3.new(0, 0, 0), 0.6, px(15))
 label(chromeF, "Home", 440, 6, 120, 30, 18, WHITE, Enum.Font.GothamBold)
-homeBar(appF)
+homeBar(chromeF, chromeReg)
 
 local apps = {}
 local pageFrames = {}
@@ -809,7 +888,24 @@ local function newPage()
 	return p
 end
 
-local kbApp = makeKeyboard(appF, 162, 330, 162, 330)
+local kbApp = makeKeyboard(appF, 162, 330, 162, 330) -- shared by Notes + Reminders
+
+-- dark / light mode
+applyTheme = function()
+	local dark = (themeMode == "dark")
+	BG = dark and Color3.fromRGB(26, 26, 34) or Color3.fromRGB(242, 242, 247)
+	CARD = dark and Color3.fromRGB(46, 46, 58) or Color3.fromRGB(255, 255, 255)
+	SIDEBAR = dark and Color3.fromRGB(32, 32, 42) or Color3.fromRGB(226, 226, 232)
+	TXT = dark and WHITE or Color3.fromRGB(20, 20, 26)
+	appF.BackgroundColor3 = BG
+	for _, l in ipairs(chromeReg.labels) do l.TextColor3 = TXT end
+	for _, fr in ipairs(chromeReg.frames) do fr.BackgroundColor3 = TXT end
+	for _, st in ipairs(chromeReg.strokes) do st.Color = TXT end
+	if state == "app" then
+		local a = getApp()
+		if a and a.render then a.render() end
+	end
+end
 
 ---------------------------------------------------------------- LOCK
 local lockF = frame(root, 0, 0, CW, CH, Color3.new(0, 0, 0), 1)
@@ -822,208 +918,220 @@ local hint = label(lockF, "Swipe up to unlock", 0, 625, 1000, 36, 26, WHITE, Enu
 homeBar(lockF)
 
 ---------------------------------------------------------------- Wi-Fi password prompt
-local NETWORKS = {
-	{ name = "Home_5G", pass = "12345678" },
-	{ name = "CoffeeShop_Free" },
-	{ name = "Roblox_Guest" },
-	{ name = "NeighborNet", pass = "password123" },
-	{ name = "Library_WiFi", pass = "readbooks" },
-}
+local NETWORKS, pwF, pwTap
+do
+	NETWORKS = {
+		{ name = "Home_5G", pass = "12345678" },
+		{ name = "CoffeeShop_Free" },
+		{ name = "Roblox_Guest" },
+		{ name = "NeighborNet", pass = "password123" },
+		{ name = "Library_WiFi", pass = "readbooks" },
+	}
 
-local pwF = frame(root, 0, 0, CW, CH, Color3.new(0, 0, 0), 0.35)
-pwF.ZIndex = 7
-pwF.Visible = false
-local PX, PY, PW, PH = 150, 50, 700, 600
-local pcard = frame(pwF, PX, PY, PW, PH, Color3.fromRGB(34, 34, 44), 0, px(28))
-local pwTitle = label(pcard, "", 150, 16, 400, 40, 24, WHITE, Enum.Font.GothamBold)
-frame(pcard, 24, 16, 110, 40, Color3.fromRGB(60, 60, 74), 0, px(20))
-label(pcard, "Cancel", 24, 16, 110, 40, 18, WHITE, Enum.Font.GothamBold)
-frame(pcard, 566, 16, 110, 40, BLUE, 0, px(20))
-label(pcard, "Join", 566, 16, 110, 40, 18, WHITE, Enum.Font.GothamBold)
-local pwField = frame(pcard, 60, 80, 580, 70, Color3.fromRGB(20, 20, 28), 0, px(16))
-local pwText = label(pwField, "", 16, 0, 548, 70, 36, WHITE, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
-local pwErr = label(pcard, "", 60, 156, 580, 30, 20, Color3.fromRGB(255, 110, 110), Enum.Font.GothamMedium)
-local kbPw = makeKeyboard(pcard, 12, 196, PX + 12, PY + 196)
-kbPw.frame.Visible = true
+	pwF = frame(root, 0, 0, CW, CH, Color3.new(0, 0, 0), 0.35)
+	pwF.ZIndex = 7
+	pwF.Visible = false
+	local PX, PY, PW, PH = 150, 50, 700, 600
+	local pcard = frame(pwF, PX, PY, PW, PH, Color3.fromRGB(34, 34, 44), 0, px(28))
+	local pwTitle = label(pcard, "", 150, 16, 400, 40, 24, WHITE, Enum.Font.GothamBold)
+	frame(pcard, 24, 16, 110, 40, Color3.fromRGB(60, 60, 74), 0, px(20))
+	label(pcard, "Cancel", 24, 16, 110, 40, 18, WHITE, Enum.Font.GothamBold)
+	frame(pcard, 566, 16, 110, 40, BLUE, 0, px(20))
+	label(pcard, "Join", 566, 16, 110, 40, 18, WHITE, Enum.Font.GothamBold)
+	local pwField = frame(pcard, 60, 80, 580, 70, Color3.fromRGB(20, 20, 28), 0, px(16))
+	local pwText = label(pwField, "", 16, 0, 548, 70, 36, WHITE, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+	local pwErr = label(pcard, "", 60, 156, 580, 30, 20, Color3.fromRGB(255, 110, 110), Enum.Font.GothamMedium)
+	local kbPw = makeKeyboard(pcard, 12, 196, PX + 12, PY + 196)
+	kbPw.frame.Visible = true
 
-local pwBuf = ""
-local pwTarget = nil
+	local pwBuf = ""
+	local pwTarget = nil
 
-local function updatePw()
-	if #pwBuf == 0 then
-		pwText.Text = "Password"
-		pwText.TextColor3 = Color3.fromRGB(110, 110, 125)
-	else
-		pwText.Text = string.rep("•", #pwBuf - 1) .. pwBuf:sub(-1)
-		pwText.TextColor3 = WHITE
+	local function updatePw()
+		if #pwBuf == 0 then
+			pwText.Text = "Password"
+			pwText.TextColor3 = Color3.fromRGB(110, 110, 125)
+		else
+			pwText.Text = string.rep("•", #pwBuf - 1) .. pwBuf:sub(-1)
+			pwText.TextColor3 = WHITE
+		end
 	end
-end
 
-local function pwJoin()
-	if pwTarget and pwBuf == pwTarget.pass then
-		pwF.Visible = false
-		pwOpen = false
-		connectTo(pwTarget)
-	else
-		pwErr.Text = "Incorrect password"
-		pwBuf = ""
+	local function pwJoin()
+		if pwTarget and pwBuf == pwTarget.pass then
+			pwF.Visible = false
+			pwOpen = false
+			connectTo(pwTarget)
+		else
+			pwErr.Text = "Incorrect password"
+			pwBuf = ""
+			updatePw()
+		end
+	end
+
+	kbPw.onChar = function(ch)
+		if #pwBuf < 20 then pwBuf = pwBuf .. ch end
+		pwErr.Text = ""
 		updatePw()
 	end
-end
-
-kbPw.onChar = function(ch)
-	if #pwBuf < 20 then pwBuf = pwBuf .. ch end
-	pwErr.Text = ""
-	updatePw()
-end
-kbPw.onBack = function()
-	pwBuf = pwBuf:sub(1, -2)
-	updatePw()
-end
-kbPw.onReturn = pwJoin
-
-local function pwTap(x, y)
-	if inRect(x, y, PX + 24, PY + 16, 110, 40) then
-		pwF.Visible = false
-		pwOpen = false
-		return
+	kbPw.onBack = function()
+		pwBuf = pwBuf:sub(1, -2)
+		updatePw()
 	end
-	if inRect(x, y, PX + 566, PY + 16, 110, 40) then
-		pwJoin()
-		return
-	end
-	kbPw.tap(x, y)
-end
+	kbPw.onReturn = pwJoin
 
-openPw = function(n)
-	pwTarget = n
-	pwBuf = ""
-	pwErr.Text = ""
-	pwTitle.Text = n.name
-	updatePw()
-	pwOpen = true
-	pwF.Visible = true
+	pwTap = function(x, y)
+		if inRect(x, y, PX + 24, PY + 16, 110, 40) then
+			pwF.Visible = false
+			pwOpen = false
+			return
+		end
+		if inRect(x, y, PX + 566, PY + 16, 110, 40) then
+			pwJoin()
+			return
+		end
+		kbPw.tap(x, y)
+	end
+
+	openPw = function(n)
+		pwTarget = n
+		pwBuf = ""
+		pwErr.Text = ""
+		pwTitle.Text = n.name
+		updatePw()
+		pwOpen = true
+		pwF.Visible = true
+	end
+
 end
 
 ---------------------------------------------------------------- Siri overlay
-local siriF = frame(root, 0, 0, CW, CH, Color3.new(0, 0, 0), 0.4)
-siriF.ZIndex = 8
-siriF.Visible = false
-local orb = frame(siriF, 500, 170, 120, 120, WHITE, 0, FULL)
-orb.AnchorPoint = Vector2.new(0.5, 0.5)
-local orbG = Instance.new("UIGradient")
-orbG.Color = ColorSequence.new({
-	ColorSequenceKeypoint.new(0, Color3.fromRGB(80, 220, 255)),
-	ColorSequenceKeypoint.new(0.35, Color3.fromRGB(190, 90, 255)),
-	ColorSequenceKeypoint.new(0.7, Color3.fromRGB(255, 120, 150)),
-	ColorSequenceKeypoint.new(1, Color3.fromRGB(80, 220, 255)),
-})
-orbG.Parent = orb
-label(siriF, "Hi, how can I help?", 0, 255, 1000, 50, 36, WHITE, Enum.Font.GothamBold)
-local siriReply = label(siriF, "", 100, 315, 800, 100, 26, Color3.fromRGB(225, 225, 240), Enum.Font.GothamMedium)
-siriReply.TextWrapped = true
-frame(siriF, 860, 56, 100, 40, Color3.fromRGB(60, 60, 74), 0, px(20))
-label(siriF, "Done", 860, 56, 100, 40, 18, WHITE, Enum.Font.GothamBold)
+local orb, orbG, siriTap
+do
+	local siriF = frame(root, 0, 0, CW, CH, Color3.new(0, 0, 0), 0.4)
+	siriF.ZIndex = 8
+	siriF.Visible = false
+	orb = frame(siriF, 500, 170, 120, 120, WHITE, 0, FULL)
+	orb.AnchorPoint = Vector2.new(0.5, 0.5)
+	orbG = Instance.new("UIGradient")
+	orbG.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(80, 220, 255)),
+		ColorSequenceKeypoint.new(0.35, Color3.fromRGB(190, 90, 255)),
+		ColorSequenceKeypoint.new(0.7, Color3.fromRGB(255, 120, 150)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(80, 220, 255)),
+	})
+	orbG.Parent = orb
+	label(siriF, "Hi, how can I help?", 0, 255, 1000, 50, 36, WHITE, Enum.Font.GothamBold)
+	local siriReply = label(siriF, "", 100, 315, 800, 100, 26, Color3.fromRGB(225, 225, 240), Enum.Font.GothamMedium)
+	siriReply.TextWrapped = true
+	frame(siriF, 860, 56, 100, 40, Color3.fromRGB(60, 60, 74), 0, px(20))
+	label(siriF, "Done", 860, 56, 100, 40, 18, WHITE, Enum.Font.GothamBold)
 
-local function fmtTime()
-	local d, h12, ap = timeParts()
-	return string.format("%d:%02d %s", h12, d.min, ap)
-end
-
-local SIRI_CHIPS = {
-	{ "What time is it?", 130, 450, function() return "It's " .. fmtTime() .. "." end },
-	{ "What's the date?", 510, 450, function()
-		local d = os.date("*t")
-		return string.format("Today is %s, %s %d.", os.date("%A"), os.date("%B"), d.day)
-	end },
-	{ "Turn Wi-Fi on", 130, 516, function()
-		setWifi(true)
-		return "Wi-Fi is on. Pick a network in Settings."
-	end },
-	{ "Open Notes", 510, 516, function()
-		closeSiri()
-		openApp("notes")
-		return nil
-	end },
-	{ "Tell me a joke", 320, 582, function()
-		return "Why don't scientists trust atoms? Because they make up everything."
-	end },
-}
-for _, chip in ipairs(SIRI_CHIPS) do
-	frame(siriF, chip[2], chip[3], 360, 52, Color3.fromRGB(60, 60, 78), 0.1, px(26))
-	label(siriF, chip[1], chip[2], chip[3], 360, 52, 20, WHITE, Enum.Font.GothamMedium)
-end
-
-local function siriTap(x, y)
-	if inRect(x, y, 860, 56, 100, 40) then
-		closeSiri()
-		return
+	local function fmtTime()
+		local d, h12, ap = timeParts()
+		return string.format("%d:%02d %s", h12, d.min, ap)
 	end
+
+	local SIRI_CHIPS = {
+		{ "What time is it?", 130, 450, function() return "It's " .. fmtTime() .. "." end },
+		{ "What's the date?", 510, 450, function()
+			local d = os.date("*t")
+			return string.format("Today is %s, %s %d.", os.date("%A"), os.date("%B"), d.day)
+		end },
+		{ "Turn Wi-Fi on", 130, 516, function()
+			setWifi(true)
+			return "Wi-Fi is on. Pick a network in Settings."
+		end },
+		{ "Open Notes", 510, 516, function()
+			closeSiri()
+			openApp("notes")
+			return nil
+		end },
+		{ "Tell me a joke", 320, 582, function()
+			return "Why don't scientists trust atoms? Because they make up everything."
+		end },
+	}
 	for _, chip in ipairs(SIRI_CHIPS) do
-		if inRect(x, y, chip[2], chip[3], 360, 52) then
-			if not siriOn then
-				siriReply.Text = "Siri is turned off. You can turn it on in Settings > Siri."
-			else
-				local r = chip[4]()
-				if r then siriReply.Text = r end
-			end
+		frame(siriF, chip[2], chip[3], 360, 52, Color3.fromRGB(60, 60, 78), 0.1, px(26))
+		label(siriF, chip[1], chip[2], chip[3], 360, 52, 20, WHITE, Enum.Font.GothamMedium)
+	end
+
+	siriTap = function(x, y)
+		if inRect(x, y, 860, 56, 100, 40) then
+			closeSiri()
 			return
 		end
+		for _, chip in ipairs(SIRI_CHIPS) do
+			if inRect(x, y, chip[2], chip[3], 360, 52) then
+				if not siriOn then
+					siriReply.Text = "Siri is turned off. You can turn it on in Settings > Siri."
+				else
+					local r = chip[4]()
+					if r then siriReply.Text = r end
+				end
+				return
+			end
+		end
 	end
-end
 
-openSiri = function()
-	if siriOpen or screenOff or state == "lock" then return end
-	siriOpen = true
-	siriReply.Text = siriOn and "" or "Siri is turned off. You can turn it on in Settings > Siri."
-	siriF.Visible = true
-end
+	openSiri = function()
+		if siriOpen or screenOff or state == "lock" then return end
+		siriOpen = true
+		siriReply.Text = siriOn and "" or "Siri is turned off. You can turn it on in Settings > Siri."
+		siriF.Visible = true
+	end
 
-closeSiri = function()
-	siriOpen = false
-	siriF.Visible = false
+	closeSiri = function()
+		siriOpen = false
+		siriF.Visible = false
+	end
+
 end
 
 ---------------------------------------------------------------- ripples, volume HUD, brightness, screen-off
-local ripples = frame(root, 0, 0, CW, CH, WHITE, 1)
-ripples.ZIndex = 10
-local function ripple(u, v)
-	local r = frame(ripples, u * CW, v * CH, 10, 10, WHITE, 0.55, FULL)
-	r.AnchorPoint = Vector2.new(0.5, 0.5)
-	tw(r, 0.45, { Size = UDim2.fromOffset(110, 110), BackgroundTransparency = 1 })
-	Debris:AddItem(r, 0.5)
-end
-
-local hud = frame(root, 330, 50, 340, 46, Color3.fromRGB(20, 20, 28), 0.15, FULL)
-hud.ZIndex = 20
-hud.Visible = false
-label(hud, "Volume", 18, 0, 90, 46, 18, WHITE, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
-local hudTrack = frame(hud, 120, 18, 190, 10, Color3.fromRGB(90, 90, 100), 0, FULL)
-local hudFill = frame(hudTrack, 0, 0, 95, 10, WHITE, 0, FULL)
-local hudToken = 0
-
-local dimF = frame(root, 0, 0, CW, CH, Color3.new(0, 0, 0), 1)
-dimF.ZIndex = 25
-local offF = frame(root, 0, 0, CW, CH, Color3.new(0, 0, 0), 1)
-offF.ZIndex = 30
-offF.Visible = false
-
-applyBrightness = function()
-	dimF.BackgroundTransparency = 1 - (1 - brightness) * 0.85
-end
-
-changeVolume = function(delta)
-	vol = math.clamp(vol + delta, 0, 16)
-	tw(hudFill, 0.1, { Size = UDim2.fromOffset(190 * vol / 16, 10) })
-	hud.Visible = true
-	hudToken = hudToken + 1
-	local my = hudToken
-	task.delay(1.6, function()
-		if hudToken == my then hud.Visible = false end
-	end)
-	if state == "app" and curId == "settings" and apps.settings.sel == "sounds" then
-		apps.settings.render()
+local ripple, offF
+do
+	local ripples = frame(root, 0, 0, CW, CH, WHITE, 1)
+	ripples.ZIndex = 10
+	ripple = function(u, v)
+		local r = frame(ripples, u * CW, v * CH, 10, 10, WHITE, 0.55, FULL)
+		r.AnchorPoint = Vector2.new(0.5, 0.5)
+		tw(r, 0.45, { Size = UDim2.fromOffset(110, 110), BackgroundTransparency = 1 })
+		Debris:AddItem(r, 0.5)
 	end
+
+	local hud = frame(root, 330, 50, 340, 46, Color3.fromRGB(20, 20, 28), 0.15, FULL)
+	hud.ZIndex = 20
+	hud.Visible = false
+	label(hud, "Volume", 18, 0, 90, 46, 18, WHITE, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+	local hudTrack = frame(hud, 120, 18, 190, 10, Color3.fromRGB(90, 90, 100), 0, FULL)
+	local hudFill = frame(hudTrack, 0, 0, 95, 10, WHITE, 0, FULL)
+	local hudToken = 0
+
+	local dimF = frame(root, 0, 0, CW, CH, Color3.new(0, 0, 0), 1)
+	dimF.ZIndex = 25
+	offF = frame(root, 0, 0, CW, CH, Color3.new(0, 0, 0), 1)
+	offF.ZIndex = 30
+	offF.Visible = false
+
+	applyBrightness = function()
+		dimF.BackgroundTransparency = 1 - (1 - brightness) * 0.85
+	end
+
+	changeVolume = function(delta)
+		vol = math.clamp(vol + delta, 0, 16)
+		tw(hudFill, 0.1, { Size = UDim2.fromOffset(190 * vol / 16, 10) })
+		hud.Visible = true
+		hudToken = hudToken + 1
+		local my = hudToken
+		task.delay(1.6, function()
+			if hudToken == my then hud.Visible = false end
+		end)
+		if state == "app" and curId == "settings" and apps.settings.sel == "sounds" then
+			apps.settings.render()
+		end
+	end
+
 end
 
 ---------------------------------------------------------------- networking
@@ -1067,215 +1175,211 @@ connectTo = function(n)
 end
 
 ---------------------------------------------------------------- APP: Settings
-local S = { page = newPage(), sel = "wifi", drag = nil, slider = nil }
-apps.settings = S
-local BT_DEVICES = { { name = "AirPods Pro", on = false }, { name = "Magic Keyboard", on = false }, { name = "Portable Speaker", on = false } }
-local VOICES = { "American", "British", "Australian" }
+local S, BT_DEVICES, card
+do
+	S = { page = newPage(), sel = "wifi", drag = nil, slider = nil }
+	apps.settings = S
+	BT_DEVICES = { { name = "AirPods Pro", on = false }, { name = "Magic Keyboard", on = false }, { name = "Portable Speaker", on = false } }
+	local VOICES = { "American", "British", "Australian" }
 
-local SETTINGS_ITEMS = {
-	{ id = "airplane", name = "Airplane Mode", icon = "airplane", color = Color3.fromRGB(255, 149, 0) },
-	{ id = "wifi", name = "Wi-Fi", icon = "wifi", color = BLUE,
-		value = function() return (not wifiOn) and "Off" or (connected or "Not Connected") end },
-	{ id = "bluetooth", name = "Bluetooth", icon = "bluetooth", color = BLUE,
-		value = function() return btOn and "On" or "Off" end },
-	{ id = "siri", name = "Siri", icon = "siri", color = Color3.fromRGB(120, 90, 220),
-		value = function() return siriOn and "On" or "Off" end },
-	{ id = "display", name = "Display & Brightness", icon = "sun", color = Color3.fromRGB(10, 132, 255) },
-	{ id = "sounds", name = "Sounds", icon = "speaker", color = Color3.fromRGB(255, 59, 48) },
-	{ id = "general", name = "General", icon = "gear", color = Color3.fromRGB(142, 142, 147) },
-}
+	local SETTINGS_ITEMS = {
+		{ id = "airplane", name = "Airplane Mode", icon = "airplane", color = Color3.fromRGB(255, 149, 0) },
+		{ id = "wifi", name = "Wi-Fi", icon = "wifi", color = BLUE,
+			value = function() return (not wifiOn) and "Off" or (connected or "Not Connected") end },
+		{ id = "bluetooth", name = "Bluetooth", icon = "bluetooth", color = BLUE,
+			value = function() return btOn and "On" or "Off" end },
+		{ id = "siri", name = "Siri", icon = "siri", color = Color3.fromRGB(120, 90, 220),
+			value = function() return siriOn and "On" or "Off" end },
+		{ id = "display", name = "Display & Brightness", icon = "sun", color = Color3.fromRGB(10, 132, 255) },
+		{ id = "sounds", name = "Sounds", icon = "speaker", color = Color3.fromRGB(255, 59, 48) },
+		{ id = "general", name = "General", icon = "gear", color = Color3.fromRGB(142, 142, 147) },
+	}
 
-local function card(f, x, y, w, h)
-	return frame(f, x, y, w, h, CARD, 0, px(14))
-end
-
-function S.render()
-	local p = S.page
-	p.clear()
-	local f = p.frame
-	S.slider, S.volLbl = nil, nil
-
-	-- sidebar
-	frame(f, 0, 44, 310, 656, Color3.fromRGB(32, 32, 42), 0)
-	label(f, "Settings", 24, 54, 260, 44, 34, WHITE, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
-	for i, it in ipairs(SETTINGS_ITEMS) do
-		local y = 116 + (i - 1) * 58
-		local selected = (S.sel == it.id)
-		if selected then frame(f, 12, y, 286, 52, BLUE, 0, px(12)) end
-		local ib = frame(f, 24, y + 8, 36, 36, it.color, 0, px(9))
-		glyph(ib, it.icon, 18, 18, 24, WHITE, it.color)
-		if it.value then
-			label(f, it.name, 72, y + 4, 214, 26, 18, WHITE, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
-			label(f, it.value(), 72, y + 28, 214, 20, 13, selected and WHITE or GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
-		elseif it.id == "airplane" then
-			label(f, it.name, 72, y, 146, 52, 18, WHITE, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
-		else
-			label(f, it.name, 72, y, 214, 52, 18, WHITE, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
-		end
-		if it.id == "airplane" then
-			drawToggle(f, 222, y + 8, airplane)
-			p.region(12, y, 286, 52, function()
-				airplane = not airplane
-				if airplane then
-					btOn = false
-					setWifi(false)
-				else
-					S.render()
-				end
-			end)
-		else
-			p.region(12, y, 286, 52, function()
-				S.sel = it.id
-				S.render()
-			end)
-		end
+	card = function(f, x, y, w, h)
+		return frame(f, x, y, w, h, CARD, 0, px(14))
 	end
 
-	-- detail
-	local sel = S.sel
-	if sel == "wifi" then
-		label(f, "Wi-Fi", 340, 54, 400, 44, 32, WHITE, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
-		card(f, 340, 116, 630, 60)
-		label(f, "Wi-Fi", 360, 116, 300, 60, 22, WHITE, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
-		drawToggle(f, 886, 128, wifiOn)
-		p.region(780, 116, 190, 60, function() setWifi(not wifiOn) end)
-		if wifiOn then
-			label(f, connected and ("Connected to " .. connected) or "Choose a network", 340, 184, 630, 28, 18, GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
-			for i, n in ipairs(NETWORKS) do
-				local y = 222 + (i - 1) * 62
-				card(f, 340, y, 630, 56)
-				label(f, n.name, 360, y, 300, 56, 22, WHITE, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
-				if n.pass then glyph(f, "lock", 790, y + 28, 20, GRAY, CARD) end
-				local st = (connecting == n.name) and "Connecting..." or ((connected == n.name) and "Connected" or "")
-				label(f, st, 810, y, 150, 56, 17, Color3.fromRGB(110, 170, 255), Enum.Font.GothamBold, Enum.TextXAlignment.Right)
-				p.region(340, y, 630, 56, function()
-					if connected == n.name then
-						connected = nil
-						onNetChanged()
-					elseif connecting ~= n.name then
-						if n.pass then openPw(n) else connectTo(n) end
+	function S.render()
+		local p = S.page
+		p.clear()
+		local f = p.frame
+		S.slider, S.volLbl = nil, nil
+
+		-- sidebar
+		frame(f, 0, 44, 310, 656, SIDEBAR, 0)
+		label(f, "Settings", 24, 54, 260, 44, 34, TXT, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+		for i, it in ipairs(SETTINGS_ITEMS) do
+			local y = 116 + (i - 1) * 58
+			local selected = (S.sel == it.id)
+			if selected then frame(f, 12, y, 286, 52, BLUE, 0, px(12)) end
+			local ib = frame(f, 24, y + 8, 36, 36, it.color, 0, px(9))
+			glyph(ib, it.icon, 18, 18, 24, WHITE, it.color)
+			if it.value then
+				label(f, it.name, 72, y + 4, 214, 26, 18, (selected and WHITE or TXT), Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+				label(f, it.value(), 72, y + 28, 214, 20, 13, selected and WHITE or GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+			elseif it.id == "airplane" then
+				label(f, it.name, 72, y, 146, 52, 18, (selected and WHITE or TXT), Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+			else
+				label(f, it.name, 72, y, 214, 52, 18, (selected and WHITE or TXT), Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+			end
+			if it.id == "airplane" then
+				drawToggle(f, 222, y + 8, airplane)
+				p.region(12, y, 286, 52, function()
+					airplane = not airplane
+					if airplane then
+						btOn = false
+						setWifi(false)
+					else
+						S.render()
 					end
 				end)
-			end
-		else
-			label(f, "Wi-Fi is turned off", 340, 300, 630, 40, 24, GRAY, Enum.Font.GothamMedium)
-		end
-
-	elseif sel == "bluetooth" then
-		label(f, "Bluetooth", 340, 54, 400, 44, 32, WHITE, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
-		card(f, 340, 116, 630, 60)
-		label(f, "Bluetooth", 360, 116, 300, 60, 22, WHITE, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
-		drawToggle(f, 886, 128, btOn)
-		p.region(780, 116, 190, 60, function()
-			btOn = not btOn
-			if btOn then airplane = false else for _, d in ipairs(BT_DEVICES) do d.on = false end end
-			S.render()
-		end)
-		if btOn then
-			label(f, "MY DEVICES", 340, 190, 300, 22, 14, GRAY, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
-			for i, d in ipairs(BT_DEVICES) do
-				local y = 220 + (i - 1) * 62
-				card(f, 340, y, 630, 56)
-				label(f, d.name, 360, y, 400, 56, 22, WHITE, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
-				label(f, d.on and "Connected" or "Not Connected", 760, y, 200, 56, 17, d.on and Color3.fromRGB(110, 170, 255) or GRAY, Enum.Font.GothamBold, Enum.TextXAlignment.Right)
-				p.region(340, y, 630, 56, function()
-					d.on = not d.on
+			else
+				p.region(12, y, 286, 52, function()
+					S.sel = it.id
 					S.render()
 				end)
 			end
-		else
-			label(f, "Bluetooth is turned off", 340, 300, 630, 40, 24, GRAY, Enum.Font.GothamMedium)
 		end
 
-	elseif sel == "siri" then
-		label(f, "Siri", 340, 54, 400, 44, 32, WHITE, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
-		card(f, 340, 116, 630, 60)
-		label(f, "Siri", 360, 116, 300, 60, 22, WHITE, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
-		drawToggle(f, 886, 128, siriOn)
-		p.region(780, 116, 190, 60, function()
-			siriOn = not siriOn
-			S.render()
-		end)
-		card(f, 340, 184, 630, 60)
-		label(f, "Hold Home Bar for Siri", 360, 184, 450, 60, 22, WHITE, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
-		drawToggle(f, 886, 196, siriHold)
-		p.region(780, 184, 190, 60, function()
-			siriHold = not siriHold
-			S.render()
-		end)
-		label(f, "SIRI VOICE", 340, 262, 300, 22, 14, GRAY, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
-		for i, name in ipairs(VOICES) do
-			local y = 290 + (i - 1) * 62
-			local on = (siriVoice == i)
-			card(f, 340, y, 630, 56)
-			label(f, name, 360, y, 400, 56, 22, WHITE, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
-			local r = frame(f, 930, y + 16, 24, 24, on and BLUE or CARD, 0, FULL)
-			stroke(r, on and BLUE or GRAY, 2)
-			p.region(340, y, 630, 56, function()
-				siriVoice = i
+		-- detail
+		local sel = S.sel
+		if sel == "wifi" then
+			label(f, "Wi-Fi", 340, 54, 400, 44, 32, TXT, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+			card(f, 340, 116, 630, 60)
+			label(f, "Wi-Fi", 360, 116, 300, 60, 22, TXT, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+			drawToggle(f, 886, 128, wifiOn)
+			p.region(780, 116, 190, 60, function() setWifi(not wifiOn) end)
+			if wifiOn then
+				label(f, connected and ("Connected to " .. connected) or "Choose a network", 340, 184, 630, 28, 18, GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+				for i, n in ipairs(NETWORKS) do
+					local y = 222 + (i - 1) * 62
+					card(f, 340, y, 630, 56)
+					label(f, n.name, 360, y, 300, 56, 22, TXT, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+					if n.pass then glyph(f, "lock", 790, y + 28, 20, GRAY, CARD) end
+					local st = (connecting == n.name) and "Connecting..." or ((connected == n.name) and "Connected" or "")
+					label(f, st, 810, y, 150, 56, 17, Color3.fromRGB(110, 170, 255), Enum.Font.GothamBold, Enum.TextXAlignment.Right)
+					p.region(340, y, 630, 56, function()
+						if connected == n.name then
+							connected = nil -- tap the connected network to disconnect
+							onNetChanged()
+						elseif connecting ~= n.name then
+							if n.pass then openPw(n) else connectTo(n) end
+						end
+					end)
+				end
+			else
+				label(f, "Wi-Fi is turned off", 340, 300, 630, 40, 24, GRAY, Enum.Font.GothamMedium)
+			end
+
+		elseif sel == "bluetooth" then
+			label(f, "Bluetooth", 340, 54, 400, 44, 32, TXT, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+			card(f, 340, 116, 630, 60)
+			label(f, "Bluetooth", 360, 116, 300, 60, 22, TXT, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+			drawToggle(f, 886, 128, btOn)
+			p.region(780, 116, 190, 60, function()
+				btOn = not btOn
+				if btOn then airplane = false else for _, d in ipairs(BT_DEVICES) do d.on = false end end
 				S.render()
 			end)
+			if btOn then
+				label(f, "MY DEVICES", 340, 190, 300, 22, 14, GRAY, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+				for i, d in ipairs(BT_DEVICES) do
+					local y = 220 + (i - 1) * 62
+					card(f, 340, y, 630, 56)
+					label(f, d.name, 360, y, 400, 56, 22, TXT, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+					label(f, d.on and "Connected" or "Not Connected", 760, y, 200, 56, 17, d.on and Color3.fromRGB(110, 170, 255) or GRAY, Enum.Font.GothamBold, Enum.TextXAlignment.Right)
+					p.region(340, y, 630, 56, function()
+						d.on = not d.on
+						S.render()
+					end)
+				end
+			else
+				label(f, "Bluetooth is turned off", 340, 300, 630, 40, 24, GRAY, Enum.Font.GothamMedium)
+			end
+
+		elseif sel == "siri" then
+			label(f, "Siri", 340, 54, 400, 44, 32, TXT, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+			card(f, 340, 116, 630, 60)
+			label(f, "Siri", 360, 116, 300, 60, 22, TXT, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+			drawToggle(f, 886, 128, siriOn)
+			p.region(780, 116, 190, 60, function()
+				siriOn = not siriOn
+				S.render()
+			end)
+			card(f, 340, 184, 630, 60)
+			label(f, "Hold Home Bar for Siri", 360, 184, 450, 60, 22, TXT, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+			drawToggle(f, 886, 196, siriHold)
+			p.region(780, 184, 190, 60, function()
+				siriHold = not siriHold
+				S.render()
+			end)
+			label(f, "SIRI VOICE", 340, 262, 300, 22, 14, GRAY, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+			for i, name in ipairs(VOICES) do
+				local y = 290 + (i - 1) * 62
+				local on = (siriVoice == i)
+				card(f, 340, y, 630, 56)
+				label(f, name, 360, y, 400, 56, 22, TXT, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+				local r = frame(f, 930, y + 16, 24, 24, on and BLUE or CARD, 0, FULL)
+				stroke(r, on and BLUE or GRAY, 2)
+				p.region(340, y, 630, 56, function()
+					siriVoice = i
+					S.render()
+				end)
+			end
+			frame(f, 340, 494, 630, 56, BLUE, 0, px(14))
+			label(f, "Try Siri", 340, 494, 630, 56, 22, WHITE, Enum.Font.GothamBold)
+			p.region(340, 494, 630, 56, function() openSiri() end)
+
+		elseif sel == "display" then
+			label(f, "Display & Brightness", 340, 54, 600, 44, 32, TXT, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+			label(f, "APPEARANCE", 340, 112, 300, 22, 14, GRAY, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+			for i, mode in ipairs({ "light", "dark" }) do
+				local x = 340 + (i - 1) * 320
+				local on = (themeMode == mode)
+				local isDark = (mode == "dark")
+				local cd = card(f, x, 140, 310, 200)
+				if on then stroke(cd, BLUE, 3) end
+				local pv = frame(f, x + 55, 156, 200, 110, isDark and Color3.fromRGB(28, 28, 36) or Color3.fromRGB(245, 245, 250), 0, px(14))
+				stroke(pv, GRAY, 1, 0.5)
+				frame(pv, 14, 14, 90, 10, isDark and Color3.fromRGB(90, 90, 108) or Color3.fromRGB(190, 190, 202), 0, px(5))
+				frame(pv, 14, 34, 150, 8, isDark and Color3.fromRGB(60, 60, 74) or Color3.fromRGB(215, 215, 224), 0, px(4))
+				frame(pv, 14, 50, 120, 8, isDark and Color3.fromRGB(60, 60, 74) or Color3.fromRGB(215, 215, 224), 0, px(4))
+				frame(pv, 14, 78, 70, 20, BLUE, 0, px(10))
+				label(f, isDark and "Dark" or "Light", x, 272, 310, 30, 22, TXT, Enum.Font.GothamMedium)
+				local r = frame(f, x + 143, 306, 24, 24, on and BLUE or CARD, 0, FULL)
+				stroke(r, on and BLUE or GRAY, 2)
+				p.region(x, 140, 310, 200, function()
+					themeMode = mode
+					applyTheme()
+				end)
+			end
+			card(f, 340, 360, 630, 120)
+			label(f, "Brightness", 360, 368, 300, 36, 22, TXT, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+			S.slider = drawSlider(f, 370, 442, 570, 0.7)
+			label(f, "Design only - this slider doesn't do anything yet.", 340, 492, 630, 28, 18, GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+
+		elseif sel == "sounds" then
+			label(f, "Sounds", 340, 54, 400, 44, 32, TXT, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+			card(f, 340, 116, 630, 130)
+			label(f, "Volume", 360, 126, 300, 36, 22, TXT, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+			S.slider = drawSlider(f, 370, 196, 570, 0.5)
+			label(f, "Design only - use the volume buttons on the side of the iPad.", 340, 262, 630, 28, 18, GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+
+		elseif sel == "general" then
+			label(f, "General", 340, 54, 400, 44, 32, TXT, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+			local rows = { { "Name", "iPad" }, { "Model", "iPad Air" }, { "Software Version", "iPadOS 18.0" }, { "Capacity", "64 GB" } }
+			for i, r in ipairs(rows) do
+				local y = 116 + (i - 1) * 62
+				card(f, 340, y, 630, 56)
+				label(f, r[1], 360, y, 300, 56, 22, TXT, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+				label(f, r[2], 640, y, 310, 56, 20, GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Right)
+			end
 		end
-		frame(f, 340, 494, 630, 56, BLUE, 0, px(14))
-		label(f, "Try Siri", 340, 494, 630, 56, 22, WHITE, Enum.Font.GothamBold)
-		p.region(340, 494, 630, 56, function() openSiri() end)
-
-	elseif sel == "display" then
-		label(f, "Display & Brightness", 340, 54, 600, 44, 32, WHITE, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
-		card(f, 340, 116, 630, 130)
-		label(f, "Brightness", 360, 126, 300, 36, 22, WHITE, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
-		S.slider = drawSlider(f, 370, 196, 570, (brightness - 0.1) / 0.9)
-		label(f, "Drag the slider to dim or brighten the screen.", 340, 262, 630, 28, 18, GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
-
-	elseif sel == "sounds" then
-		label(f, "Sounds", 340, 54, 400, 44, 32, WHITE, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
-		card(f, 340, 116, 630, 130)
-		label(f, "Volume", 360, 126, 300, 36, 22, WHITE, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
-		S.volLbl = label(f, math.floor(vol / 16 * 100 + 0.5) .. "%", 820, 126, 130, 36, 20, GRAY, Enum.Font.GothamBold, Enum.TextXAlignment.Right)
-		S.slider = drawSlider(f, 370, 196, 570, vol / 16)
-		label(f, "You can also use the volume buttons on the side of the iPad.", 340, 262, 630, 28, 18, GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
-
-	elseif sel == "general" then
-		label(f, "General", 340, 54, 400, 44, 32, WHITE, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
-		local rows = { { "Name", "iPad" }, { "Model", "iPad Air" }, { "Software Version", "iPadOS 18.0" }, { "Capacity", "64 GB" } }
-		for i, r in ipairs(rows) do
-			local y = 116 + (i - 1) * 62
-			card(f, 340, y, 630, 56)
-			label(f, r[1], 360, y, 300, 56, 22, WHITE, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
-			label(f, r[2], 640, y, 310, 56, 20, GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Right)
-		end
 	end
-end
 
--- Define S.onDrag BEFORE S.onPress so it is never nil
-function S.onDrag(x, y)
-	if not S.drag then return end
-	local frac = math.clamp((x - 370) / 570, 0, 1)
-	if S.drag == "bright" then
-		brightness = 0.1 + 0.9 * frac
-		applyBrightness()
-	else
-		vol = math.floor(frac * 16 + 0.5)
-		frac = vol / 16
-		if S.volLbl then S.volLbl.Text = math.floor(frac * 100 + 0.5) .. "%" end
-	end
-	setSlider(S.slider, frac)
-end
+	S.tap = S.page.tap
 
-function S.onPress(x, y)
-	if (S.sel == "display" or S.sel == "sounds") and inRect(x, y, 350, 170, 620, 60) then
-		S.drag = (S.sel == "display") and "bright" or "vol"
-		S.onDrag(x, y)
-		return true
-	end
-	return false
 end
-
-function S.onRelease()
-	S.drag = nil
-end
-
-S.tap = S.page.tap
 
 ---------------------------------------------------------------- APP: App Store
 local STORE = {
@@ -1289,7 +1393,7 @@ local STORE = {
 local EXTRA = {}
 for _, it in ipairs(STORE) do EXTRA[it.id] = it end
 
-local homeApps = { "appstore", "settings", "notes", "podcasts", "reminders" }
+local homeApps = { "appstore", "playstore", "settings", "classroom", "notes", "podcasts", "reminders", "flappy" }
 local DEFS = {
 	appstore = { name = "App Store", c1 = Color3.fromRGB(80, 170, 255), c2 = Color3.fromRGB(20, 90, 230) },
 	settings = { name = "Settings", c1 = Color3.fromRGB(170, 172, 180), c2 = Color3.fromRGB(100, 102, 112) },
@@ -1298,6 +1402,9 @@ local DEFS = {
 	reminders = { name = "Reminders", c1 = Color3.fromRGB(255, 255, 255), c2 = Color3.fromRGB(215, 215, 225) },
 }
 for _, it in ipairs(STORE) do DEFS[it.id] = { name = it.name, c1 = it.c1, c2 = it.c2 } end
+DEFS.playstore = { name = "Play Store" }
+DEFS.classroom = { name = "Classroom" }
+DEFS.flappy = { name = "Flappy Bird" }
 
 local AS = { page = newPage() }
 apps.appstore = AS
@@ -1307,9 +1414,9 @@ function AS.render()
 	local p = AS.page
 	p.clear()
 	local f = p.frame
-	label(f, "App Store", 60, 54, 500, 52, 42, WHITE, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+	label(f, "App Store", 60, 54, 500, 52, 42, TXT, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
 	if not connected then
-		label(f, "No Internet Connection", 0, 250, 1000, 50, 36, WHITE, Enum.Font.GothamBold)
+		label(f, "No Internet Connection", 0, 250, 1000, 50, 36, TXT, Enum.Font.GothamBold)
 		label(f, "Connect to a Wi-Fi network in Settings to browse apps.", 0, 306, 1000, 34, 22, GRAY, Enum.Font.GothamMedium)
 		frame(f, 400, 370, 200, 54, BLUE, 0, px(27))
 		label(f, "Open Settings", 400, 370, 200, 54, 20, WHITE, Enum.Font.GothamBold)
@@ -1323,7 +1430,7 @@ function AS.render()
 	for i, it in ipairs(STORE) do
 		local y = 144 + (i - 1) * 86
 		drawIcon(f, it.id, 60, y, 70)
-		label(f, it.name, 148, y + 6, 520, 32, 26, WHITE, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+		label(f, it.name, 148, y + 6, 520, 32, 26, TXT, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
 		label(f, it.sub, 148, y + 40, 520, 26, 18, GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
 		local by = y + 13
 		if installed[it.id] then
@@ -1345,7 +1452,7 @@ function AS.render()
 end
 AS.tap = AS.page.tap
 
----------------------------------------------------------------- APP: Demo
+---------------------------------------------------------------- APP: Demo (apps installed from the App Store)
 local demoApp = { page = newPage(), def = nil }
 function demoApp.render()
 	local p = demoApp.page
@@ -1354,245 +1461,251 @@ function demoApp.render()
 	local d = demoApp.def
 	if not d then return end
 	drawIcon(f, d.id, 400, 150, 200)
-	label(f, d.name, 0, 380, 1000, 60, 46, WHITE, Enum.Font.GothamBold)
+	label(f, d.name, 0, 380, 1000, 60, 46, TXT, Enum.Font.GothamBold)
 	label(f, "Demo app - nothing here yet", 0, 440, 1000, 36, 24, GRAY, Enum.Font.GothamMedium)
 end
 demoApp.tap = demoApp.page.tap
 
----------------------------------------------------------------- APP: Notes
-local N = {
-	page = newPage(),
-	notes = { { body = "Welcome to Notes\nTap + to write a new note." } },
-	sel = 1,
-	editing = false,
-}
-apps.notes = N
+---------------------------------------------------------------- APP: Notes (works)
+do
+	local N = {
+		page = newPage(),
+		notes = { { body = "Welcome to Notes\nTap + to write a new note." } },
+		sel = 1,
+		editing = false,
+	}
+	apps.notes = N
 
-local function noteTitle(b)
-	local first = b:match("([^\n]*)") or ""
-	return first == "" and "New Note" or first
-end
+	local function noteTitle(b)
+		local first = b:match("([^\n]*)") or ""
+		return first == "" and "New Note" or first
+	end
 
-local function noteEditStart()
-	N.editing = true
-	kbApp.onChar = function(ch)
-		local n = N.notes[N.sel]
-		if n and #n.body < 600 then
-			n.body = n.body .. ch
+	local function noteEditStart()
+		N.editing = true
+		kbApp.onChar = function(ch)
+			local n = N.notes[N.sel]
+			if n and #n.body < 600 then
+				n.body = n.body .. ch
+				N.render()
+			end
+		end
+		kbApp.onBack = function()
+			local n = N.notes[N.sel]
+			if n then
+				n.body = n.body:sub(1, -2)
+				N.render()
+			end
+		end
+		kbApp.onReturn = function()
+			local n = N.notes[N.sel]
+			if n and #n.body < 600 then
+				n.body = n.body .. "\n"
+				N.render()
+			end
+		end
+		kbApp.onDone = function()
+			N.editing = false
+			kbApp.frame.Visible = false
 			N.render()
 		end
+		kbApp.shift = false
+		kbApp.refresh()
+		kbApp.frame.Visible = true
 	end
-	kbApp.onBack = function()
-		local n = N.notes[N.sel]
-		if n then
-			n.body = n.body:sub(1, -2)
-			N.render()
-		end
-	end
-	kbApp.onReturn = function()
-		local n = N.notes[N.sel]
-		if n and #n.body < 600 then
-			n.body = n.body .. "\n"
-			N.render()
-		end
-	end
-	kbApp.onDone = function()
+
+	function N.onShow()
 		N.editing = false
 		kbApp.frame.Visible = false
-		N.render()
-	end
-	kbApp.shift = false
-	kbApp.refresh()
-	kbApp.frame.Visible = true
-end
-
-function N.onShow()
-	N.editing = false
-	kbApp.frame.Visible = false
-end
-
-function N.render()
-	local p = N.page
-	p.clear()
-	local f = p.frame
-	frame(f, 0, 44, 310, 656, Color3.fromRGB(32, 32, 42), 0)
-	label(f, "Notes", 24, 54, 200, 44, 34, WHITE, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
-	local plus = frame(f, 248, 58, 44, 44, Color3.fromRGB(255, 204, 0), 0, FULL)
-	label(plus, "+", 0, 0, 44, 44, 30, Color3.new(0, 0, 0), Enum.Font.GothamBold)
-	p.region(236, 50, 66, 60, function()
-		if #N.notes >= 8 then return end
-		table.insert(N.notes, 1, { body = "" })
-		N.sel = 1
-		noteEditStart()
-		N.render()
-	end)
-	for i, n in ipairs(N.notes) do
-		local y = 116 + (i - 1) * 70
-		local selected = (i == N.sel)
-		frame(f, 12, y, 286, 62, selected and Color3.fromRGB(255, 204, 0) or CARD, selected and 0.78 or 0, px(12))
-		label(f, noteTitle(n.body), 26, y + 6, 260, 28, 20, WHITE, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
-		label(f, n.body:match("\n([^\n]*)") or "No additional text", 26, y + 34, 260, 22, 15, GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
-		p.region(12, y, 286, 62, function()
-			N.sel = i
-			N.editing = false
-			kbApp.frame.Visible = false
-			N.render()
-		end)
 	end
 
-	local note = N.notes[N.sel]
-	if note then
-		frame(f, 700, 58, 110, 40, Color3.fromRGB(255, 69, 58), 0.15, px(20))
-		label(f, "Delete", 700, 58, 110, 40, 18, WHITE, Enum.Font.GothamBold)
-		p.region(700, 58, 110, 40, function()
-			table.remove(N.notes, N.sel)
-			N.sel = (#N.notes > 0) and math.min(N.sel, #N.notes) or nil
-			N.editing = false
-			kbApp.frame.Visible = false
+	function N.render()
+		local p = N.page
+		p.clear()
+		local f = p.frame
+		frame(f, 0, 44, 310, 656, SIDEBAR, 0)
+		label(f, "Notes", 24, 54, 200, 44, 34, TXT, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+		local plus = frame(f, 248, 58, 44, 44, Color3.fromRGB(255, 204, 0), 0, FULL)
+		label(plus, "+", 0, 0, 44, 44, 30, Color3.new(0, 0, 0), Enum.Font.GothamBold)
+		p.region(236, 50, 66, 60, function()
+			if #N.notes >= 8 then return end
+			table.insert(N.notes, 1, { body = "" })
+			N.sel = 1
+			noteEditStart()
 			N.render()
 		end)
-		if N.editing then
-			frame(f, 830, 58, 110, 40, BLUE, 0, px(20))
-			label(f, "Done", 830, 58, 110, 40, 18, WHITE, Enum.Font.GothamBold)
-			p.region(830, 58, 110, 40, function()
+		for i, n in ipairs(N.notes) do
+			local y = 116 + (i - 1) * 70
+			local selected = (i == N.sel)
+			frame(f, 12, y, 286, 62, selected and Color3.fromRGB(255, 204, 0) or CARD, selected and 0.78 or 0, px(12))
+			label(f, noteTitle(n.body), 26, y + 6, 260, 28, 20, TXT, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+			label(f, n.body:match("\n([^\n]*)") or "No additional text", 26, y + 34, 260, 22, 15, GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+			p.region(12, y, 286, 62, function()
+				N.sel = i
 				N.editing = false
 				kbApp.frame.Visible = false
 				N.render()
 			end)
 		end
-		local h = N.editing and 214 or 540
-		local ta
-		if note.body == "" then
-			ta = label(f, N.editing and "|" or "Tap here to start typing...", 340, 112, 620, h, 24, N.editing and WHITE or GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
-		else
-			ta = label(f, note.body .. (N.editing and "|" or ""), 340, 112, 620, h, 24, WHITE, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
-		end
-		ta.TextWrapped = true
-		ta.TextYAlignment = Enum.TextYAlignment.Top
-		p.region(330, 104, 640, h + 8, function()
-			if not N.editing then
-				noteEditStart()
+
+		local note = N.notes[N.sel]
+		if note then
+			frame(f, 700, 58, 110, 40, Color3.fromRGB(255, 69, 58), 0.15, px(20))
+			label(f, "Delete", 700, 58, 110, 40, 18, WHITE, Enum.Font.GothamBold)
+			p.region(700, 58, 110, 40, function()
+				table.remove(N.notes, N.sel)
+				N.sel = (#N.notes > 0) and math.min(N.sel, #N.notes) or nil
+				N.editing = false
+				kbApp.frame.Visible = false
 				N.render()
+			end)
+			if N.editing then
+				frame(f, 830, 58, 110, 40, BLUE, 0, px(20))
+				label(f, "Done", 830, 58, 110, 40, 18, WHITE, Enum.Font.GothamBold)
+				p.region(830, 58, 110, 40, function()
+					N.editing = false
+					kbApp.frame.Visible = false
+					N.render()
+				end)
 			end
-		end)
-	else
-		label(f, "No note selected", 320, 300, 680, 40, 24, GRAY, Enum.Font.GothamMedium)
-	end
-end
-
-function N.tap(x, y)
-	if N.editing and kbApp.frame.Visible then
-		if kbApp.tap(x, y) then return end
-		if inRect(x, y, 162, 330, 676, 346) then return end
-	end
-	N.page.tap(x, y)
-end
-
----------------------------------------------------------------- APP: Reminders
-local Rm = {
-	page = newPage(),
-	items = { { text = "Buy milk", done = false }, { text = "Charge iPad", done = false } },
-	adding = false,
-	draft = "",
-}
-apps.reminders = Rm
-
-local function remCommit()
-	if #Rm.draft > 0 and #Rm.items < 9 then
-		table.insert(Rm.items, { text = Rm.draft, done = false })
-	end
-	Rm.adding = false
-	Rm.draft = ""
-	kbApp.frame.Visible = false
-	Rm.render()
-end
-
-local function remStart()
-	if #Rm.items >= 9 or Rm.adding then return end
-	Rm.adding = true
-	Rm.draft = ""
-	kbApp.onChar = function(ch)
-		if #Rm.draft < 60 then
-			Rm.draft = Rm.draft .. ch
-			Rm.render()
+			local h = N.editing and 214 or 540
+			local ta
+			if note.body == "" then
+				ta = label(f, N.editing and "|" or "Tap here to start typing...", 340, 112, 620, h, 24, N.editing and TXT or GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+			else
+				ta = label(f, note.body .. (N.editing and "|" or ""), 340, 112, 620, h, 24, TXT, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+			end
+			ta.TextWrapped = true
+			ta.TextYAlignment = Enum.TextYAlignment.Top
+			p.region(330, 104, 640, h + 8, function()
+				if not N.editing then
+					noteEditStart()
+					N.render()
+				end
+			end)
+		else
+			label(f, "No note selected", 320, 300, 680, 40, 24, GRAY, Enum.Font.GothamMedium)
 		end
 	end
-	kbApp.onBack = function()
-		Rm.draft = Rm.draft:sub(1, -2)
+
+	function N.tap(x, y)
+		if N.editing and kbApp.frame.Visible then
+			if kbApp.tap(x, y) then return end
+			if inRect(x, y, 162, 330, 676, 346) then return end
+		end
+		N.page.tap(x, y)
+	end
+
+end
+
+---------------------------------------------------------------- APP: Reminders (works)
+do
+	local Rm = {
+		page = newPage(),
+		items = { { text = "Buy milk", done = false }, { text = "Charge iPad", done = false } },
+		adding = false,
+		draft = "",
+	}
+	apps.reminders = Rm
+
+	local function remCommit()
+		if #Rm.draft > 0 and #Rm.items < 9 then
+			table.insert(Rm.items, { text = Rm.draft, done = false })
+		end
+		Rm.adding = false
+		Rm.draft = ""
+		kbApp.frame.Visible = false
 		Rm.render()
 	end
-	kbApp.onReturn = remCommit
-	kbApp.onDone = remCommit
-	kbApp.shift = false
-	kbApp.refresh()
-	kbApp.frame.Visible = true
-	Rm.render()
-end
 
-function Rm.onShow()
-	Rm.adding = false
-	Rm.draft = ""
-	kbApp.frame.Visible = false
-end
-
-function Rm.render()
-	local p = Rm.page
-	p.clear()
-	local f = p.frame
-	local remaining, anyDone = 0, false
-	for _, it in ipairs(Rm.items) do
-		if it.done then anyDone = true else remaining = remaining + 1 end
-	end
-	label(f, "Reminders", 60, 54, 500, 52, 42, BLUE, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
-	label(f, remaining .. " remaining", 60, 106, 400, 26, 20, GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
-	frame(f, 880, 58, 60, 46, BLUE, 0, px(23))
-	label(f, "+", 880, 58, 60, 46, 30, WHITE, Enum.Font.GothamBold)
-	p.region(870, 52, 80, 58, remStart)
-	if anyDone then
-		frame(f, 710, 58, 150, 46, Color3.fromRGB(60, 60, 74), 0, px(23))
-		label(f, "Clear Done", 710, 58, 150, 46, 18, WHITE, Enum.Font.GothamBold)
-		p.region(710, 58, 150, 46, function()
-			for i = #Rm.items, 1, -1 do
-				if Rm.items[i].done then table.remove(Rm.items, i) end
+	local function remStart()
+		if #Rm.items >= 9 or Rm.adding then return end
+		Rm.adding = true
+		Rm.draft = ""
+		kbApp.onChar = function(ch)
+			if #Rm.draft < 60 then
+				Rm.draft = Rm.draft .. ch
+				Rm.render()
 			end
+		end
+		kbApp.onBack = function()
+			Rm.draft = Rm.draft:sub(1, -2)
 			Rm.render()
-		end)
+		end
+		kbApp.onReturn = remCommit
+		kbApp.onDone = remCommit
+		kbApp.shift = false
+		kbApp.refresh()
+		kbApp.frame.Visible = true
+		Rm.render()
 	end
 
-	local y = 150
-	if Rm.adding then
-		frame(f, 60, y, 880, 56, CARD, 0, px(14))
-		local c = frame(f, 60, y + 10, 36, 36, BG, 0, FULL)
-		stroke(c, BLUE, 2)
-		label(f, Rm.draft == "" and "New Reminder|" or (Rm.draft .. "|"), 116, y, 800, 56, 26, Rm.draft == "" and GRAY or WHITE, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
-		y = y + 62
+	function Rm.onShow()
+		Rm.adding = false
+		Rm.draft = ""
+		kbApp.frame.Visible = false
 	end
-	for i, it in ipairs(Rm.items) do
-		local c = frame(f, 60, y + 10, 36, 36, it.done and BLUE or BG, 0, FULL)
-		stroke(c, BLUE, 2)
-		local lbl = label(f, it.done and ("<s>" .. esc(it.text) .. "</s>") or it.text, 116, y, 820, 56, 26, it.done and GRAY or WHITE, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
-		lbl.RichText = it.done
-		frame(f, 116, y + 55, 824, 1, Color3.fromRGB(60, 60, 72), 0)
-		p.region(60, y, 880, 56, function()
-			it.done = not it.done
-			Rm.render()
-		end)
-		y = y + 56
+
+	function Rm.render()
+		local p = Rm.page
+		p.clear()
+		local f = p.frame
+		local remaining, anyDone = 0, false
+		for _, it in ipairs(Rm.items) do
+			if it.done then anyDone = true else remaining = remaining + 1 end
+		end
+		label(f, "Reminders", 60, 54, 500, 52, 42, BLUE, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+		label(f, remaining .. " remaining", 60, 106, 400, 26, 20, GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+		frame(f, 880, 58, 60, 46, BLUE, 0, px(23))
+		label(f, "+", 880, 58, 60, 46, 30, WHITE, Enum.Font.GothamBold)
+		p.region(870, 52, 80, 58, remStart)
+		if anyDone then
+			frame(f, 710, 58, 150, 46, Color3.fromRGB(60, 60, 74), 0, px(23))
+			label(f, "Clear Done", 710, 58, 150, 46, 18, WHITE, Enum.Font.GothamBold)
+			p.region(710, 58, 150, 46, function()
+				for i = #Rm.items, 1, -1 do
+					if Rm.items[i].done then table.remove(Rm.items, i) end
+				end
+				Rm.render()
+			end)
+		end
+
+		local y = 150
+		if Rm.adding then
+			frame(f, 60, y, 880, 56, CARD, 0, px(14))
+			local c = frame(f, 60, y + 10, 36, 36, BG, 0, FULL)
+			stroke(c, BLUE, 2)
+			label(f, Rm.draft == "" and "New Reminder|" or (Rm.draft .. "|"), 116, y, 800, 56, 26, Rm.draft == "" and GRAY or TXT, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+			y = y + 62
+		end
+		for i, it in ipairs(Rm.items) do
+			local c = frame(f, 60, y + 10, 36, 36, it.done and BLUE or BG, 0, FULL)
+			stroke(c, BLUE, 2)
+			local lbl = label(f, it.done and ("<s>" .. esc(it.text) .. "</s>") or it.text, 116, y, 820, 56, 26, it.done and GRAY or TXT, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+			lbl.RichText = it.done
+			frame(f, 116, y + 55, 824, 1, SIDEBAR, 0)
+			p.region(60, y, 880, 56, function()
+				it.done = not it.done
+				Rm.render()
+			end)
+			y = y + 56
+		end
+		if #Rm.items == 0 and not Rm.adding then
+			label(f, "All done! Tap + to add a reminder.", 0, 300, 1000, 40, 24, GRAY, Enum.Font.GothamMedium)
+		end
 	end
-	if #Rm.items == 0 and not Rm.adding then
-		label(f, "All done! Tap + to add a reminder.", 0, 300, 1000, 40, 24, GRAY, Enum.Font.GothamMedium)
+
+	function Rm.tap(x, y)
+		if Rm.adding and kbApp.frame.Visible then
+			if kbApp.tap(x, y) then return end
+			if inRect(x, y, 162, 330, 676, 346) then return end
+		end
+		Rm.page.tap(x, y)
 	end
+
 end
 
-function Rm.tap(x, y)
-	if Rm.adding and kbApp.frame.Visible then
-		if kbApp.tap(x, y) then return end
-		if inRect(x, y, 162, 330, 676, 346) then return end
-	end
-	Rm.page.tap(x, y)
-end
-
----------------------------------------------------------------- APP: Podcasts
+---------------------------------------------------------------- APP: Podcasts (demo)
 local SHOWS = {
 	{ "Morning Brew Chat", "Daily news & banter", "", Color3.fromRGB(255, 149, 0) },
 	{ "True Crime Tuesdays", "Mysteries unfolded", "", Color3.fromRGB(175, 82, 222) },
@@ -1609,7 +1722,7 @@ function Pod.render()
 	p.clear()
 	local f = p.frame
 	Pod.fill = nil
-	label(f, "Podcasts", 60, 54, 500, 52, 42, WHITE, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+	label(f, "Podcasts", 60, 54, 500, 52, 42, TXT, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
 	label(f, "Top Shows", 60, 106, 400, 26, 20, GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
 	for i, s in ipairs(SHOWS) do
 		local col, row = (i - 1) % 3, math.floor((i - 1) / 3)
@@ -1619,7 +1732,7 @@ function Pod.render()
 		local art = frame(f, x + 16, y + 16, 72, 72, s[4], 0, px(16))
 		gradient(art, s[4], s[4]:Lerp(Color3.new(0, 0, 0), 0.35), 90)
 		label(art, s[1]:sub(1, 1), 0, 0, 72, 72, 40, WHITE, Enum.Font.GothamBold)
-		label(f, s[1], x + 16, y + 96, 248, 30, 22, WHITE, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+		label(f, s[1], x + 16, y + 96, 248, 30, 22, TXT, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
 		label(f, s[2], x + 16, y + 128, 248, 24, 16, GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
 		p.region(x, y, 280, 184, function()
 			if Pod.sel ~= i then Pod.prog = 0 end
@@ -1634,7 +1747,7 @@ function Pod.render()
 		local art = frame(f, 76, 564, 76, 76, s[4], 0, px(16))
 		gradient(art, s[4], s[4]:Lerp(Color3.new(0, 0, 0), 0.35), 90)
 		label(art, s[1]:sub(1, 1), 0, 0, 76, 76, 40, WHITE, Enum.Font.GothamBold)
-		label(f, s[1], 170, 562, 560, 34, 24, WHITE, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+		label(f, s[1], 170, 562, 560, 34, 24, TXT, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
 		label(f, "Episode 24  -  Demo", 170, 596, 560, 24, 17, GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
 		local track = frame(f, 170, 632, 560, 8, Color3.fromRGB(80, 80, 94), 0, FULL)
 		Pod.fill = frame(track, 0, 0, 560 * Pod.prog, 8, WHITE, 0, FULL)
@@ -1650,214 +1763,527 @@ function Pod.render()
 end
 Pod.tap = Pod.page.tap
 
----------------------------------------------------------------- CONTROL CENTER
-local ccF = frame(root, 0, 0, CW, CH, Color3.new(0, 0, 0), 1)
-ccF.ZIndex = 9
-ccF.Visible = false
-local ccPanel = frame(ccF, 0, 0, CW, CH, WHITE, 1)
-local ccToast = frame(ccF, 330, 54, 340, 42, Color3.fromRGB(34, 34, 44), 0.1, FULL)
-ccToast.Visible = false
-local ccToastLbl = label(ccToast, "", 0, 0, 340, 42, 18, WHITE, Enum.Font.GothamBold)
-local ccToastToken = 0
-local cc = { regions = {}, sliders = {}, grab = nil }
-local ccState = { airdrop = false, rotlock = false, dnd = false, silent = false, torch = false, rec = false, music = false }
-local CCX, CCY = 706, 60
-local CC_DARK = Color3.fromRGB(34, 34, 46)
-local CC_OFF = Color3.fromRGB(70, 70, 86)
-local CC_TILE = Color3.fromRGB(44, 44, 58)
+---------------------------------------------------------------- APP: Play Store (demo - no apps yet)
+do
+	local Ps = { page = newPage() }
+	apps.playstore = Ps
 
-local function ccShowToast(text)
-	ccToastLbl.Text = text
-	ccToast.Visible = true
-	ccToastToken = ccToastToken + 1
-	local my = ccToastToken
-	task.delay(1.6, function()
-		if ccToastToken == my then ccToast.Visible = false end
-	end)
-end
-
-ccRender = function()
-	ccPanel:ClearAllChildren()
-	cc.regions, cc.sliders = {}, {}
-	local function reg(x, y, w, h, fn) table.insert(cc.regions, { x, y, w, h, fn }) end
-	local function cell(c, r) return CCX + c * 66, CCY + r * 66 end
-	local function toggle(key, name)
-		ccState[key] = not ccState[key]
-		ccRender()
-		ccShowToast(name .. ": " .. (ccState[key] and "On" or "Off"))
-	end
-
-	local x0, y0 = cell(0, 0)
-	frame(ccPanel, x0, y0, 124, 124, CC_DARK, 0.08, px(30))
-	local conn = {
-		{ "airplane", 31, 31, airplane, Color3.fromRGB(255, 149, 0), function()
-			airplane = not airplane
-			if airplane then
-				btOn = false
-				for _, d in ipairs(BT_DEVICES) do d.on = false end
-				setWifi(false)
-			else
-				ccRender()
-			end
-		end },
-		{ "airdrop", 93, 31, ccState.airdrop, BLUE, function() toggle("airdrop", "AirDrop") end },
-		{ "wifi", 31, 93, wifiOn, BLUE, function() setWifi(not wifiOn) end },
-		{ "bluetooth", 93, 93, btOn, BLUE, function()
-			btOn = not btOn
-			if btOn then
-				airplane = false
-			else
-				for _, d in ipairs(BT_DEVICES) do d.on = false end
-			end
-			ccRender()
-		end },
-	}
-	for _, b in ipairs(conn) do
-		local cx, cy = x0 + b[2], y0 + b[3]
-		local col = b[4] and b[5] or CC_OFF
-		local c = frame(ccPanel, cx - 26, cy - 26, 52, 52, col, 0, FULL)
-		glyph(c, b[1], 26, 26, 30, WHITE, col)
-		reg(cx - 30, cy - 30, 60, 60, b[6])
-	end
-
-	local mx, my = cell(2, 0)
-	frame(ccPanel, mx, my, 124, 124, CC_DARK, 0.08, px(30))
-	label(ccPanel, "Music", mx, my + 12, 124, 24, 16, WHITE, Enum.Font.GothamBold)
-	label(ccPanel, ccState.music and "Playing" or "Not Playing", mx, my + 34, 124, 20, 12, GRAY, Enum.Font.GothamMedium)
-	local py = my + 88
-	local ctl = Color3.fromRGB(200, 200, 210)
-	triShape(ccPanel, 1, "l", mx + 14, py - 9, 18, ctl)
-	triShape(ccPanel, 1, "l", mx + 23, py - 9, 18, ctl)
-	if ccState.music then
-		shape(ccPanel, 1, mx + 56, py, 8, 28, WHITE, 0, 0.3)
-		shape(ccPanel, 1, mx + 70, py, 8, 28, WHITE, 0, 0.3)
-	else
-		triShape(ccPanel, 1, "r", mx + 54, py - 14, 28, WHITE)
-	end
-	triShape(ccPanel, 1, "r", mx + 94, py - 9, 18, ctl)
-	triShape(ccPanel, 1, "r", mx + 103, py - 9, 18, ctl)
-	reg(mx + 4, py - 24, 44, 48, function() ccShowToast("Previous track (demo)") end)
-	reg(mx + 46, py - 24, 40, 48, function()
-		ccState.music = not ccState.music
-		ccRender()
-	end)
-	reg(mx + 86, py - 24, 36, 48, function() ccShowToast("Next track (demo)") end)
-
-	local bx, by = cell(2, 2)
-	for i = 1, 2 do
-		local sx = bx + (i - 1) * 66
-		local frac = (i == 1) and ((brightness - 0.1) / 0.9) or (vol / 16)
-		frame(ccPanel, sx, by, 58, 124, CC_OFF, 0.05, px(22))
-		local fh = math.floor(124 * frac)
-		local fill = frame(ccPanel, sx, by + 124 - fh, 58, fh, Color3.fromRGB(236, 236, 244), 0, px(22))
-		local gc = (frac > 0.2) and Color3.fromRGB(70, 70, 84) or WHITE
-		glyph(ccPanel, (i == 1) and "sun" or "speaker", sx + 29, by + 124 - 24, 28, gc, Color3.fromRGB(236, 236, 244))
-		cc.sliders[i] = { x = sx, y = by, w = 58, h = 124, fill = fill, id = (i == 1) and "bright" or "vol" }
-	end
-
-	local function small(col, row, name, on, onColor, glyphOn, fn)
-		local x, y = cell(col, row)
-		local bg = on and onColor or CC_TILE
-		frame(ccPanel, x, y, 58, 58, bg, 0.08, px(18))
-		glyph(ccPanel, name, x + 29, y + 29, 30, (on and glyphOn) or WHITE, bg)
-		reg(x, y, 58, 58, fn)
-	end
-	small(0, 2, "rotlock", ccState.rotlock, Color3.fromRGB(255, 69, 58), WHITE, function() toggle("rotlock", "Orientation Lock") end)
-	small(1, 2, "moon", ccState.dnd, Color3.fromRGB(94, 92, 230), WHITE, function() toggle("dnd", "Do Not Disturb") end)
-
-	local sx0, sy0 = cell(0, 3)
-	frame(ccPanel, sx0, sy0, 124, 58, CC_DARK, 0.08, px(18))
-	glyph(ccPanel, "mirror", sx0 + 28, sy0 + 29, 30, WHITE, CC_DARK)
-	label(ccPanel, "Screen\nMirroring", sx0 + 50, sy0, 70, 58, 13, WHITE, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
-	reg(sx0, sy0, 124, 58, function() ccShowToast("Screen Mirroring: no devices found") end)
-
-	small(0, 4, "bell", ccState.silent, Color3.fromRGB(255, 69, 58), WHITE, function() toggle("silent", "Silent Mode") end)
-	small(1, 4, "torch", ccState.torch, Color3.fromRGB(240, 240, 248), Color3.fromRGB(30, 30, 40), function()
-		toggle("torch", "Flashlight")
-		setTorch(ccState.torch)
-	end)
-	small(2, 4, "timer", false, CC_TILE, WHITE, function() ccShowToast("Timer (demo)") end)
-	small(3, 4, "camera", false, CC_TILE, WHITE, function() ccShowToast("Camera (demo)") end)
-	small(0, 5, "record", ccState.rec, Color3.fromRGB(255, 69, 58), WHITE, function() toggle("rec", "Screen Recording") end)
-	small(1, 5, "stopwatch", false, CC_TILE, WHITE, function() ccShowToast("Stopwatch (demo)") end)
-end
-
-local function ccPress(x, y)
-	for _, sl in ipairs(cc.sliders) do
-		if inRect(x, y, sl.x - 4, sl.y - 4, sl.w + 8, sl.h + 8) then
-			cc.grab = sl
-			return true
-		end
-	end
-	return false
-end
-
-local function ccDrag(x, y)
-	local sl = cc.grab
-	if not sl then return end
-	local frac = math.clamp(1 - (y - sl.y) / sl.h, 0, 1)
-	local fh = math.floor(sl.h * frac)
-	sl.fill.Position = UDim2.fromOffset(sl.x, sl.y + sl.h - fh)
-	sl.fill.Size = UDim2.fromOffset(sl.w, fh)
-	if sl.id == "bright" then
-		brightness = 0.1 + 0.9 * frac
-		applyBrightness()
-	else
-		vol = math.floor(frac * 16 + 0.5)
-	end
-end
-
-local function ccRelease()
-	cc.grab = nil
-end
-
-local function ccFollow(p)
-	if not ccF.Visible then
-		ccRender()
-		ccF.Visible = true
-	end
-	ccPanel.Position = UDim2.fromOffset(0, -460 * (1 - p))
-	ccF.BackgroundTransparency = 1 - 0.45 * p
-end
-
-openCC = function(follow)
-	ccOpen = true
-	if not follow then
-		ccRender()
-		ccF.Visible = true
-		ccPanel.Position = UDim2.fromOffset(0, -460)
-		ccF.BackgroundTransparency = 1
-	end
-	tw(ccPanel, 0.28, { Position = UDim2.fromOffset(0, 0) }, Enum.EasingStyle.Quint)
-	tw(ccF, 0.28, { BackgroundTransparency = 0.55 })
-end
-
-closeCC = function(instant)
-	if not ccOpen and not ccF.Visible then return end
-	ccOpen = false
-	cc.grab = nil
-	if instant then
-		ccF.Visible = false
-		ccF.BackgroundTransparency = 1
-		ccToast.Visible = false
-		return
-	end
-	tw(ccPanel, 0.25, { Position = UDim2.fromOffset(0, -460) }, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
-	tw(ccF, 0.25, { BackgroundTransparency = 1 })
-	task.delay(0.27, function()
-		if not ccOpen then ccF.Visible = false end
-	end)
-end
-
-local function ccTap(x, y)
-	for i = #cc.regions, 1, -1 do
-		local r = cc.regions[i]
-		if inRect(x, y, r[1], r[2], r[3], r[4]) then
-			r[5]()
+	function Ps.render()
+		local p = Ps.page
+		p.clear()
+		local f = p.frame
+		label(f, "Play Store", 60, 54, 500, 52, 42, TXT, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+		if not connected then
+			label(f, "No Internet Connection", 0, 250, 1000, 50, 36, TXT, Enum.Font.GothamBold)
+			label(f, "Connect to a Wi-Fi network in Settings to open the Play Store.", 0, 306, 1000, 34, 22, GRAY, Enum.Font.GothamMedium)
+			frame(f, 400, 370, 200, 54, BLUE, 0, px(27))
+			label(f, "Open Settings", 400, 370, 200, 54, 20, WHITE, Enum.Font.GothamBold)
+			p.region(400, 370, 200, 54, function()
+				S.sel = "wifi"
+				openApp("settings")
+			end)
 			return
 		end
+		frame(f, 60, 124, 880, 52, CARD, 0, px(26))
+		label(f, "Search apps & games", 92, 124, 600, 52, 20, GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+		label(f, "No apps available yet", 0, 290, 1000, 50, 34, TXT, Enum.Font.GothamBold)
+		label(f, "This is a demo - the Play Store is empty for now.", 0, 344, 1000, 34, 22, GRAY, Enum.Font.GothamMedium)
 	end
-	if not inRect(x, y, CCX - 16, CCY - 8, 288, 412) then closeCC() end
+	Ps.tap = Ps.page.tap
+end
+
+---------------------------------------------------------------- APP: Classroom
+do
+	local CLASSES = {
+		{ name = "Math 101", teacher = "Ms. Rivera", room = "Room 204", color = Color3.fromRGB(30, 136, 229), tasks = {
+			{ text = "Chapter 3 worksheet", due = "Fri", done = false },
+			{ text = "Quiz prep", due = "Mon", done = false },
+			{ text = "Read pages 40-52", due = "Wed", done = true },
+		} },
+		{ name = "Science", teacher = "Mr. Okafor", room = "Lab 2", color = Color3.fromRGB(67, 160, 71), tasks = {
+			{ text = "Lab report", due = "Thu", done = false },
+			{ text = "Plant diary", due = "Daily", done = false },
+		} },
+		{ name = "English", teacher = "Mrs. Lin", room = "Room 110", color = Color3.fromRGB(251, 140, 0), tasks = {
+			{ text = "Essay draft", due = "Tue", done = false },
+			{ text = "Vocabulary list", due = "Fri", done = false },
+		} },
+		{ name = "History", teacher = "Mr. Brooks", room = "Room 305", color = Color3.fromRGB(142, 68, 173), tasks = {
+			{ text = "Timeline project", due = "Next week", done = false },
+		} },
+	}
+	local Cr = { page = newPage(), sel = nil }
+	apps.classroom = Cr
+
+	function Cr.onShow()
+		Cr.sel = nil
+	end
+
+	function Cr.render()
+		local p = Cr.page
+		p.clear()
+		local f = p.frame
+		if not Cr.sel then
+			label(f, "Classroom", 60, 54, 500, 52, 42, TXT, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+			label(f, "Your classes", 60, 106, 400, 26, 20, GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+			for i, c in ipairs(CLASSES) do
+				local col, row = (i - 1) % 2, math.floor((i - 1) / 2)
+				local x, y = 60 + col * 450, 150 + row * 250
+				local pending = 0
+				for _, t in ipairs(c.tasks) do
+					if not t.done then pending = pending + 1 end
+				end
+				frame(f, x, y, 430, 220, CARD, 0, px(22))
+				frame(f, x, y, 430, 110, c.color, 0, px(22))
+				frame(f, x, y + 60, 430, 50, c.color, 0)
+				label(f, c.name, x + 24, y + 14, 380, 44, 32, WHITE, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+				label(f, c.teacher, x + 24, y + 62, 380, 26, 18, Color3.fromRGB(235, 235, 245), Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+				label(f, pending .. (pending == 1 and " assignment due" or " assignments due"), x + 24, y + 126, 380, 28, 22, TXT, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+				label(f, c.room, x + 24, y + 164, 380, 24, 17, GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+				p.region(x, y, 430, 220, function()
+					Cr.sel = i
+					Cr.render()
+				end)
+			end
+		else
+			local c = CLASSES[Cr.sel]
+			frame(f, 0, 44, 1000, 130, c.color, 0)
+			label(f, c.name, 50, 62, 600, 52, 42, WHITE, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+			label(f, c.teacher .. "  -  " .. c.room, 50, 118, 600, 28, 20, Color3.fromRGB(235, 235, 245), Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+			frame(f, 820, 70, 130, 42, Color3.new(0, 0, 0), 0.65, px(21))
+			label(f, "Classes", 820, 70, 130, 42, 18, WHITE, Enum.Font.GothamBold)
+			p.region(820, 70, 130, 42, function()
+				Cr.sel = nil
+				Cr.render()
+			end)
+			local done = 0
+			for _, t in ipairs(c.tasks) do
+				if t.done then done = done + 1 end
+			end
+			label(f, "Assignments", 60, 190, 400, 32, 24, TXT, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+			label(f, done .. " of " .. #c.tasks .. " done", 700, 190, 240, 32, 18, GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Right)
+			for i, t in ipairs(c.tasks) do
+				local y = 232 + (i - 1) * 62
+				frame(f, 60, y, 880, 56, CARD, 0, px(14))
+				local ring = frame(f, 78, y + 10, 36, 36, t.done and c.color or CARD, 0, FULL)
+				stroke(ring, c.color, 2)
+				local lbl = label(f, t.done and ("<s>" .. esc(t.text) .. "</s>") or t.text, 134, y, 620, 56, 24, t.done and GRAY or TXT, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+				lbl.RichText = t.done
+				label(f, "Due " .. t.due, 760, y, 160, 56, 17, GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Right)
+				p.region(60, y, 880, 56, function()
+					t.done = not t.done
+					Cr.render()
+				end)
+			end
+		end
+	end
+	Cr.tap = Cr.page.tap
+end
+
+---------------------------------------------------------------- APP: Flappy Bird
+do
+	local GROUND_Y, GAP, PIPE_W, CAP_H = 620, 190, 90, 28
+	local BX = 260
+	local GRAV, FLAP, SPEED, SPACING = 1500, -470, 175, 340
+	local SKY = Color3.fromRGB(112, 197, 206)
+	local PIPE, PIPE_CAP = Color3.fromRGB(115, 191, 46), Color3.fromRGB(140, 214, 62)
+	local OUTLINE = Color3.fromRGB(84, 56, 71)
+
+	local Fl = { page = newPage(), phase = "ready", score = 0, best = 0, y = 300, vy = 0, deadAt = 0, pipes = {} }
+	apps.flappy = Fl
+
+	-- sounds (your ids). They live on the torch part so they follow you and get cleaned up with the script
+	local tapSnd = Instance.new("Sound")
+	tapSnd.Name = "FlappyTap"
+	tapSnd.SoundId = "rbxassetid://119778675553294"
+	tapSnd.Parent = torchPart
+	local failSnd = Instance.new("Sound")
+	failSnd.Name = "FlappyFail"
+	failSnd.SoundId = "rbxassetid://108601872025792"
+	failSnd.Parent = torchPart
+
+	local function play(snd)
+		pcall(function()
+			snd.Volume = math.clamp(vol / 16 * 2, 0, 2) -- follows the iPad volume buttons
+			snd.TimePosition = 0
+			snd:Play()
+		end)
+	end
+
+	local function layoutPipes()
+		for _, pr in ipairs(Fl.pipes) do
+			local top, bottom = pr.gapY - GAP / 2, pr.gapY + GAP / 2
+			pr.top.Position = UDim2.fromOffset(pr.x, 0)
+			pr.top.Size = UDim2.fromOffset(PIPE_W, math.max(1, top - CAP_H))
+			pr.topCap.Position = UDim2.fromOffset(pr.x - 4, top - CAP_H)
+			pr.botCap.Position = UDim2.fromOffset(pr.x - 4, bottom)
+			pr.bot.Position = UDim2.fromOffset(pr.x, bottom + CAP_H)
+			pr.bot.Size = UDim2.fromOffset(PIPE_W, math.max(1, GROUND_Y - (bottom + CAP_H)))
+		end
+	end
+
+	local function refreshUI()
+		if not Fl.bird then return end
+		Fl.scoreLbl.Text = tostring(Fl.score)
+		Fl.hint.Visible = (Fl.phase == "ready")
+		Fl.over.Visible = (Fl.phase == "dead")
+		Fl.overScore.Text = "Score: " .. Fl.score
+		Fl.overBest.Text = "Best: " .. Fl.best
+	end
+
+	local function reset()
+		Fl.phase, Fl.score, Fl.y, Fl.vy = "ready", 0, 300, 0
+		for i, pr in ipairs(Fl.pipes) do
+			pr.x = 1100 + (i - 1) * SPACING
+			pr.gapY = math.random(160, 460)
+			pr.passed = false
+		end
+		layoutPipes()
+		if Fl.bird then
+			Fl.bird.Position = UDim2.fromOffset(BX, Fl.y)
+			Fl.bird.Rotation = 0
+		end
+		refreshUI()
+	end
+
+	local function die()
+		if Fl.phase ~= "play" then return end
+		Fl.phase = "dead"
+		Fl.deadAt = os.clock()
+		if Fl.score > Fl.best then Fl.best = Fl.score end
+		play(failSnd)
+		refreshUI()
+	end
+
+	function Fl.onShow()
+		Fl.needsBuild = true
+	end
+
+	function Fl.render()
+		if not Fl.needsBuild and Fl.bird and Fl.bird.Parent then return end
+		Fl.needsBuild = false
+		local p = Fl.page
+		p.clear()
+		local f = p.frame
+		frame(f, 0, 0, CW, GROUND_Y, SKY, 0)
+		frame(f, 110, 400, 190, 56, WHITE, 0.3, FULL)
+		frame(f, 200, 372, 150, 70, WHITE, 0.3, FULL)
+		frame(f, 640, 430, 230, 60, WHITE, 0.3, FULL)
+		frame(f, 720, 396, 140, 66, WHITE, 0.3, FULL)
+
+		Fl.pipes = {}
+		local function pipeFrame(color)
+			local fr = frame(f, 0, 0, PIPE_W, 10, color, 0)
+			stroke(fr, OUTLINE, 2)
+			return fr
+		end
+		for i = 1, 3 do
+			local pr = {
+				top = pipeFrame(PIPE), topCap = pipeFrame(PIPE_CAP),
+				bot = pipeFrame(PIPE), botCap = pipeFrame(PIPE_CAP),
+				x = 0, gapY = 300, passed = false,
+			}
+			pr.topCap.Size = UDim2.fromOffset(PIPE_W + 8, CAP_H)
+			pr.botCap.Size = UDim2.fromOffset(PIPE_W + 8, CAP_H)
+			Fl.pipes[i] = pr
+		end
+
+		frame(f, 0, GROUND_Y, CW, CH - GROUND_Y, Color3.fromRGB(222, 216, 149), 0)
+		frame(f, 0, GROUND_Y, CW, 16, Color3.fromRGB(100, 200, 70), 0)
+		frame(f, 0, GROUND_Y + 16, CW, 3, OUTLINE, 0)
+
+		local bird = frame(f, BX, 300, 46, 34, Color3.fromRGB(255, 208, 40), 0, FULL)
+		bird.AnchorPoint = Vector2.new(0.5, 0.5)
+		stroke(bird, OUTLINE, 2)
+		shape(bird, 1, 16, 20, 22, 13, Color3.fromRGB(255, 236, 150), 0, 0.5)
+		shape(bird, 1, 34, 12, 14, 14, WHITE, 0, 0.5)
+		shape(bird, 1, 37, 12, 6, 6, Color3.new(0, 0, 0), 0, 0.5)
+		shape(bird, 1, 44, 21, 16, 10, Color3.fromRGB(255, 120, 40), 0, 0.4)
+		Fl.bird = bird
+
+		local sc = label(f, "0", 0, 70, 1000, 90, 76, WHITE, Enum.Font.GothamBold)
+		sc.TextStrokeTransparency = 0
+		sc.TextStrokeColor3 = Color3.new(0, 0, 0)
+		Fl.scoreLbl = sc
+		local hint = label(f, "Tap to start", 0, 430, 1000, 50, 36, WHITE, Enum.Font.GothamBold)
+		hint.TextStrokeTransparency = 0
+		hint.TextStrokeColor3 = Color3.new(0, 0, 0)
+		Fl.hint = hint
+
+		local over = frame(f, 340, 170, 320, 250, Color3.fromRGB(222, 216, 149), 0, px(18))
+		stroke(over, OUTLINE, 3)
+		label(over, "Game Over", 0, 16, 320, 50, 36, OUTLINE, Enum.Font.GothamBold)
+		Fl.overScore = label(over, "", 0, 86, 320, 40, 28, OUTLINE, Enum.Font.GothamBold)
+		Fl.overBest = label(over, "", 0, 128, 320, 40, 28, OUTLINE, Enum.Font.GothamBold)
+		label(over, "Tap to retry", 0, 184, 320, 40, 22, OUTLINE, Enum.Font.GothamMedium)
+		Fl.over = over
+
+		reset()
+	end
+
+	function Fl.update(dt)
+		if not Fl.bird or not Fl.bird.Parent then return end
+		dt = math.min(dt, 1 / 20)
+		if Fl.phase == "ready" then
+			Fl.y = 300 + math.sin(os.clock() * 6) * 8
+			Fl.vy = 0
+		elseif Fl.phase == "play" then
+			Fl.vy = Fl.vy + GRAV * dt
+			Fl.y = Fl.y + Fl.vy * dt
+			for _, pr in ipairs(Fl.pipes) do
+				pr.x = pr.x - SPEED * dt
+				if pr.x + PIPE_W < -10 then
+					local far = 0
+					for _, o in ipairs(Fl.pipes) do far = math.max(far, o.x) end
+					pr.x = far + SPACING
+					pr.gapY = math.random(160, 460)
+					pr.passed = false
+				end
+				if not pr.passed and pr.x + PIPE_W < BX - 20 then
+					pr.passed = true
+					Fl.score = Fl.score + 1
+					Fl.scoreLbl.Text = tostring(Fl.score)
+				end
+				if BX + 18 > pr.x and BX - 18 < pr.x + PIPE_W then
+					if Fl.y - 14 < pr.gapY - GAP / 2 or Fl.y + 14 > pr.gapY + GAP / 2 then die() end
+				end
+			end
+			if Fl.y + 16 >= GROUND_Y then
+				Fl.y = GROUND_Y - 16
+				die()
+			end
+			if Fl.y < 16 then
+				Fl.y = 16
+				Fl.vy = 0
+			end
+		elseif Fl.phase == "dead" then
+			if Fl.y + 16 < GROUND_Y then
+				Fl.vy = Fl.vy + GRAV * dt
+				Fl.y = math.min(GROUND_Y - 16, Fl.y + Fl.vy * dt)
+			end
+		end
+		Fl.bird.Position = UDim2.fromOffset(BX, Fl.y)
+		Fl.bird.Rotation = math.clamp(Fl.vy / 12, -25, 70)
+		layoutPipes()
+	end
+
+	-- tap anywhere (below the status bar) = flap. Taps are handled on press so it feels instant
+	function Fl.onPress(x, y)
+		if y < 50 then return false end
+		if Fl.phase == "ready" then
+			Fl.phase = "play"
+			Fl.vy = FLAP
+			play(tapSnd)
+			refreshUI()
+		elseif Fl.phase == "play" then
+			Fl.vy = FLAP
+			play(tapSnd)
+		elseif Fl.phase == "dead" and os.clock() - Fl.deadAt > 0.6 then
+			reset()
+		end
+		return true
+	end
+
+	Fl.tap = Fl.page.tap
+end
+
+---------------------------------------------------------------- CONTROL CENTER (swipe down from the top-right / Wi-Fi icon)
+local ccF, ccPress, ccDrag, ccRelease, ccFollow, ccTap
+do
+	ccF = frame(root, 0, 0, CW, CH, Color3.new(0, 0, 0), 1)
+	ccF.ZIndex = 9
+	ccF.Visible = false
+	local ccPanel = frame(ccF, 0, 0, CW, CH, WHITE, 1)
+	local ccToast = frame(ccF, 330, 54, 340, 42, Color3.fromRGB(34, 34, 44), 0.1, FULL)
+	ccToast.Visible = false
+	local ccToastLbl = label(ccToast, "", 0, 0, 340, 42, 18, WHITE, Enum.Font.GothamBold)
+	local ccToastToken = 0
+	local cc = { regions = {}, sliders = {}, grab = nil }
+	local ccState = { airdrop = false, rotlock = false, dnd = false, silent = false, torch = false, rec = false, music = false }
+	local CCX, CCY = 706, 60
+	local CC_DARK = Color3.fromRGB(34, 34, 46)
+	local CC_OFF = Color3.fromRGB(70, 70, 86)
+	local CC_TILE = Color3.fromRGB(44, 44, 58)
+
+	local function ccShowToast(text)
+		ccToastLbl.Text = text
+		ccToast.Visible = true
+		ccToastToken = ccToastToken + 1
+		local my = ccToastToken
+		task.delay(1.6, function()
+			if ccToastToken == my then ccToast.Visible = false end
+		end)
+	end
+
+	ccRender = function()
+		ccPanel:ClearAllChildren()
+		cc.regions, cc.sliders = {}, {}
+		local function reg(x, y, w, h, fn) table.insert(cc.regions, { x, y, w, h, fn }) end
+		local function cell(c, r) return CCX + c * 66, CCY + r * 66 end
+		local function toggle(key, name)
+			ccState[key] = not ccState[key]
+			ccRender()
+			ccShowToast(name .. ": " .. (ccState[key] and "On" or "Off"))
+		end
+
+		-- connectivity block (airplane / airdrop / wifi / bluetooth)
+		local x0, y0 = cell(0, 0)
+		frame(ccPanel, x0, y0, 124, 124, CC_DARK, 0.08, px(30))
+		local conn = {
+			{ "airplane", 31, 31, airplane, Color3.fromRGB(255, 149, 0), function()
+				airplane = not airplane
+				if airplane then
+					btOn = false
+					for _, d in ipairs(BT_DEVICES) do d.on = false end
+					setWifi(false)
+				else
+					ccRender()
+				end
+			end },
+			{ "airdrop", 93, 31, ccState.airdrop, BLUE, function() toggle("airdrop", "AirDrop") end },
+			{ "wifi", 31, 93, wifiOn, BLUE, function() setWifi(not wifiOn) end },
+			{ "bluetooth", 93, 93, btOn, BLUE, function()
+				btOn = not btOn
+				if btOn then
+					airplane = false
+				else
+					for _, d in ipairs(BT_DEVICES) do d.on = false end
+				end
+				ccRender()
+			end },
+		}
+		for _, b in ipairs(conn) do
+			local cx, cy = x0 + b[2], y0 + b[3]
+			local col = b[4] and b[5] or CC_OFF
+			local c = frame(ccPanel, cx - 26, cy - 26, 52, 52, col, 0, FULL)
+			glyph(c, b[1], 26, 26, 30, WHITE, col)
+			reg(cx - 30, cy - 30, 60, 60, b[6])
+		end
+
+		-- music block
+		local mx, my = cell(2, 0)
+		frame(ccPanel, mx, my, 124, 124, CC_DARK, 0.08, px(30))
+		label(ccPanel, "Music", mx, my + 12, 124, 24, 16, WHITE, Enum.Font.GothamBold)
+		label(ccPanel, ccState.music and "Playing" or "Not Playing", mx, my + 34, 124, 20, 12, GRAY, Enum.Font.GothamMedium)
+		local py = my + 88
+		local ctl = Color3.fromRGB(200, 200, 210)
+		triShape(ccPanel, 1, "l", mx + 14, py - 9, 18, ctl)
+		triShape(ccPanel, 1, "l", mx + 23, py - 9, 18, ctl)
+		if ccState.music then
+			shape(ccPanel, 1, mx + 56, py, 8, 28, WHITE, 0, 0.3)
+			shape(ccPanel, 1, mx + 70, py, 8, 28, WHITE, 0, 0.3)
+		else
+			triShape(ccPanel, 1, "r", mx + 54, py - 14, 28, WHITE)
+		end
+		triShape(ccPanel, 1, "r", mx + 94, py - 9, 18, ctl)
+		triShape(ccPanel, 1, "r", mx + 103, py - 9, 18, ctl)
+		reg(mx + 4, py - 24, 44, 48, function() ccShowToast("Previous track (demo)") end)
+		reg(mx + 46, py - 24, 40, 48, function()
+			ccState.music = not ccState.music
+			ccRender()
+		end)
+		reg(mx + 86, py - 24, 36, 48, function() ccShowToast("Next track (demo)") end)
+
+		-- brightness + volume sliders (design only - they don't do anything)
+		local bx, by = cell(2, 2)
+		for i = 1, 2 do
+			local sx = bx + (i - 1) * 66
+			local frac = (i == 1) and 0.7 or 0.45
+			frame(ccPanel, sx, by, 58, 124, CC_OFF, 0.05, px(22))
+			local fh = math.floor(124 * frac)
+			frame(ccPanel, sx, by + 124 - fh, 58, fh, Color3.fromRGB(236, 236, 244), 0, px(22))
+			glyph(ccPanel, (i == 1) and "sun" or "speaker", sx + 29, by + 124 - 24, 28, Color3.fromRGB(70, 70, 84), Color3.fromRGB(236, 236, 244))
+		end
+
+		-- small tiles
+		local function small(col, row, name, on, onColor, glyphOn, fn)
+			local x, y = cell(col, row)
+			local bg = on and onColor or CC_TILE
+			frame(ccPanel, x, y, 58, 58, bg, 0.08, px(18))
+			glyph(ccPanel, name, x + 29, y + 29, 30, (on and glyphOn) or WHITE, bg)
+			reg(x, y, 58, 58, fn)
+		end
+		small(0, 2, "rotlock", ccState.rotlock, Color3.fromRGB(255, 69, 58), WHITE, function() toggle("rotlock", "Orientation Lock") end)
+		small(1, 2, "moon", ccState.dnd, Color3.fromRGB(94, 92, 230), WHITE, function() toggle("dnd", "Do Not Disturb") end)
+
+		-- screen mirroring (wide)
+		local sx0, sy0 = cell(0, 3)
+		frame(ccPanel, sx0, sy0, 124, 58, CC_DARK, 0.08, px(18))
+		glyph(ccPanel, "mirror", sx0 + 28, sy0 + 29, 30, WHITE, CC_DARK)
+		label(ccPanel, "Screen\nMirroring", sx0 + 50, sy0, 70, 58, 13, WHITE, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+		reg(sx0, sy0, 124, 58, function() ccShowToast("Screen Mirroring: no devices found") end)
+
+		small(0, 4, "bell", ccState.silent, Color3.fromRGB(255, 69, 58), WHITE, function() toggle("silent", "Silent Mode") end)
+		small(1, 4, "torch", ccState.torch, Color3.fromRGB(240, 240, 248), Color3.fromRGB(30, 30, 40), function()
+			toggle("torch", "Flashlight")
+			setTorch(ccState.torch)
+		end)
+		small(2, 4, "timer", false, CC_TILE, WHITE, function() ccShowToast("Timer (demo)") end)
+		small(3, 4, "camera", false, CC_TILE, WHITE, function() ccShowToast("Camera (demo)") end)
+		small(0, 5, "record", ccState.rec, Color3.fromRGB(255, 69, 58), WHITE, function() toggle("rec", "Screen Recording") end)
+		small(1, 5, "stopwatch", false, CC_TILE, WHITE, function() ccShowToast("Stopwatch (demo)") end)
+	end
+
+	-- the sliders are design only, so there is nothing to grab or drag
+	ccPress = function(x, y)
+		return false
+	end
+
+	ccDrag = function(x, y)
+	end
+
+	ccRelease = function()
+	end
+
+	ccFollow = function(p) -- finger is dragging the panel down
+		if not ccF.Visible then
+			ccRender()
+			ccF.Visible = true
+		end
+		ccPanel.Position = UDim2.fromOffset(0, -460 * (1 - p))
+		ccF.BackgroundTransparency = 1 - 0.45 * p
+	end
+
+	openCC = function(follow)
+		ccOpen = true
+		if not follow then
+			ccRender()
+			ccF.Visible = true
+			ccPanel.Position = UDim2.fromOffset(0, -460)
+			ccF.BackgroundTransparency = 1
+		end
+		tw(ccPanel, 0.28, { Position = UDim2.fromOffset(0, 0) }, Enum.EasingStyle.Quint)
+		tw(ccF, 0.28, { BackgroundTransparency = 0.55 })
+	end
+
+	closeCC = function(instant)
+		if not ccOpen and not ccF.Visible then return end
+		ccOpen = false
+		cc.grab = nil
+		if instant then
+			ccF.Visible = false
+			ccF.BackgroundTransparency = 1
+			ccToast.Visible = false
+			return
+		end
+		tw(ccPanel, 0.25, { Position = UDim2.fromOffset(0, -460) }, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
+		tw(ccF, 0.25, { BackgroundTransparency = 1 })
+		task.delay(0.27, function()
+			if not ccOpen then ccF.Visible = false end
+		end)
+	end
+
+	ccTap = function(x, y)
+		for i = #cc.regions, 1, -1 do
+			local r = cc.regions[i]
+			if inRect(x, y, r[1], r[2], r[3], r[4]) then
+				r[5]()
+				return
+			end
+		end
+		if not inRect(x, y, CCX - 16, CCY - 8, 288, 412) then closeCC() end
+	end
+
 end
 
 ---------------------------------------------------------------- navigation
@@ -1963,6 +2389,7 @@ lockNow = function(instant)
 	end
 end
 
+-- power button: screen off / on (black screen)
 local function sleepScreen()
 	if screenOff then return end
 	screenOff = true
@@ -1984,16 +2411,16 @@ local function wakeScreen()
 	end)
 end
 
----------------------------------------------------------------- spring
+---------------------------------------------------------------- spring (tap force)
 local sp = { x = 0, y = 0, z = 0, rx = 0, ry = 0, xv = 0, yv = 0, zv = 0, rxv = 0, ryv = 0 }
 
 local function bounce(u, v)
-	sp.zv = sp.zv - 1.1
-	sp.rxv = sp.rxv + (v - 0.5) * 1.5
+	sp.zv = sp.zv - 1.1                  -- pushed back a little
+	sp.rxv = sp.rxv + (v - 0.5) * 1.5    -- tilts away from where you tapped
 	sp.ryv = sp.ryv + (u - 0.5) * 1.5
 end
 
----------------------------------------------------------------- taps
+---------------------------------------------------------------- taps on the screen
 local function openSettingsWifi()
 	S.sel = "wifi"
 	if state == "app" and curId == "settings" then
@@ -2053,7 +2480,7 @@ local function handleTap(u, v)
 	end
 end
 
----------------------------------------------------------------- side buttons
+---------------------------------------------------------------- side buttons (3D)
 local function rayBox(o, d, bmin, bmax)
 	local tmin, tmax = 0, math.huge
 	for _, ax in ipairs({ "X", "Y", "Z" }) do
@@ -2071,7 +2498,7 @@ local function rayBox(o, d, bmin, bmax)
 	return tmin
 end
 
-local PAD = Vector3.new(0.13, 0.13, 0.2)
+local PAD = Vector3.new(0.13, 0.13, 0.2) -- forgiving finger hitbox
 local function hitSide(pos)
 	local ray = camera:ScreenPointToRay(pos.X, pos.Y)
 	local cf = model.PrimaryPart.CFrame
@@ -2109,11 +2536,11 @@ local function sideAction(name)
 	end
 end
 
----------------------------------------------------------------- input
+---------------------------------------------------------------- input (ray -> screen)
 local function screenUV(pos)
 	local ray = camera:ScreenPointToRay(pos.X, pos.Y)
 	local cf = screen.CFrame
-	local n = -cf.LookVector
+	local n = -cf.LookVector -- back-face normal (towards you)
 	local denom = ray.Direction:Dot(n)
 	if denom > -1e-4 then return nil end
 	local p0 = cf:PointToWorldSpace(Vector3.new(0, 0, 0.003))
@@ -2273,7 +2700,7 @@ CAS:BindActionAtPriority(
 	Enum.UserInputType.Touch, Enum.UserInputType.MouseButton1, Enum.UserInputType.MouseMovement
 )
 
----------------------------------------------------------------- render step
+---------------------------------------------------------------- per-frame update
 local ARM_NAMES = {
 	"LeftUpperArm", "LeftLowerArm", "LeftHand", "RightUpperArm", "RightLowerArm", "RightHand",
 	"Left Arm", "Right Arm",
@@ -2299,12 +2726,14 @@ RunService:BindToRenderStep("DeltaIPad", Enum.RenderPriority.Camera.Value + 2, f
 	end
 	dt = math.min(dt, 1 / 30)
 
+	-- little inertia when you turn the camera
 	local rel = prevCam:ToObjectSpace(camera.CFrame)
 	local rx, ry = rel:ToEulerAnglesYXZ()
 	prevCam = camera.CFrame
 	sp.x = math.clamp(sp.x + ry * 0.9, -0.2, 0.2)
 	sp.y = math.clamp(sp.y - rx * 0.9, -0.2, 0.2)
 
+	-- springs (this is the tap bounce)
 	for _, k in ipairs({ "x", "y", "z", "rx", "ry" }) do
 		local kv = k .. "v"
 		sp[kv] = sp[kv] + (-K * sp[k] - C * sp[kv]) * dt
@@ -2318,6 +2747,7 @@ RunService:BindToRenderStep("DeltaIPad", Enum.RenderPriority.Camera.Value + 2, f
 		* CFrame.Angles(sp.rx, sp.ry, 0)
 	)
 
+	-- hide the default first-person arms (we have our own hands)
 	local ch = player.Character
 	if ch then
 		for _, n in ipairs(ARM_NAMES) do
@@ -2326,6 +2756,7 @@ RunService:BindToRenderStep("DeltaIPad", Enum.RenderPriority.Camera.Value + 2, f
 		end
 	end
 
+	-- PC: hold Left Ctrl to free the mouse
 	if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then
 		UIS.MouseBehavior = Enum.MouseBehavior.Default
 		UIS.MouseIconEnabled = true
@@ -2345,16 +2776,23 @@ table.insert(conns, RunService.Heartbeat:Connect(function(dt)
 		hint.TextTransparency = 0.15 + 0.4 * (0.5 + 0.5 * math.sin(os.clock() * 2.4))
 	end
 
+	-- Siri orb animation
 	if siriOpen then
 		orbG.Rotation = (os.clock() * 140) % 360
 		local s = 120 + 8 * math.sin(os.clock() * 4)
 		orb.Size = UDim2.fromOffset(s, s)
 	end
 
+	-- hold the home bar = Siri
 	if drag.active and drag.mode == "bottom" and not drag.moved and not drag.siriDone
 		and siriOn and siriHold and (os.clock() - drag.t0) > 0.6 then
 		drag.siriDone = true
 		openSiri()
+	end
+
+	-- podcasts progress (demo)
+	if state == "app" and curId == "flappy" then
+		apps.flappy.update(dt)
 	end
 
 	if Pod.playing and Pod.sel then
@@ -2364,9 +2802,10 @@ table.insert(conns, RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 
+	-- App Store downloads
 	if not connected then
 		if next(downloading) then
-			for k in pairs(downloading) do downloading[k] = nil end
+			table.clear(downloading)
 			if state == "app" and curId == "appstore" then AS.render() end
 		end
 	else
@@ -2386,14 +2825,14 @@ table.insert(conns, RunService.Heartbeat:Connect(function(dt)
 		if any then
 			dlTimer = dlTimer + dt
 			if dlTimer > 0.1 or not next(downloading) then
-				dlTimer = dlTimer = 0
+				dlTimer = 0
 				if state == "app" and curId == "appstore" then AS.render() end
 			end
 		end
 	end
 end))
 
----------------------------------------------------------------- toggle button
+---------------------------------------------------------------- "pull it out" button
 local sg = Instance.new("ScreenGui")
 sg.Name = "DeltaIPadToggle"
 sg.ResetOnSpawn = false
@@ -2417,7 +2856,7 @@ table.insert(conns, tb.Activated:Connect(function()
 end))
 sg.Parent = player:WaitForChild("PlayerGui")
 
----------------------------------------------------------------- init
+---------------------------------------------------------------- go
 layoutHome()
 refreshClocks()
 applyBrightness()
