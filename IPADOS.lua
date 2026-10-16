@@ -2,6 +2,7 @@
 	iPad (first person) - Roblox Delta LocalScript  (v4)
 	- Real 3D iPad in workspace (rounded corners, bezel, camera, side buttons), both hands hold it
 	- Swipe up to unlock
+	- Home screen has a Dock at the bottom: Settings, App Store, Camera, Gallery, Calculator
 	- Apps: App Store, Settings, Classroom, Notes (works), Podcasts (demo),
 	  Reminders (works), Camera + Gallery, Calculator (works). Flappy Bird is NOT preinstalled - download it from the App Store (tap = flap, with your sounds)
 	- Camera: tap the shutter. The iPad hides for a split second and a real screenshot is saved. Tap Flip for selfie mode
@@ -1448,7 +1449,8 @@ local STORE = {
 local EXTRA = {}
 for _, it in ipairs(STORE) do EXTRA[it.id] = it end
 
-local homeApps = { "appstore", "settings", "classroom", "notes", "podcasts", "reminders", "camera", "gallery", "calculator" }
+local homeApps = { "classroom", "notes", "podcasts", "reminders" }              -- the grid (downloaded apps are added here)
+local dockApps = { "settings", "appstore", "camera", "gallery", "calculator" }  -- the dock at the bottom
 local DEFS = {
 	appstore = { name = "App Store", c1 = Color3.fromRGB(80, 170, 255), c2 = Color3.fromRGB(20, 90, 230) },
 	settings = { name = "Settings", c1 = Color3.fromRGB(170, 172, 180), c2 = Color3.fromRGB(100, 102, 112) },
@@ -2719,6 +2721,21 @@ layoutHome = function()
 		drawIcon(c, id, 0, 0, size)
 		label(c, d.name, -20, size + 4, size + 40, 22, 18, WHITE, Enum.Font.GothamMedium)
 		table.insert(homeBtns, { x = cx - size / 2 - 8, y = cy - size / 2 - 6, w = size + 16, h = size + 34, id = id, scale = sc })
+		homeBtnPos[id] = { cx, cy }
+	end
+
+	-- the dock: translucent rounded bar along the bottom
+	local n = #dockApps
+	local pitch, dsize = 120, 78
+	local dw = n * pitch + 20
+	frame(iconsF, 500 - dw / 2, 560, dw, 104, WHITE, 0.72, px(30))
+	for i, id in ipairs(dockApps) do
+		local cx, cy = 500 - (n - 1) * pitch / 2 + (i - 1) * pitch, 612
+		local c = frame(iconsF, cx - dsize / 2, cy - dsize / 2, dsize, dsize, WHITE, 1)
+		local sc = Instance.new("UIScale")
+		sc.Parent = c
+		drawIcon(c, id, 0, 0, dsize)
+		table.insert(homeBtns, { x = cx - dsize / 2 - 6, y = cy - dsize / 2 - 4, w = dsize + 12, h = dsize + 8, id = id, scale = sc })
 		homeBtnPos[id] = { cx, cy }
 	end
 end
