@@ -3,17 +3,20 @@
 	- Real 3D iPad in workspace (rounded corners, bezel, camera, side buttons), both hands hold it
 	- Swipe up to unlock
 	- Home screen has a Dock at the bottom: Settings, App Store, Camera, Gallery, Calculator
-	- Apps: App Store, Settings, Classroom, Notes (works), Podcasts (demo),
-	  Reminders (works), Camera + Gallery, Calculator (works). Flappy Bird is NOT preinstalled - download it from the App Store (tap = flap, with your sounds)
-	- Camera: tap the shutter. The iPad hides for a split second and a real screenshot is saved. Tap Flip for selfie mode
-	  (the camera turns around and photographs YOU). Gallery shows photos full-screen (arrows / delete).
-	  If screenshots are blocked in the game you get a placeholder picture instead
-	- Apps that need Wi-Fi (App Store, Podcasts, Classroom) only work while Wi-Fi is on AND connected.
+	- Apps: App Store, Settings, Classroom, Notes (works), Podcasts (demo), Reminders (works),
+	  Camera + Gallery, Calculator (works)
+	- App Store only has Flappy Bird and Talabat: tap GET, then open them from the home screen
+	- Talabat: order food with coins, a box drops 5 studs in front of you, walk up and tap Eat / Drink.
+	  Any soda = speed boost 5s (soda sound). Every main-menu meal = a RANDOM power (meal sound):
+	  X-Ray (see everyone through walls) 2s / Noclip 3s / Super jump 4s / +30 HP
+	- Camera: LIVE viewfinder (it moves when you move). Tap the shutter to take a picture, Flip = selfie camera.
+	  The iPad is never in the picture. Photos are copies of the parts around you (no terrain / skybox).
+	  Gallery shows them full-screen (arrows / delete)
+	- Apps that need Wi-Fi (App Store, Podcasts, Classroom, Talabat) only work while Wi-Fi is on AND connected.
 	  Offline apps: Settings, Notes, Reminders, Flappy Bird (once downloaded)
 	- Settings > Display & Brightness: Dark / Light mode. The brightness + volume sliders are design only
 	- Settings: Airplane Mode, Wi-Fi (off by default, some networks need a password), Bluetooth,
 	  Siri (on/off, hold-home-bar, voice, "Try Siri"), Display & Brightness, Sounds (volume), General
-	- App Store needs Wi-Fi. GET installs demo apps onto the home screen
 	- Tap the Wi-Fi icon in the status bar = jump to Settings > Wi-Fi
 	- SWIPE DOWN from the top-right (start on the Wi-Fi / battery icons) = Control Center
 	  (airplane, AirDrop, Wi-Fi, Bluetooth, music, brightness + volume sliders, silent, torch ...)
@@ -203,6 +206,10 @@ do
 	end
 
 end
+
+local boxFolder = Instance.new("Folder")   -- Talabat boxes live here
+boxFolder.Name = "DeltaIPadBoxes"
+boxFolder.Parent = workspace
 
 ---------------------------------------------------------------- screen UI helpers
 local gui = Instance.new("SurfaceGui")
@@ -609,63 +616,15 @@ do
 			end
 		end,
 	}
-	ICONS.x_chess = {
-		c1 = Color3.fromRGB(110, 115, 130), c2 = Color3.fromRGB(30, 32, 42),
+	ICONS.talabat = {
+		c1 = Color3.fromRGB(255, 140, 30), c2 = Color3.fromRGB(240, 70, 0),
 		draw = function(ic, s)
-			shape(ic, s, 0.5, 0.31, 0.2, 0.2, WHITE, 0, 0.5)
-			shape(ic, s, 0.5, 0.45, 0.28, 0.06, WHITE, 0, 0.5)
-			shape(ic, s, 0.5, 0.62, 0.3, 0.3, WHITE, 0, 0.4)
-			shape(ic, s, 0.5, 0.79, 0.52, 0.08, WHITE, 0, 0.4)
-		end,
-	}
-	ICONS.x_weather = {
-		c1 = Color3.fromRGB(110, 200, 255), c2 = Color3.fromRGB(30, 110, 230),
-		draw = function(ic, s)
-			shape(ic, s, 0.64, 0.34, 0.3, 0.3, Color3.fromRGB(255, 214, 10), 0, 0.5)
-			shape(ic, s, 0.37, 0.6, 0.28, 0.28, WHITE, 0, 0.5)
-			shape(ic, s, 0.55, 0.54, 0.34, 0.34, WHITE, 0, 0.5)
-			shape(ic, s, 0.7, 0.62, 0.24, 0.24, WHITE, 0, 0.5)
-			shape(ic, s, 0.54, 0.7, 0.5, 0.18, WHITE, 0, 0.5)
-		end,
-	}
-	ICONS.x_photo = {
-		c1 = WHITE, c2 = Color3.fromRGB(235, 235, 240),
-		draw = function(ic, s)
-			local cols = {
-				Color3.fromRGB(255, 120, 60), Color3.fromRGB(255, 200, 40), Color3.fromRGB(90, 210, 90),
-				Color3.fromRGB(60, 200, 230), Color3.fromRGB(80, 120, 255), Color3.fromRGB(230, 80, 200),
-			}
-			for i = 1, 6 do
-				local a = math.rad((i - 1) * 60)
-				shape(ic, s, 0.5 + 0.17 * math.cos(a), 0.5 + 0.17 * math.sin(a), 0.34, 0.34, cols[i], 0, 0.5, 0.25)
-			end
-		end,
-	}
-	ICONS.x_sketch = {
-		c1 = Color3.fromRGB(190, 120, 255), c2 = Color3.fromRGB(100, 60, 220),
-		draw = function(ic, s)
-			shape(ic, s, 0.5, 0.5, 0.16, 0.52, Color3.fromRGB(255, 214, 10), 45, 0.1)
-			shape(ic, s, 0.684, 0.316, 0.17, 0.1, Color3.fromRGB(255, 120, 150), 45, 0.2)
-			shape(ic, s, 0.31, 0.69, 0.11, 0.11, Color3.fromRGB(245, 215, 180), 45, 0.1)
-			shape(ic, s, 0.275, 0.725, 0.05, 0.05, Color3.fromRGB(60, 60, 70), 45, 0.1)
-		end,
-	}
-	ICONS.x_fit = {
-		c1 = Color3.fromRGB(40, 40, 46), c2 = Color3.fromRGB(0, 0, 0),
-		draw = function(ic, s)
-			ringShape(ic, s, 0.5, 0.5, 0.74, 0.1, Color3.fromRGB(255, 45, 85))
-			ringShape(ic, s, 0.5, 0.5, 0.52, 0.1, Color3.fromRGB(166, 255, 0))
-			ringShape(ic, s, 0.5, 0.5, 0.3, 0.1, Color3.fromRGB(0, 200, 255))
-		end,
-	}
-	ICONS.x_calc = {
-		c1 = Color3.fromRGB(255, 190, 60), c2 = Color3.fromRGB(230, 120, 20),
-		draw = function(ic, s)
-			shape(ic, s, 0.5, 0.26, 0.7, 0.16, Color3.fromRGB(40, 40, 46), 0, 0.3)
-			shape(ic, s, 0.32, 0.52, 0.3, 0.2, WHITE, 0, 0.3)
-			shape(ic, s, 0.68, 0.52, 0.3, 0.2, WHITE, 0, 0.3)
-			shape(ic, s, 0.32, 0.76, 0.3, 0.2, WHITE, 0, 0.3)
-			shape(ic, s, 0.68, 0.76, 0.3, 0.2, WHITE, 0, 0.3)
+			local o = Color3.fromRGB(255, 90, 0)
+			ringShape(ic, s, 0.5, 0.36, 0.28, 0.05, WHITE)
+			shape(ic, s, 0.5, 0.6, 0.5, 0.44, WHITE, 0, 0.14)
+			shape(ic, s, 0.42, 0.58, 0.05, 0.05, o, 0, 0.5)
+			shape(ic, s, 0.58, 0.58, 0.05, 0.05, o, 0, 0.5)
+			shape(ic, s, 0.5, 0.68, 0.16, 0.04, o, 0, 0.5)
 		end,
 	}
 
@@ -718,7 +677,6 @@ local curId = nil
 local screenOff = false
 local siriOpen, pwOpen = false, false
 local ccOpen = false
-local selfieActive = false          -- true for a moment while a selfie is being taken
 local themeMode = "dark"          -- "dark" | "light"
 local wifiOn, connected, connecting, connectToken = false, nil, nil, nil
 local airplane, btOn = false, false
@@ -1438,32 +1396,17 @@ end
 
 ---------------------------------------------------------------- APP: App Store
 local STORE = {
-	{ id = "flappy", name = "Flappy Bird", sub = "Tap to flap through the pipes", c1 = Color3.fromRGB(122, 205, 220), c2 = Color3.fromRGB(70, 165, 195) },
-	{ id = "x_chess", name = "Pocket Chess", sub = "Classic strategy board game", c1 = Color3.fromRGB(120, 120, 130), c2 = Color3.fromRGB(40, 40, 48) },
-	{ id = "x_weather", name = "Weather Now", sub = "Live forecasts for your city", c1 = Color3.fromRGB(110, 200, 255), c2 = Color3.fromRGB(30, 110, 230) },
-	{ id = "x_photo", name = "Photo Studio", sub = "Edit and share your photos", c1 = Color3.fromRGB(255, 170, 100), c2 = Color3.fromRGB(230, 70, 130) },
-	{ id = "x_sketch", name = "Sketchbook", sub = "Draw anywhere, any time", c1 = Color3.fromRGB(190, 120, 255), c2 = Color3.fromRGB(100, 60, 220) },
-	{ id = "x_fit", name = "Fitness Pal", sub = "Track workouts and goals", c1 = Color3.fromRGB(110, 230, 130), c2 = Color3.fromRGB(20, 160, 80) },
-	{ id = "x_calc", name = "Calc Pro", sub = "Powerful scientific calculator", c1 = Color3.fromRGB(255, 190, 60), c2 = Color3.fromRGB(230, 120, 20) },
+	{ id = "flappy", name = "Flappy Bird", sub = "Tap to flap through the pipes" },
+	{ id = "talabat", name = "Talabat", sub = "Order food - it drops in a box next to you. Some foods give powers!" },
 }
-local EXTRA = {}
-for _, it in ipairs(STORE) do EXTRA[it.id] = it end
-
 local homeApps = { "classroom", "notes", "podcasts", "reminders" }              -- the grid (downloaded apps are added here)
 local dockApps = { "settings", "appstore", "camera", "gallery", "calculator" }  -- the dock at the bottom
 local DEFS = {
-	appstore = { name = "App Store", c1 = Color3.fromRGB(80, 170, 255), c2 = Color3.fromRGB(20, 90, 230) },
-	settings = { name = "Settings", c1 = Color3.fromRGB(170, 172, 180), c2 = Color3.fromRGB(100, 102, 112) },
-	notes = { name = "Notes", c1 = Color3.fromRGB(255, 226, 90), c2 = Color3.fromRGB(240, 180, 30) },
-	podcasts = { name = "Podcasts", c1 = Color3.fromRGB(200, 110, 255), c2 = Color3.fromRGB(120, 50, 210) },
-	reminders = { name = "Reminders", c1 = Color3.fromRGB(255, 255, 255), c2 = Color3.fromRGB(215, 215, 225) },
+	appstore = { name = "App Store" }, settings = { name = "Settings" }, notes = { name = "Notes" },
+	podcasts = { name = "Podcasts" }, reminders = { name = "Reminders" }, classroom = { name = "Classroom" },
+	camera = { name = "Camera" }, gallery = { name = "Gallery" }, calculator = { name = "Calculator" },
+	flappy = { name = "Flappy Bird" }, talabat = { name = "Talabat" },
 }
-for _, it in ipairs(STORE) do DEFS[it.id] = { name = it.name, c1 = it.c1, c2 = it.c2 } end
-DEFS.classroom = { name = "Classroom" }
-DEFS.flappy = { name = "Flappy Bird" }
-DEFS.camera = { name = "Camera" }
-DEFS.gallery = { name = "Gallery" }
-DEFS.calculator = { name = "Calculator" }
 
 local AS = { page = newPage() }
 apps.appstore = AS
@@ -1473,24 +1416,17 @@ function AS.render()
 	local p = AS.page
 	p.clear()
 	local f = p.frame
-	label(f, "App Store", 60, 54, 500, 52, 42, TXT, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
 	if not connected then
-		label(f, "No Internet Connection", 0, 250, 1000, 50, 36, TXT, Enum.Font.GothamBold)
-		label(f, "Connect to a Wi-Fi network in Settings to browse apps.", 0, 306, 1000, 34, 22, GRAY, Enum.Font.GothamMedium)
-		frame(f, 400, 370, 200, 54, BLUE, 0, px(27))
-		label(f, "Open Settings", 400, 370, 200, 54, 20, WHITE, Enum.Font.GothamBold)
-		p.region(400, 370, 200, 54, function()
-			S.sel = "wifi"
-			openApp("settings")
-		end)
+		offlineScreen(p, f, "App Store")
 		return
 	end
+	label(f, "App Store", 60, 54, 500, 52, 42, TXT, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
 	label(f, "Featured Apps", 60, 104, 500, 28, 20, GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
 	for i, it in ipairs(STORE) do
-		local y = 144 + (i - 1) * 76
+		local y = 150 + (i - 1) * 90
 		drawIcon(f, it.id, 60, y, 70)
-		label(f, it.name, 148, y + 6, 520, 32, 26, TXT, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
-		label(f, it.sub, 148, y + 40, 520, 26, 18, GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+		label(f, it.name, 148, y + 4, 520, 32, 26, TXT, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+		label(f, it.sub, 148, y + 38, 620, 26, 17, GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
 		local by = y + 13
 		if installed[it.id] then
 			frame(f, 800, by, 140, 44, Color3.fromRGB(70, 70, 84), 0, px(22))
@@ -1510,20 +1446,6 @@ function AS.render()
 	end
 end
 AS.tap = AS.page.tap
-
----------------------------------------------------------------- APP: Demo (apps installed from the App Store)
-local demoApp = { page = newPage(), def = nil }
-function demoApp.render()
-	local p = demoApp.page
-	p.clear()
-	local f = p.frame
-	local d = demoApp.def
-	if not d then return end
-	drawIcon(f, d.id, 400, 150, 200)
-	label(f, d.name, 0, 380, 1000, 60, 46, TXT, Enum.Font.GothamBold)
-	label(f, "Demo app - nothing here yet", 0, 440, 1000, 36, 24, GRAY, Enum.Font.GothamMedium)
-end
-demoApp.tap = demoApp.page.tap
 
 ---------------------------------------------------------------- APP: Notes (works)
 do
@@ -2126,152 +2048,197 @@ do
 	Fl.tap = Fl.page.tap
 end
 
----------------------------------------------------------------- APP: Camera + Gallery
+---------------------------------------------------------------- APP: Camera + Gallery (live viewfinder)
 do
-	local MAXP = 12
-	local photos = {}   -- newest first: { ts = "Oct 16, 09:41 PM", content = <image id>, pending = bool, failed = bool }
-	local Cam = { page = newPage(), busy = false, selfie = false }
+	local MAXP = 8
+	local RADIUS = 90
+	local Lighting = game:GetService("Lighting")
+	local photos = {}   -- newest first: { ts = "Oct 16, 09:41 PM", vp = ViewportFrame, corner = UICorner }
+	local Cam = { page = newPage(), selfie = false, map = {}, dyn = {}, acc = 1 }
 	local Gal = { page = newPage(), view = nil, openLatest = false }
 	apps.camera = Cam
 	apps.gallery = Gal
 
-	local function setImg(im, c)
-		if typeof(c) == "string" then
-			im.Image = c
-		else
-			pcall(function() im.ImageContent = c end)
+	-- a photo's ViewportFrame lives in only one place at a time; unparent them before a page is rebuilt
+	local function detachAll()
+		for _, ph in ipairs(photos) do
+			if ph.vp then ph.vp.Parent = nil end
 		end
 	end
 
-	-- little landscape drawing, shown when the real screenshot isn't available
-	local function placeholder(parent, x, y, w, h, note)
-		local f = frame(parent, x, y, w, h, Color3.fromRGB(120, 190, 235), 0, px(14))
-		gradient(f, Color3.fromRGB(110, 185, 235), Color3.fromRGB(225, 238, 250), 90)
-		f.ClipsDescendants = true
-		frame(f, w * 0.68, h * 0.14, w * 0.14, w * 0.14, Color3.fromRGB(255, 214, 10), 0, FULL)
-		frame(f, -w * 0.1, h * 0.62, w * 0.75, w * 0.75, Color3.fromRGB(86, 168, 92), 0, FULL)
-		frame(f, w * 0.4, h * 0.72, w * 0.8, w * 0.8, Color3.fromRGB(64, 140, 78), 0, FULL)
-		if note then
-			label(f, note, 0, h - 90, w, 40, 22, WHITE, Enum.Font.GothamBold)
-		end
-		return f
+	local function styleViewport(vp)
+		local ct = Lighting.ClockTime
+		vp.BackgroundColor3 = (ct >= 6 and ct <= 18) and Color3.fromRGB(135, 195, 235) or Color3.fromRGB(16, 20, 40)
+		vp.BackgroundTransparency = 0
+		vp.Ambient = Color3.fromRGB(150, 150, 160)
+		vp.LightColor = Color3.fromRGB(235, 230, 215)
+		local ok, sun = pcall(function() return Lighting:GetSunDirection() end)
+		vp.LightDirection = (ok and sun) and -sun or Vector3.new(-1, -1.5, -0.6)
 	end
 
-	local function photoView(parent, ph, x, y, w, h, fit, big)
-		if ph.content then
-			local im = Instance.new("ImageLabel")
-			im.BackgroundColor3 = Color3.new(0, 0, 0)
-			im.BorderSizePixel = 0
-			im.Position = UDim2.fromOffset(x, y)
-			im.Size = UDim2.fromOffset(w, h)
-			im.ScaleType = fit and Enum.ScaleType.Fit or Enum.ScaleType.Crop
-			setImg(im, ph.content)
-			if not big then
-				local c = Instance.new("UICorner")
-				c.CornerRadius = px(14)
-				c.Parent = im
+	-- where the camera looks from (normal = your view, selfie = in front of your face looking back at you)
+	local function viewInfo()
+		local cam = workspace.CurrentCamera
+		if Cam.selfie then
+			local ch = player.Character
+			local head = ch and ch:FindFirstChild("Head")
+			if head then
+				local pos = head.Position + head.CFrame.LookVector * 6 + Vector3.new(0, 0.6, 0)
+				return CFrame.lookAt(pos, head.Position + Vector3.new(0, -0.5, 0)), head.Position
 			end
-			im.Parent = parent
-			return im
-		elseif ph.pending then
-			local f = frame(parent, x, y, w, h, Color3.fromRGB(40, 40, 48), 0, (not big) and px(14) or nil)
-			label(f, "Saving...", 0, 0, w, h, big and 28 or 16, GRAY, Enum.Font.GothamMedium)
-			return f
 		end
-		return placeholder(parent, x, y, w, h, big and "Placeholder photo (screenshots aren't available here)" or nil)
+		return cam.CFrame, cam.CFrame.Position
+	end
+
+	-- copies the parts around you into the viewfinder (the iPad itself is never copied, so it is "invisible")
+	local function syncWorld(center)
+		if not Cam.world or not Cam.world.Parent then return end
+		local params = OverlapParams.new()
+		params.FilterType = Enum.RaycastFilterType.Exclude
+		local ex = { model, torchPart }
+		if not Cam.selfie and player.Character then table.insert(ex, player.Character) end
+		params.FilterDescendantsInstances = ex
+		params.MaxParts = 500
+		local parts = workspace:GetPartBoundsInRadius(center, RADIUS, params)
+		local seen = {}
+		for _, part in ipairs(parts) do
+			if part.Transparency < 0.95 and part.Size.Magnitude < 4000 then
+				seen[part] = true
+				if not Cam.map[part] then
+					local ok, c = pcall(function() return part:Clone() end)
+					if ok and c then
+						for _, d in ipairs(c:GetDescendants()) do
+							if d:IsA("LuaSourceContainer") or d:IsA("Sound") or d:IsA("JointInstance") or d:IsA("Constraint")
+								or d:IsA("ParticleEmitter") or d:IsA("ProximityPrompt") or d:IsA("BillboardGui") or d:IsA("SurfaceGui") then
+								d:Destroy()
+							end
+						end
+						c.Anchored = true
+						c.CanCollide = false
+						c.Parent = Cam.world
+						Cam.map[part] = c
+						if not part.Anchored then Cam.dyn[part] = c end
+					end
+				end
+			end
+		end
+		for part, c in pairs(Cam.map) do
+			if not seen[part] or not part.Parent then
+				c:Destroy()
+				Cam.map[part] = nil
+				Cam.dyn[part] = nil
+			end
+		end
+	end
+
+	-- keeps the viewfinder live while you move / turn
+	table.insert(conns, RunService.RenderStepped:Connect(function(dt)
+		if not (state == "app" and curId == "camera" and Cam.vp and Cam.vp.Parent and Cam.vcam) then return end
+		local cf, center = viewInfo()
+		Cam.vcam.CFrame = cf
+		Cam.vcam.FieldOfView = workspace.CurrentCamera.FieldOfView
+		Cam.acc = Cam.acc + dt
+		if Cam.acc > 0.3 then
+			Cam.acc = 0
+			syncWorld(center)
+		end
+		for part, c in pairs(Cam.dyn) do
+			if part.Parent then c.CFrame = part.CFrame end
+		end
+	end))
+
+	local function photoView(parent, ph, x, y, w, h, big)
+		local vp = ph.vp
+		vp.Position = UDim2.fromOffset(x, y)
+		vp.Size = UDim2.fromOffset(w, h)
+		ph.corner.CornerRadius = big and px(0) or px(14)
+		vp.Parent = parent
+		return vp
 	end
 
 	---------------- Camera
 	function Cam.drawThumb()
 		local h = Cam.thumbHolder
 		if not h or not h.Parent then return end
+		detachAll()
 		h:ClearAllChildren()
 		if photos[1] then
-			photoView(h, photos[1], 0, 0, 90, 90, false, false)
+			photoView(h, photos[1], 0, 0, 90, 90, false)
 		else
 			frame(h, 0, 0, 90, 90, Color3.fromRGB(40, 40, 48), 0, px(14))
 		end
 	end
 
 	local function takePhoto()
-		if Cam.busy then return end
-		Cam.busy = true
-		local selfie = Cam.selfie
-		local ph = { ts = os.date("%b %d, %I:%M %p"), pending = true, selfie = selfie }
-		table.insert(photos, 1, ph)
-		while #photos > MAXP do table.remove(photos) end
+		if not Cam.vp or not Cam.vp.Parent or not Cam.vcam then return end
+		local cf, center = viewInfo()
+		Cam.vcam.CFrame = cf
+		syncWorld(center) -- make sure the picture shows the latest surroundings
+		local vp = Instance.new("ViewportFrame")
+		styleViewport(vp)
+		vp.BorderSizePixel = 0
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = px(14)
+		corner.Parent = vp
+		Cam.world:Clone().Parent = vp          -- frozen copy of the world = the photo
+		local pc = Instance.new("Camera")
+		pc.CFrame = cf
+		pc.FieldOfView = Cam.vcam.FieldOfView
+		pc.Parent = vp
+		vp.CurrentCamera = pc
+		table.insert(photos, 1, { ts = os.date("%b %d, %I:%M %p"), vp = vp, corner = corner, selfie = Cam.selfie })
+		while #photos > MAXP do
+			local old = table.remove(photos)
+			if old.vp then old.vp:Destroy() end
+		end
 		if Cam.flash and Cam.flash.Parent then
 			Cam.flash.BackgroundTransparency = 0.1
 			tw(Cam.flash, 0.35, { BackgroundTransparency = 1 })
 		end
 		Cam.drawThumb()
-		task.spawn(function()
-			local tg = player:FindFirstChild("PlayerGui") and player.PlayerGui:FindFirstChild("DeltaIPadToggle")
-			local got = nil
-			local oldType = nil
-			task.wait(0.15) -- let the flash show first
-			pcall(function()
-				-- hide the iPad (and its little button) for a moment so the picture shows the world
-				if tg then tg.Enabled = false end
-				model.Parent = nil
-				if selfie then
-					-- flip the camera around: look at your own face from the front
-					local ch = player.Character
-					local head = ch and ch:FindFirstChild("Head")
-					local cam = workspace.CurrentCamera
-					if head and cam then
-						oldType = cam.CameraType
-						selfieActive = true
-						cam.CameraType = Enum.CameraType.Scriptable
-						local pos = head.Position + head.CFrame.LookVector * 6 + Vector3.new(0, 0.6, 0)
-						cam.CFrame = CFrame.lookAt(pos, head.Position + Vector3.new(0, -0.5, 0))
-					end
-				end
-				RunService.RenderStepped:Wait()
-				RunService.RenderStepped:Wait()
-				RunService.RenderStepped:Wait()
-				local done = false
-				game:GetService("CaptureService"):CaptureScreenshot(function(id)
-					got = id
-					done = true
-				end)
-				local t1 = os.clock()
-				while not done and os.clock() - t1 < 3 do task.wait() end
-			end)
-			-- always put everything back
-			if selfieActive then
-				selfieActive = false
-				pcall(function() workspace.CurrentCamera.CameraType = oldType or Enum.CameraType.Custom end)
-			end
-			model.Parent = shown and workspace or nil
-			if tg then tg.Enabled = true end
-			ph.pending = false
-			if got then ph.content = got else ph.failed = true end
-			Cam.busy = false
-			if state == "app" and curId == "camera" then Cam.drawThumb() end
-			if state == "app" and curId == "gallery" then Gal.render() end
-		end)
+		if Cam.countLbl and Cam.countLbl.Parent then Cam.countLbl.Text = #photos .. " saved" end
 	end
 
 	function Cam.render()
+		detachAll()
 		local p = Cam.page
 		p.clear()
 		local f = p.frame
 		setChrome(WHITE)
+		Cam.map, Cam.dyn, Cam.acc = {}, {}, 1
 		frame(f, 0, 0, CW, CH, Color3.new(0, 0, 0), 0)
-		local vf = frame(f, 30, 56, 800, 590, Color3.fromRGB(28, 28, 34), 0, px(18))
-		gradient(vf, Color3.fromRGB(46, 50, 62), Color3.fromRGB(14, 14, 18), 90)
+
+		local vp = Instance.new("ViewportFrame")
+		styleViewport(vp)
+		vp.Position = UDim2.fromOffset(30, 56)
+		vp.Size = UDim2.fromOffset(800, 590)
+		vp.BorderSizePixel = 0
+		local cr = Instance.new("UICorner")
+		cr.CornerRadius = px(18)
+		cr.Parent = vp
+		vp.Parent = f
+		Cam.vp = vp
+		Cam.world = Instance.new("Model")
+		Cam.world.Name = "World"
+		Cam.world.Parent = vp
+		local vc = Instance.new("Camera")
+		vc.Parent = vp
+		vp.CurrentCamera = vc
+		Cam.vcam = vc
+		local cf, center = viewInfo()
+		vc.CFrame = cf
+		vc.FieldOfView = workspace.CurrentCamera.FieldOfView
+		syncWorld(center)
+
+		-- viewfinder overlay
 		for i = 1, 2 do
-			frame(vf, 800 * i / 3, 0, 1, 590, WHITE, 0.75)
-			frame(vf, 0, 590 * i / 3, 800, 1, WHITE, 0.75)
+			frame(f, 30 + 800 * i / 3, 56, 1, 590, WHITE, 0.75)
+			frame(f, 30, 56 + 590 * i / 3, 800, 1, WHITE, 0.75)
 		end
-		local focus = frame(vf, 340, 245, 120, 100, WHITE, 1)
+		local focus = frame(f, 370, 301, 120, 100, WHITE, 1)
 		stroke(focus, Color3.fromRGB(255, 204, 0), 2)
-		if Cam.selfie then
-			frame(vf, 360, 170, 80, 80, Color3.fromRGB(70, 74, 90), 0, FULL)
-			frame(vf, 300, 262, 200, 120, Color3.fromRGB(70, 74, 90), 0, px(60))
-		end
-		label(vf, Cam.selfie and "Selfie camera - you'll be in the picture" or "Look at something, then tap the shutter", 0, 540, 800, 30, 18, Color3.fromRGB(200, 200, 212), Enum.Font.GothamMedium)
+		local hint = label(f, Cam.selfie and "Selfie camera - you're in the picture" or "Live view - move around, then tap the shutter", 30, 612, 800, 30, 18, WHITE, Enum.Font.GothamMedium)
+		hint.TextStrokeTransparency = 0.5
 		Cam.flash = frame(f, 30, 56, 800, 590, WHITE, 1, px(18))
 
 		label(f, "PHOTO", 850, 64, 150, 28, 18, Color3.fromRGB(255, 204, 0), Enum.Font.GothamBold)
@@ -2288,7 +2255,8 @@ do
 		stroke(ring, WHITE, 4)
 		frame(f, 891, 341, 68, 68, WHITE, 0, FULL)
 		p.region(870, 320, 110, 110, takePhoto)
-		label(f, #photos .. " saved", 850, 440, 150, 26, 16, GRAY, Enum.Font.GothamMedium)
+		Cam.countLbl = label(f, #photos .. " saved", 850, 440, 150, 26, 16, GRAY, Enum.Font.GothamMedium)
+
 		local flip = frame(f, 885, 500, 80, 80, Color3.fromRGB(52, 52, 62), 0, FULL)
 		glyph(flip, "flip", 40, 40, 40, WHITE, Color3.fromRGB(52, 52, 62))
 		label(f, Cam.selfie and "Selfie" or "Back", 850, 584, 150, 24, 16, Cam.selfie and Color3.fromRGB(255, 204, 0) or GRAY, Enum.Font.GothamBold)
@@ -2306,6 +2274,7 @@ do
 	end
 
 	function Gal.render()
+		detachAll()
 		local p = Gal.page
 		p.clear()
 		local f = p.frame
@@ -2317,7 +2286,7 @@ do
 		if Gal.view then
 			local ph = photos[Gal.view]
 			frame(f, 0, 0, CW, CH, Color3.new(0, 0, 0), 0)
-			photoView(f, ph, 0, 0, CW, CH, true, true)
+			photoView(f, ph, 0, 0, CW, CH, true)
 			frame(f, 0, 0, CW, 70, Color3.new(0, 0, 0), 0.45)
 			frame(f, 30, 66, 130, 42, Color3.new(0, 0, 0), 0.5, px(21))
 			label(f, "Photos", 30, 66, 130, 42, 18, WHITE, Enum.Font.GothamBold)
@@ -2328,7 +2297,8 @@ do
 			frame(f, 840, 66, 130, 42, Color3.fromRGB(255, 69, 58), 0.1, px(21))
 			label(f, "Delete", 840, 66, 130, 42, 18, WHITE, Enum.Font.GothamBold)
 			p.region(840, 66, 130, 42, function()
-				table.remove(photos, Gal.view)
+				local gone = table.remove(photos, Gal.view)
+				if gone and gone.vp then gone.vp:Destroy() end
 				Gal.view = (#photos > 0) and math.min(Gal.view, #photos) or nil
 				Gal.render()
 			end)
@@ -2360,7 +2330,7 @@ do
 			for i, ph in ipairs(photos) do
 				local col, row = (i - 1) % 4, math.floor((i - 1) / 4)
 				local x, y = 60 + col * 225, 150 + row * 166
-				photoView(f, ph, x, y, 205, 150, false, false)
+				photoView(f, ph, x, y, 205, 150, false)
 				p.region(x, y, 205, 150, function()
 					Gal.view = i
 					Gal.render()
@@ -2499,6 +2469,368 @@ do
 		end
 	end
 	Calc.tap = Calc.page.tap
+end
+
+---------------------------------------------------------------- APP: Talabat (order food, it drops in a box next to you)
+do
+	local wallet = 150
+	local tab = "bev" -- "bev" (beverages) | "main" (main menu)
+	local ORANGE = Color3.fromRGB(255, 92, 0)
+
+	local ITEMS = {
+		bev = {
+			{ name = "Fizzo Cola", price = 8, kind = "soda", color = Color3.fromRGB(110, 50, 30) },
+			{ name = "Lemon Spark", price = 8, kind = "soda", color = Color3.fromRGB(170, 205, 50) },
+			{ name = "Orange Pop", price = 8, kind = "soda", color = Color3.fromRGB(255, 150, 40) },
+			{ name = "Berry Blast", price = 9, kind = "soda", color = Color3.fromRGB(200, 50, 110) },
+			{ name = "Grape Fizz", price = 9, kind = "soda", color = Color3.fromRGB(130, 80, 200) },
+			{ name = "Spring Water", price = 4, kind = "water", color = Color3.fromRGB(120, 190, 240) },
+		},
+		main = {
+			{ name = "Golden Rice Bowl", price = 12, kind = "rice" },
+			{ name = "Smoky Hot Dog", price = 14, kind = "hotdog" },
+			{ name = "Double Burger", price = 22, kind = "burger" },
+			{ name = "Cheesy Pizza", price = 28, kind = "pizza" },
+			{ name = "Salmon Sushi", price = 36, kind = "sushi" },
+			{ name = "Crispy Fries", price = 10, kind = "fries" },
+		},
+	}
+
+	-- sounds (your ids). They live on the torch part so they follow you and are cleaned up with the script
+	local function mkSound(id)
+		local s = Instance.new("Sound")
+		s.SoundId = "rbxassetid://" .. id
+		s.Parent = torchPart
+		return s
+	end
+	local sodaSnd = mkSound("134472706551177")   -- plays when you drink a soda
+	local mealSnd = mkSound("134938643932555")   -- plays when you eat a meal
+	local function play(s)
+		pcall(function()
+			s.Volume = math.clamp(vol / 16 * 2, 0, 2) -- follows the iPad volume buttons
+			s.TimePosition = 0
+			s:Play()
+		end)
+	end
+
+	-- little drawings of the foods (shapes, no emoji)
+	local function outline(fr)
+		stroke(fr, Color3.fromRGB(200, 195, 185), 1.5)
+	end
+	local function art(parent, it, cx, cy, size)
+		local h = frame(parent, cx - size / 2, cy - size / 2, size, size, WHITE, 1)
+		local s, k = size, it.kind
+		if k == "soda" then
+			shape(h, s, 0.5, 0.6, 0.42, 0.6, it.color, 0, 0.12)
+			shape(h, s, 0.5, 0.6, 0.42, 0.18, WHITE, 0, 0)
+			shape(h, s, 0.5, 0.29, 0.5, 0.08, Color3.fromRGB(245, 245, 245), 0, 0.4)
+			outline(shape(h, s, 0.6, 0.15, 0.05, 0.3, WHITE, 12, 0.3))
+		elseif k == "water" then
+			shape(h, s, 0.5, 0.58, 0.36, 0.7, it.color, 0, 0.3, 0.2)
+			outline(shape(h, s, 0.5, 0.14, 0.14, 0.1, WHITE, 0, 0.3))
+			shape(h, s, 0.5, 0.58, 0.36, 0.2, WHITE, 0, 0, 0.3)
+		elseif k == "rice" then
+			outline(shape(h, s, 0.5, 0.45, 0.62, 0.44, Color3.fromRGB(246, 245, 238), 0, 0.5))
+			shape(h, s, 0.5, 0.68, 0.8, 0.34, Color3.fromRGB(205, 60, 55), 0, 0.45)
+			shape(h, s, 0.5, 0.58, 0.82, 0.06, Color3.fromRGB(230, 95, 85), 0, 0.5)
+		elseif k == "hotdog" then
+			shape(h, s, 0.5, 0.58, 0.86, 0.3, Color3.fromRGB(236, 186, 112), 0, 0.5)
+			shape(h, s, 0.5, 0.5, 0.94, 0.17, Color3.fromRGB(190, 70, 50), 0, 0.5)
+			for i = 0, 4 do
+				shape(h, s, 0.22 + 0.14 * i, 0.5, 0.1, 0.05, Color3.fromRGB(255, 214, 10), (i % 2 == 0) and 30 or -30, 0.5)
+			end
+		elseif k == "burger" then
+			shape(h, s, 0.5, 0.3, 0.74, 0.27, Color3.fromRGB(232, 160, 80), 0, 0.5)
+			shape(h, s, 0.5, 0.47, 0.8, 0.07, Color3.fromRGB(100, 190, 70), 0, 0.5)
+			shape(h, s, 0.5, 0.53, 0.74, 0.06, Color3.fromRGB(255, 205, 50), 0, 0.2)
+			shape(h, s, 0.5, 0.6, 0.74, 0.12, Color3.fromRGB(110, 60, 40), 0, 0.4)
+			shape(h, s, 0.5, 0.73, 0.74, 0.14, Color3.fromRGB(232, 160, 80), 0, 0.5)
+		elseif k == "pizza" then
+			shape(h, s, 0.5, 0.5, 0.82, 0.82, Color3.fromRGB(246, 200, 92), 0, 0.5)
+			ringShape(h, s, 0.5, 0.5, 0.82, 0.06, Color3.fromRGB(205, 140, 60))
+			for _, pos in ipairs({ { 0.38, 0.38 }, { 0.62, 0.42 }, { 0.5, 0.62 }, { 0.34, 0.6 }, { 0.66, 0.64 } }) do
+				shape(h, s, pos[1], pos[2], 0.14, 0.14, Color3.fromRGB(200, 50, 45), 0, 0.5)
+			end
+		elseif k == "sushi" then
+			outline(shape(h, s, 0.5, 0.62, 0.74, 0.34, Color3.fromRGB(248, 248, 244), 0, 0.3))
+			shape(h, s, 0.5, 0.44, 0.7, 0.2, Color3.fromRGB(255, 130, 90), 0, 0.4)
+			shape(h, s, 0.5, 0.62, 0.1, 0.34, Color3.fromRGB(34, 44, 34), 0, 0)
+		elseif k == "fries" then
+			for i = 0, 5 do
+				shape(h, s, 0.28 + 0.088 * i, 0.3, 0.07, 0.4, Color3.fromRGB(255, 205, 60), (i - 2.5) * 4, 0.2)
+			end
+			shape(h, s, 0.5, 0.66, 0.5, 0.42, Color3.fromRGB(220, 50, 50), 0, 0.12)
+		end
+		return h
+	end
+
+	-- floating text above your head
+	local function floatText(text)
+		local ch = player.Character
+		local head = ch and ch:FindFirstChild("Head")
+		if not head then return end
+		local bb = Instance.new("BillboardGui")
+		bb.Size = UDim2.fromOffset(260, 44)
+		bb.StudsOffset = Vector3.new(0, 3, 0)
+		bb.AlwaysOnTop = true
+		local tl = Instance.new("TextLabel")
+		tl.Size = UDim2.fromScale(1, 1)
+		tl.BackgroundTransparency = 1
+		tl.Text = text
+		tl.TextSize = 28
+		tl.Font = Enum.Font.GothamBold
+		tl.TextColor3 = Color3.fromRGB(120, 255, 140)
+		tl.TextStrokeTransparency = 0
+		tl.Parent = bb
+		bb.Parent = head
+		TweenService:Create(bb, TweenInfo.new(1.6), { StudsOffset = Vector3.new(0, 6, 0) }):Play()
+		Debris:AddItem(bb, 1.7)
+	end
+
+	---------------- the powers
+	local token = 0
+	local function speedBoost(hum, secs, extra)
+		token = token + 1
+		local my = token
+		local base = hum:GetAttribute("TalabatBaseSpeed") or hum.WalkSpeed
+		hum:SetAttribute("TalabatBaseSpeed", base)
+		hum.WalkSpeed = base + extra
+		task.delay(secs, function()
+			if token == my then
+				pcall(function()
+					hum.WalkSpeed = base
+					hum:SetAttribute("TalabatBaseSpeed", nil)
+				end)
+			end
+		end)
+	end
+
+	local function xray(secs) -- see everyone through walls
+		local list = {}
+		local mine = player.Character
+		for _, d in ipairs(workspace:GetDescendants()) do
+			if d:IsA("Humanoid") and d.Parent and d.Parent ~= mine and d.Parent:IsA("Model") then
+				local h = Instance.new("Highlight")
+				h.Adornee = d.Parent
+				h.FillColor = Color3.fromRGB(255, 60, 60)
+				h.FillTransparency = 0.45
+				h.OutlineColor = WHITE
+				h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+				h.Parent = d.Parent
+				table.insert(list, h)
+			end
+		end
+		task.delay(secs, function()
+			for _, h in ipairs(list) do h:Destroy() end
+		end)
+		return #list
+	end
+
+	local function noclip(secs) -- walk through walls
+		local conn
+		conn = RunService.Stepped:Connect(function()
+			local ch = player.Character
+			if ch then
+				for _, d in ipairs(ch:GetDescendants()) do
+					if d:IsA("BasePart") then d.CanCollide = false end
+				end
+			end
+		end)
+		task.delay(secs, function() conn:Disconnect() end)
+	end
+
+	local function superJump(hum, secs)
+		local usePower = hum.UseJumpPower
+		local base = usePower and hum.JumpPower or hum.JumpHeight
+		if usePower then hum.JumpPower = base * 1.9 else hum.JumpHeight = base * 1.9 end
+		task.delay(secs, function()
+			pcall(function()
+				if usePower then hum.JumpPower = base else hum.JumpHeight = base end
+			end)
+		end)
+	end
+
+	-- what happens when you eat / drink
+	local function consume(it)
+		local ch = player.Character
+		local hum = ch and ch:FindFirstChildOfClass("Humanoid")
+		if not hum then return end
+		if it.kind == "soda" then
+			play(sodaSnd)
+			speedBoost(hum, 5, 10)
+			floatText("Speed boost! (5s)")
+		elseif it.kind == "water" then
+			floatText("Refreshing!")
+		else
+			play(mealSnd)
+			local pick = math.random(1, 4) -- every meal gives a random power
+			if pick == 1 then
+				local n = xray(2)
+				floatText(n > 0 and "X-Ray vision! (2s)" or "X-Ray vision - nobody around")
+			elseif pick == 2 then
+				noclip(3)
+				floatText("Noclip! (3s)")
+			elseif pick == 3 then
+				superJump(hum, 4)
+				floatText("Super jump! (4s)")
+			else
+				hum.Health = math.min(hum.MaxHealth, hum.Health + 30)
+				floatText("+30 HP")
+			end
+		end
+	end
+
+	---------------- delivery: the box falls from the sky and lands 5 studs in front of you
+	local function addPrompt(box, it)
+		local pr = Instance.new("ProximityPrompt")
+		pr.ActionText = (it.kind == "soda" or it.kind == "water") and ("Drink " .. it.name) or ("Eat " .. it.name)
+		pr.ObjectText = "Talabat order"
+		pr.HoldDuration = 0.25
+		pr.MaxActivationDistance = 14
+		pr.RequiresLineOfSight = false
+		pr.Parent = box
+		pr.Triggered:Connect(function(plr)
+			if plr ~= player then return end
+			consume(it)
+			box:Destroy()
+		end)
+	end
+
+	local function dropBox(it)
+		local ch = player.Character
+		local root = ch and ch:FindFirstChild("HumanoidRootPart")
+		if not root then return false end
+		local look = root.CFrame.LookVector
+		local flat = Vector3.new(look.X, 0, look.Z)
+		flat = (flat.Magnitude > 0.01) and flat.Unit or Vector3.new(0, 0, -1)
+		local target = root.Position + flat * 5
+		local params = RaycastParams.new()
+		params.FilterType = Enum.RaycastFilterType.Exclude
+		params.FilterDescendantsInstances = { ch, boxFolder, model }
+		local hit = workspace:Raycast(target + Vector3.new(0, 30, 0), Vector3.new(0, -90, 0), params)
+		local groundY = hit and hit.Position.Y or (root.Position.Y - 3)
+		local box = Instance.new("Part")
+		box.Name = "TalabatBox"
+		box.Size = Vector3.new(2.6, 2.2, 2.6)
+		box.Color = Color3.fromRGB(196, 140, 84)
+		box.Material = Enum.Material.Wood
+		box.Anchored = true
+		box.CanCollide = false
+		box.CFrame = CFrame.new(target.X, groundY + 45, target.Z)
+		box.Parent = boxFolder
+		local bb = Instance.new("BillboardGui")
+		bb.Size = UDim2.fromOffset(200, 44)
+		bb.StudsOffset = Vector3.new(0, 2.6, 0)
+		bb.AlwaysOnTop = true
+		local tl = Instance.new("TextLabel")
+		tl.Size = UDim2.fromScale(1, 1)
+		tl.BackgroundTransparency = 1
+		tl.Text = "Talabat - " .. it.name
+		tl.TextSize = 20
+		tl.Font = Enum.Font.GothamBold
+		tl.TextColor3 = Color3.fromRGB(255, 140, 30)
+		tl.TextStrokeTransparency = 0
+		tl.Parent = bb
+		bb.Parent = box
+		TweenService:Create(box, TweenInfo.new(1.4, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+			{ CFrame = CFrame.new(target.X, groundY + 1.1, target.Z) }):Play()
+		task.delay(1.5, function()
+			if box.Parent then addPrompt(box, it) end
+		end)
+		Debris:AddItem(box, 240)
+		return true
+	end
+
+	---------------- the app
+	local Tal = { page = newPage(), toast = "", token = 0 }
+	apps.talabat = Tal
+
+	function Tal.say(text)
+		Tal.toast = text
+		Tal.token = Tal.token + 1
+		local my = Tal.token
+		if state == "app" and curId == "talabat" then Tal.render() end
+		task.delay(2.8, function()
+			if Tal.token == my then
+				Tal.toast = ""
+				if state == "app" and curId == "talabat" then Tal.render() end
+			end
+		end)
+	end
+
+	local function order(it)
+		if not connected then
+			Tal.say("No internet connection")
+			return
+		end
+		if wallet < it.price then
+			Tal.say("Not enough coins - tap Top up")
+			return
+		end
+		wallet = wallet - it.price
+		Tal.say("Order placed! Arriving in 3 seconds...")
+		task.delay(3, function()
+			if dropBox(it) then
+				Tal.say(it.name .. " delivered - walk up to the box!")
+			else
+				wallet = wallet + it.price
+				Tal.say("Couldn't deliver (no character). Refunded.")
+			end
+		end)
+	end
+
+	function Tal.render()
+		local p = Tal.page
+		p.clear()
+		local f = p.frame
+		if not connected then
+			offlineScreen(p, f, "Talabat")
+			return
+		end
+		frame(f, 0, 44, CW, 112, ORANGE, 0)
+		label(f, "Talabat", 50, 54, 360, 52, 42, WHITE, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+		label(f, "Delivered 5 studs in front of you", 50, 108, 420, 26, 17, Color3.fromRGB(255, 232, 214), Enum.Font.GothamMedium, Enum.TextXAlignment.Left)
+		frame(f, 520, 70, 200, 44, Color3.fromRGB(255, 255, 255), 0.15, FULL)
+		label(f, "Top up +100 (demo)", 520, 70, 200, 44, 15, WHITE, Enum.Font.GothamBold)
+		p.region(520, 70, 200, 44, function()
+			wallet = wallet + 100
+			Tal.render()
+		end)
+		frame(f, 740, 68, 220, 48, WHITE, 0, FULL)
+		label(f, "Wallet: " .. wallet, 740, 68, 220, 48, 22, ORANGE, Enum.Font.GothamBold)
+		if Tal.toast ~= "" then
+			frame(f, 200, 128, 600, 24, Color3.new(0, 0, 0), 0.45, FULL)
+			label(f, Tal.toast, 200, 128, 600, 24, 14, WHITE, Enum.Font.GothamBold)
+		end
+
+		-- tabs
+		for i, t in ipairs({ { "bev", "Beverages" }, { "main", "Main Menu" } }) do
+			local x = 60 + (i - 1) * 190
+			local on = (tab == t[1])
+			frame(f, x, 168, 176, 40, on and ORANGE or CARD, 0, FULL)
+			label(f, t[2], x, 168, 176, 40, 18, on and WHITE or TXT, Enum.Font.GothamBold)
+			p.region(x, 168, 176, 40, function()
+				tab = t[1]
+				Tal.render()
+			end)
+		end
+		label(f, tab == "bev" and "Any soda = speed boost for 5 seconds" or "Every meal gives a random power!",
+			450, 168, 490, 40, 16, GRAY, Enum.Font.GothamMedium, Enum.TextXAlignment.Right)
+
+		for i, it in ipairs(ITEMS[tab]) do
+			local col, row = (i - 1) % 3, math.floor((i - 1) / 3)
+			local x, y = 60 + col * 300, 222 + row * 200
+			card(f, x, y, 280, 184)
+			art(f, it, x + 140, y + 46, 70)
+			label(f, it.name, x, y + 88, 280, 26, 20, TXT, Enum.Font.GothamBold)
+			label(f, it.kind == "soda" and "Speed boost 5s" or (it.kind == "water" and "Just refreshing" or "Random power"),
+				x, y + 112, 280, 20, 14, GRAY, Enum.Font.GothamMedium)
+			frame(f, x + 50, y + 140, 180, 34, ORANGE, 0, FULL)
+			label(f, "Order - " .. it.price .. " coins", x + 50, y + 140, 180, 34, 15, WHITE, Enum.Font.GothamBold)
+			p.region(x, y, 280, 184, function() order(it) end)
+		end
+	end
+	Tal.tap = Tal.page.tap
 end
 
 ---------------------------------------------------------------- CONTROL CENTER (swipe down from the top-right / Wi-Fi icon)
@@ -2742,12 +3074,7 @@ end
 
 getApp = function()
 	if not curId then return nil end
-	if apps[curId] then return apps[curId] end
-	if EXTRA[curId] then
-		demoApp.def = EXTRA[curId]
-		return demoApp
-	end
-	return nil
+	return apps[curId]
 end
 
 showApp = function(id)
@@ -3149,17 +3476,6 @@ end
 
 RunService:BindToRenderStep("DeltaIPad", Enum.RenderPriority.Camera.Value + 2, function(dt)
 	camera = workspace.CurrentCamera
-	if selfieActive then
-		-- selfie in progress: keep the camera where it was put and show the whole avatar
-		prevCam = camera.CFrame
-		local ch0 = player.Character
-		if ch0 then
-			for _, d in ipairs(ch0:GetDescendants()) do
-				if d:IsA("BasePart") then d.LocalTransparencyModifier = 0 end
-			end
-		end
-		return
-	end
 	torchPart.CFrame = camera.CFrame * CFrame.new(0.5, -0.6, -1.5)
 	if not shown then
 		prevCam = camera.CFrame
@@ -3315,6 +3631,7 @@ env.__DeltaIPadCleanup = function()
 	for _, c in ipairs(conns) do pcall(function() c:Disconnect() end) end
 	pcall(function() model:Destroy() end)
 	pcall(function() torchPart:Destroy() end)
+	pcall(function() boxFolder:Destroy() end)
 	pcall(function() sg:Destroy() end)
 	pcall(function() player.CameraMode = Enum.CameraMode.Classic end)
 end
