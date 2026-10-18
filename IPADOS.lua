@@ -1,6 +1,7 @@
 --[[
 	iPad (first person) - Roblox Delta LocalScript  (v4)
-	- Real 3D iPad in workspace (rounded corners, bezel, camera, side buttons), both hands hold it
+	- Real 3D iPad in workspace (rounded corners, bezel, camera, side buttons), held by two blocky arms
+	  (they wear your Shirt + skin colours). When you tap, the nearest arm reaches to your finger and goes back
 	- Swipe up to unlock
 	- Home screen has a Dock at the bottom: Settings, App Store, Camera, Gallery, Calculator
 	- Apps: App Store, Settings, Classroom, Notes (works), Podcasts (demo), Reminders (works),
@@ -70,6 +71,7 @@ local shown = true
 
 ---------------------------------------------------------------- 3D model
 local model, screen, powerPart, volUpPart, volDownPart, SIDE_BTNS
+local armModel, armUpdate, armDown, armMove, armUp
 do
 	model = Instance.new("Model")
 	model.Name = "DeltaIPad"
@@ -128,44 +130,95 @@ do
 		{ name = "voldown", center = Vector3.new(W / 2 + 0.012, H / 2 - 0.85, 0), size = Vector3.new(0.06, 0.2, 0.06) },
 	}
 
-	---------------------------------------------------------------- hands
-	local skin = Color3.fromRGB(234, 184, 146)
-	pcall(function()
-		local hd = player.Character and player.Character:FindFirstChild("Head")
-		if hd and hd:IsA("BasePart") then skin = hd.Color end
-	end)
-	local sleeve = Color3.fromRGB(44, 48, 62)
+	---------------------------------------------------------------- arms (blocky, wearing your clothes)
+	local ch0 = player.Character
+	local function armColor(side)
+		local bc = ch0 and ch0:FindFirstChildOfClass("BodyColors")
+		if bc then return (side == "Left") and bc.LeftArmColor3 or bc.RightArmColor3 end
+		local hd = ch0 and ch0:FindFirstChild("Head")
+		return (hd and hd:IsA("BasePart")) and hd.Color or Color3.fromRGB(234, 184, 146)
+	end
 
-	local function limb(a, b, th, color, mat, caps)
-		local mid = (a + b) / 2
-		local len = (b - a).Magnitude
-		mk(Vector3.new(len, th, th), CFrame.lookAt(mid, b) * CFrame.Angles(0, math.pi / 2, 0), color, mat, CYL)
-		if caps then
-			mk(Vector3.new(th, th, th), CFrame.new(a), color, mat, BALL)
-			mk(Vector3.new(th, th, th), CFrame.new(b), color, mat, BALL)
+	armModel = Instance.new("Model")
+	armModel.Name = "DeltaIPadArms"
+	local arms = {}
+	for _, side in ipairs({ "Left", "Right" }) do
+		local p = Instance.new("Part")
+		p.Name = side .. " Arm"
+		p.Anchored = true
+		p.CanCollide = false
+		p.CanQuery = false
+		p.CanTouch = false
+		p.CastShadow = false
+		p.Size = Vector3.new(0.55, 3, 0.55)
+		p.Color = armColor(side)
+		p.Material = SP
+		p.Parent = armModel
+		arms[side] = p
+	end
+
+	-- your clothes: copy your Shirt + body colours into a tiny humanoid model so the game draws your sleeves on the arms
+	pcall(function()
+		local bc = ch0 and ch0:FindFirstChildOfClass("BodyColors")
+		local shirt = ch0 and ch0:FindFirstChildOfClass("Shirt")
+		if bc then bc:Clone().Parent = armModel end
+		if shirt then shirt:Clone().Parent = armModel end
+		local hum = Instance.new("Humanoid")
+		hum.RigType = Enum.HumanoidRigType.R6
+		hum.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+		hum.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
+		hum.RequiresNeck = false
+		hum.BreakJointsOnDeath = false
+		hum.PlatformStand = true
+		hum.Parent = armModel
+	end)
+
+	-- where each arm rests (holding the iPad's sides) - coordinates are in the iPad's own space
+	local REST = {
+		Left = { S = Vector3.new(-(W / 2 + 1.3), -3.4, 2.3), H = Vector3.new(-(W / 2 - 0.1), -0.5, 0.33) },
+		Right = { S = Vector3.new(W / 2 + 1.3, -3.4, 2.3), H = Vector3.new(W / 2 - 0.1, -0.5, 0.33) },
+	}
+	local st = {
+		Left = { reach = 0, holding = false, holdUntil = 0, target = Vector3.zero },
+		Right = { reach = 0, holding = false, holdUntil = 0, target = Vector3.zero },
+	}
+	local active = nil
+
+	local function screenPoint(u, v)
+		return Vector3.new((u - 0.5) * SW, (0.5 - v) * SH, T / 2 + 0.017 + 0.3)
+	end
+
+	-- finger goes down on the screen: the nearest arm reaches to that spot
+	armDown = function(u, v)
+		active = (u < 0.5) and "Left" or "Right"
+		local a = st[active]
+		a.holding = true
+		a.holdUntil = os.clock() + 0.18 -- even a quick tap reaches all the way
+		a.target = screenPoint(u, v)
+	end
+	armMove = function(u, v)
+		if active then st[active].target = screenPoint(u, v) end
+	end
+	-- finger lifted: the arm goes back to where it was
+	armUp = function()
+		if active then st[active].holding = false end
+		active = nil
+	end
+
+	armUpdate = function(ipadCF, dt)
+		local now = os.clock()
+		for side, part in pairs(arms) do
+			local a, r = st[side], REST[side]
+			local want = (a.holding or now < a.holdUntil) and 1 or 0
+			local rate = (want == 1) and 9 or 5
+			a.reach = a.reach + math.clamp(want - a.reach, -rate * dt, rate * dt)
+			local e = a.reach * a.reach * (3 - 2 * a.reach)
+			local hand = r.H:Lerp(a.target, e)
+			local shoulder = r.S
+			part.Size = Vector3.new(0.55, (hand - shoulder).Magnitude, 0.55)
+			part.CFrame = ipadCF * (CFrame.lookAt((shoulder + hand) / 2, hand) * CFrame.Angles(math.pi / 2, 0, 0))
 		end
 	end
-
-	local function buildHand(s) -- s = -1 left, +1 right
-		local x = W / 2
-		-- thumb wraps over the front bezel
-		local A = Vector3.new(s * (x + 0.05), -0.62, 0.15)
-		local B = Vector3.new(s * (x - 0.17), -0.5, T / 2 + 0.12)
-		local Cc = Vector3.new(s * (x - 0.6), -0.43, T / 2 + 0.125)
-		limb(A, B, 0.2, skin, SP, true)
-		limb(B, Cc, 0.19, skin, SP, true)
-		mk(Vector3.new(0.13, 0.1, 0.012), CFrame.new(Cc.X - s * 0.02, Cc.Y, Cc.Z + 0.098), Color3.fromRGB(245, 225, 215), SP)
-		-- palm gripping the back edge
-		mk(Vector3.new(0.95, 0.52, 0.52), CFrame.new(s * (x + 0.29), -0.12, -0.18) * CFrame.Angles(0, 0, math.pi / 2), skin, SP, CYL)
-		-- forearm + sleeve going down out of view
-		local p0 = Vector3.new(s * (x + 0.32), -0.55, -0.15)
-		local p1 = Vector3.new(s * (x + 0.9), -2.1, 0.95)
-		mk(Vector3.new(0.46, 0.46, 0.46), CFrame.new(p0), skin, SP, BALL)
-		limb(p0, p1, 0.44, skin, SP, false)
-		limb(p0:Lerp(p1, 0.42), p1 + (p1 - p0) * 0.2, 0.58, sleeve, Enum.Material.Fabric, false)
-	end
-	buildHand(-1)
-	buildHand(1)
 
 end
 
@@ -2095,7 +2148,7 @@ do
 		if not Cam.world or not Cam.world.Parent then return end
 		local params = OverlapParams.new()
 		params.FilterType = Enum.RaycastFilterType.Exclude
-		local ex = { model, torchPart }
+		local ex = { model, torchPart, armModel }
 		if not Cam.selfie and player.Character then table.insert(ex, player.Character) end
 		params.FilterDescendantsInstances = ex
 		params.MaxParts = 500
@@ -2609,7 +2662,7 @@ do
 		local list = {}
 		local mine = player.Character
 		for _, d in ipairs(workspace:GetDescendants()) do
-			if d:IsA("Humanoid") and d.Parent and d.Parent ~= mine and d.Parent:IsA("Model") then
+			if d:IsA("Humanoid") and d.Parent and d.Parent ~= mine and d.Parent ~= armModel and d.Parent:IsA("Model") then
 				local h = Instance.new("Highlight")
 				h.Adornee = d.Parent
 				h.FillColor = Color3.fromRGB(255, 60, 60)
@@ -3330,11 +3383,13 @@ local function startDrag(input, ty, u, v)
 		end
 	end
 	bounce(u, v)
+	armDown(u, v)
 	if not screenOff then ripple(u, v) end
 end
 
 local function moveDrag(u, v)
 	drag.u, drag.v = u, v
+	armMove(u, v)
 	if math.abs(v - drag.sv) > 0.03 or math.abs(u - drag.su) > 0.03 then drag.moved = true end
 	if drag.mode == "unlock" then
 		lockF.Position = UDim2.fromScale(0, -math.clamp(drag.sv - v, 0, 1))
@@ -3354,6 +3409,7 @@ end
 local function endDrag()
 	local d = drag
 	drag = { active = false }
+	armUp()
 	if d.mode == "side" then return end
 	if d.mode == "ccdrag" then
 		ccRelease()
@@ -3469,6 +3525,7 @@ local function setShown(on)
 	shown = on
 	drag = { active = false }
 	model.Parent = on and workspace or nil
+	armModel.Parent = on and workspace or nil
 	pcall(function()
 		player.CameraMode = on and Enum.CameraMode.LockFirstPerson or Enum.CameraMode.Classic
 	end)
@@ -3498,11 +3555,9 @@ RunService:BindToRenderStep("DeltaIPad", Enum.RenderPriority.Camera.Value + 2, f
 	end
 
 	local bob = math.sin((os.clock() - t0) * 1.4) * 0.012
-	model:PivotTo(
-		camera.CFrame * HOLD
-		* CFrame.new(sp.x, sp.y + bob, sp.z)
-		* CFrame.Angles(sp.rx, sp.ry, 0)
-	)
+	local ipadCF = camera.CFrame * HOLD * CFrame.new(sp.x, sp.y + bob, sp.z) * CFrame.Angles(sp.rx, sp.ry, 0)
+	model:PivotTo(ipadCF)
+	armUpdate(ipadCF, dt)
 
 	-- hide the default first-person arms (we have our own hands)
 	local ch = player.Character
@@ -3630,6 +3685,7 @@ env.__DeltaIPadCleanup = function()
 	pcall(function() CAS:UnbindAction("DeltaIPadInput") end)
 	for _, c in ipairs(conns) do pcall(function() c:Disconnect() end) end
 	pcall(function() model:Destroy() end)
+	pcall(function() armModel:Destroy() end)
 	pcall(function() torchPart:Destroy() end)
 	pcall(function() boxFolder:Destroy() end)
 	pcall(function() sg:Destroy() end)
